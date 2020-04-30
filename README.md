@@ -9,6 +9,11 @@ To build use :
 make TARGET=hb
 ```
 
+Usage example :
+
+```
+./hb64 rosco -quik adventure.bin -debug
+```
 
 
 # **MAME** #
