@@ -241,7 +241,7 @@ TARGET := $(PROJECT)
 endif
 
 ifndef TARGET
-TARGET := mame
+TARGET := hb
 endif
 
 ifndef SUBTARGET

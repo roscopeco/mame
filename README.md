@@ -3,10 +3,14 @@
 
 Please note that this is specific fork for Homebrew computers.
 
-To build use :
+Makefile has been patched to build homebrew build by default.
+
+ROMs directory contain needed roms since they are freely available anyway.
+
+To build just use :
 
 ```
-make TARGET=hb
+make -j9
 ```
 
 Usage example :
