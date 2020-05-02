@@ -241,7 +241,7 @@ TARGET := $(PROJECT)
 endif
 
 ifndef TARGET
-TARGET := hb
+TARGET := sbc
 endif
 
 ifndef SUBTARGET

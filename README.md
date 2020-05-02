@@ -1,9 +1,9 @@
 
-# **HOMEBREW MAME** #
+# **SBC MAME** #
 
-Please note that this is specific fork for Homebrew computers.
+Please note that this is specific fork for SBC computers.
 
-Makefile has been patched to build homebrew build by default.
+Makefile has been patched to build SBC build by default.
 
 ROMs directory contain needed roms since they are freely available anyway.
 
@@ -16,7 +16,7 @@ make -j9
 Usage example :
 
 ```
-./hb64 rosco -quik adventure.bin -debug
+./sbc64 rosco -quik adventure.bin -debug
 ```
 
 

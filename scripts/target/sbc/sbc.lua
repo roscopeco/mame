@@ -24,11 +24,11 @@ MACHINES["INPUT_MERGER"] = true
 VIDEOS["MC6845"] = true
 
 
-function createProjects_hb_hb(_target, _subtarget)
-	project ("hb_hb")
+function createProjects_sbc_sbc(_target, _subtarget)
+	project ("sbc_sbc")
 	targetsubdir(_target .."_" .. _subtarget)
 	kind (LIBTYPE)
-	uuid (os.uuid("drv-hb-hb"))
+	uuid (os.uuid("drv-sbc-sbc"))
 	addprojectflags()
 	precompiledheaders_novs()
 
@@ -44,14 +44,14 @@ function createProjects_hb_hb(_target, _subtarget)
 	}
 
 files{
-	MAME_DIR .. "src/hb/drivers/rc2014.cpp",
-	MAME_DIR .. "src/hb/drivers/rc2014_sio.cpp",
-	MAME_DIR .. "src/hb/drivers/rosco.cpp",
+	MAME_DIR .. "src/sbc/drivers/rc2014.cpp",
+	MAME_DIR .. "src/sbc/drivers/rc2014_sio.cpp",
+	MAME_DIR .. "src/sbc/drivers/rosco.cpp",
 }
 end
 
-function linkProjects_hb_hb(_target, _subtarget)
+function linkProjects_sbc_sbc(_target, _subtarget)
 	links {
-		"hb_hb",
+		"sbc_sbc",
 	}
 end

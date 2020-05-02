@@ -10,9 +10,9 @@
 
 #include "emu.h"
 
-#define APPNAME                 "MAMEHB"
-#define APPNAME_LOWER           "mamehb"
-#define CONFIGNAME              "mamehb"
+#define APPNAME                 "MAMESBC"
+#define APPNAME_LOWER           "mamesbc"
+#define CONFIGNAME              "mamesbc"
 #define COPYRIGHT               "Copyright Nicola Salmoria\nand the MAME team\nhttp://mamedev.org"
 #define COPYRIGHT_INFO          "Copyright Nicola Salmoria and the MAME team"
 
