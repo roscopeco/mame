@@ -7,7 +7,7 @@ MACHINES["CLOCK"] = true
 
 CPUS["M680X0"] = true
 MACHINES["MC68901"] = true
-
+VIDEOS["V9938"] = true
 --------------------------------------
 -- To be able to use serial devices --
 --------------------------------------

@@ -4,6 +4,7 @@
 #include "machine/mc68901.h"
 #include "imagedev/snapquik.h"
 #include "formats/imageutl.h"
+#include "video/v9938.h"
 
 
 class rosco_state : public driver_device
@@ -13,6 +14,7 @@ public:
 		: driver_device(mconfig, type, tag)
 		, m_maincpu(*this, "maincpu")
 		, m_ram(*this, "ram")
+		, m_v9958(*this, "v9958")
 	{
 	}
 
@@ -24,9 +26,11 @@ private:
 	virtual void machine_reset() override;
 
 	DECLARE_QUICKLOAD_LOAD_MEMBER(quickload_cb);
+	DECLARE_QUICKLOAD_LOAD_MEMBER(quickload_rom_cb);
 
 	required_device<cpu_device> m_maincpu;
 	required_shared_ptr<uint16_t> m_ram;
+	required_device<v9958_device> m_v9958;
 };
 
 /******************************************************************************
@@ -37,6 +41,7 @@ void rosco_state::rosco_map(address_map &map)
 {
 	map(0x000000, 0x0fffff).ram().share("ram");
 	map(0xf80000, 0xf8002f).rw("mfp", FUNC(mc68901_device::read), FUNC(mc68901_device::write)).umask16(0x00ff);
+	map(0xf80000, 0xf80007).rw("v9958", FUNC(v9958_device::read), FUNC(v9958_device::write)).umask16(0xff00);
 	map(0xfc0000, 0xffffff).rom().region("monitor", 0);
 }
 
@@ -94,6 +99,25 @@ QUICKLOAD_LOAD_MEMBER(rosco_state::quickload_cb)
 	return image_init_result::PASS;
 }
 
+/*QUICKLOAD_LOAD_MEMBER(rosco_state::quickload_rom_cb)
+{
+	int quick_length;
+	int read_;
+	std::vector<uint8_t> temp_copy;
+
+	quick_length = image.length();
+	temp_copy.resize(quick_length);
+	read_ = image.fread(&temp_copy[0], quick_length);
+	if (read_ != quick_length) {
+		return image_init_result::FAIL;
+	}
+
+	uint16_t *ROM16 = (uint16_t *) memregion("monitor")->base();
+	for (int i = 0; i < quick_length; i += 2)
+		ROM16[i / 2] = pick_integer_be(&temp_copy[0], i, 2);
+	return image_init_result::PASS;
+}
+*/
 void rosco_state::rosco(machine_config &config)
 {
 	M68000(config, m_maincpu, 8_MHz_XTAL);
@@ -111,6 +135,13 @@ void rosco_state::rosco(machine_config &config)
 
 	/* quickload */
 	QUICKLOAD(config, "quickload", "bin").set_load_callback(FUNC(rosco_state::quickload_cb));
+//	QUICKLOAD(config, "rom", "bin").set_load_callback(FUNC(rosco_state::quickload_rom_cb));
+
+	V9958(config, m_v9958, XTAL(21'477'272));
+	m_v9958->set_screen_ntsc("screen");
+	m_v9958->set_vram_size(0x20000);
+
+	SCREEN(config, "screen", SCREEN_TYPE_RASTER);
 }
 
 /******************************************************************************
