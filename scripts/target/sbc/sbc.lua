@@ -8,6 +8,9 @@ MACHINES["CLOCK"] = true
 CPUS["M680X0"] = true
 MACHINES["MC68901"] = true
 VIDEOS["V9938"] = true
+
+CPUS["M6502"] = true
+CPUS["M6809"] = true
 --------------------------------------
 -- To be able to use serial devices --
 --------------------------------------
@@ -47,6 +50,9 @@ files{
 	MAME_DIR .. "src/sbc/drivers/rc2014.cpp",
 	MAME_DIR .. "src/sbc/drivers/rc2014_sio.cpp",
 	MAME_DIR .. "src/sbc/drivers/rosco.cpp",
+	MAME_DIR .. "src/sbc/drivers/grantz80.cpp",
+	MAME_DIR .. "src/sbc/drivers/grant6809.cpp",
+	MAME_DIR .. "src/sbc/drivers/grant6502.cpp",
 }
 end
 
