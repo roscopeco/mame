@@ -13,6 +13,7 @@ public:
 	rosco_state(const machine_config &mconfig, device_type type, const char *tag)
 		: driver_device(mconfig, type, tag)
 		, m_maincpu(*this, "maincpu")
+        , m_mfp(*this, "mfp")
 		, m_ram(*this, "ram")
 		, m_v9958(*this, "v9958")
 	{
@@ -21,6 +22,7 @@ public:
 	void rosco(machine_config &config);
 private:
 	void rosco_map(address_map &map);
+	void cpu_space_map(address_map &map);
 
 	virtual void machine_start() override;
 	virtual void machine_reset() override;
@@ -29,6 +31,7 @@ private:
 	DECLARE_QUICKLOAD_LOAD_MEMBER(quickload_rom_cb);
 
 	required_device<cpu_device> m_maincpu;
+	required_device<mc68901_device> m_mfp;
 	required_shared_ptr<uint16_t> m_ram;
 	required_device<v9958_device> m_v9958;
 };
@@ -40,9 +43,15 @@ private:
 void rosco_state::rosco_map(address_map &map)
 {
 	map(0x000000, 0x0fffff).ram().share("ram");
-	map(0xf80000, 0xf8002f).rw("mfp", FUNC(mc68901_device::read), FUNC(mc68901_device::write)).umask16(0x00ff);
+	map(0xf80000, 0xf8002f).rw(m_mfp, FUNC(mc68901_device::read), FUNC(mc68901_device::write)).umask16(0x00ff);
 	map(0xf80000, 0xf80007).rw("v9958", FUNC(v9958_device::read), FUNC(v9958_device::write)).umask16(0xff00);
 	map(0xfc0000, 0xffffff).rom().region("monitor", 0);
+}
+
+void rosco_state::cpu_space_map(address_map &map)
+{
+    map(0xfffff0, 0xffffff).m(m_maincpu, FUNC(m68000_base_device::autovectors_map));
+    map(0xfffff9, 0xfffff9).r(m_mfp, FUNC(mc68901_device::get_vector));
 }
 
 /******************************************************************************
@@ -122,15 +131,17 @@ void rosco_state::rosco(machine_config &config)
 {
 	M68000(config, m_maincpu, 8_MHz_XTAL);
 	m_maincpu->set_addrmap(AS_PROGRAM, &rosco_state::rosco_map);
+	m_maincpu->set_addrmap(m68000_base_device::AS_CPU_SPACE, &rosco_state::cpu_space_map);
 
-	mc68901_device &mfp(MC68901(config, "mfp", 8_MHz_XTAL));
-	mfp.set_timer_clock(3.6864_MHz_XTAL);
-	mfp.out_so_cb().set("rs232", FUNC(rs232_port_device::write_txd));
-	mfp.out_tdo_cb().set("mfp", FUNC(mc68901_device::rc_w));
-	mfp.out_tdo_cb().append("mfp", FUNC(mc68901_device::tc_w));
+	MC68901(config, m_mfp, 8_MHz_XTAL);
+	m_mfp->set_timer_clock(3.6864_MHz_XTAL);
+	m_mfp->out_so_cb().set("rs232", FUNC(rs232_port_device::write_txd));
+	m_mfp->out_tdo_cb().set(m_mfp, FUNC(mc68901_device::rc_w));
+	m_mfp->out_tdo_cb().append(m_mfp, FUNC(mc68901_device::tc_w));
+	m_mfp->out_irq_cb().set_inputline(m_maincpu, M68K_IRQ_4);
 
 	rs232_port_device &rs232(RS232_PORT(config, "rs232", default_rs232_devices, "terminal"));
-	rs232.rxd_handler().set("mfp", FUNC(mc68901_device::si_w));
+	rs232.rxd_handler().set(m_mfp, FUNC(mc68901_device::si_w));
 	rs232.set_option_device_input_defaults("terminal", terminal_defaults);
 
 	/* quickload */
