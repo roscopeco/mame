@@ -151,6 +151,7 @@ void rosco_state::rosco(machine_config &config)
 	V9958(config, m_v9958, XTAL(21'477'272));
 	m_v9958->set_screen_ntsc("screen");
 	m_v9958->set_vram_size(0x20000);
+	m_v9958->int_cb().set_inputline(m_maincpu, M68K_IRQ_2);
 
 	SCREEN(config, "screen", SCREEN_TYPE_RASTER);
 }
