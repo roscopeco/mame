@@ -11,6 +11,8 @@ VIDEOS["V9938"] = true
 
 CPUS["M6502"] = true
 CPUS["M6809"] = true
+
+MACHINES["68681"] = true
 --------------------------------------
 -- To be able to use serial devices --
 --------------------------------------
@@ -53,6 +55,7 @@ files{
 	MAME_DIR .. "src/sbc/drivers/grantz80.cpp",
 	MAME_DIR .. "src/sbc/drivers/grant6809.cpp",
 	MAME_DIR .. "src/sbc/drivers/grant6502.cpp",
+	MAME_DIR .. "src/sbc/drivers/t68k.cpp",
 }
 end
 
