@@ -55,7 +55,8 @@ files{
 	MAME_DIR .. "src/sbc/drivers/grantz80.cpp",
 	MAME_DIR .. "src/sbc/drivers/grant6809.cpp",
 	MAME_DIR .. "src/sbc/drivers/grant6502.cpp",
-	MAME_DIR .. "src/sbc/drivers/t68k.cpp",
+	MAME_DIR .. "src/sbc/drivers/t68krc.cpp",
+	MAME_DIR .. "src/sbc/drivers/tiny68k.cpp",
 }
 end
 

@@ -3,10 +3,10 @@
 #include "cpu/m68000/m68000.h"
 #include "machine/mc68681.h"
 
-class t68k_state : public driver_device
+class t68krc_state : public driver_device
 {
 public:
-	t68k_state(const machine_config &mconfig, device_type type, const char *tag)
+	t68krc_state(const machine_config &mconfig, device_type type, const char *tag)
 		: driver_device(mconfig, type, tag)
 		, m_maincpu(*this, "maincpu")
 		, m_duart(*this, "duart")
@@ -14,9 +14,11 @@ public:
 	{
 	}
 
-	void t68k(machine_config &config);
+	void t68krc(machine_config &config);
+	void t68krc_v2(machine_config &config);
 private:
-	void t68k_map(address_map &map);
+	void t68krc_map(address_map &map);
+	void t68krc_v2_map(address_map &map);
 
 	virtual void machine_start() override;
 	virtual void machine_reset() override;
@@ -35,7 +37,7 @@ private:
  Address Maps
 ******************************************************************************/
 
-void t68k_state::t68k_map(address_map &map)
+void t68krc_state::t68krc_map(address_map &map)
 {
 	map(0x000000, 0x1fffff).ram().share("ram");
 	//map(0xff8000, 0xff8fff) // RC2014 Bus
@@ -48,7 +50,7 @@ void t68k_state::t68k_map(address_map &map)
  Input Ports
 ******************************************************************************/
 
-static INPUT_PORTS_START( t68k )
+static INPUT_PORTS_START( t68krc )
 INPUT_PORTS_END
 
 static const input_device_default terminal_defaults[] =
@@ -66,11 +68,11 @@ static const input_device_default terminal_defaults[] =
  Machine Start/Reset
 ******************************************************************************/
 
-void t68k_state::machine_start()
+void t68krc_state::machine_start()
 {
 }
 
-void t68k_state::machine_reset()
+void t68krc_state::machine_reset()
 {
 	// CPLD loads flash content to RAM
 	uint16_t* ram = (uint16_t *) m_ram;
@@ -83,33 +85,33 @@ void t68k_state::machine_reset()
  Machine Drivers
 ******************************************************************************/
 
-WRITE8_MEMBER(t68k_state::duart_output)
+WRITE8_MEMBER(t68krc_state::duart_output)
 {
 //	printf("duart_output : %02x\n",data);
 }
 
-WRITE_LINE_MEMBER(t68k_state::duart_irq_handler)
+WRITE_LINE_MEMBER(t68krc_state::duart_irq_handler)
 {
 	m_maincpu->set_input_line(M68K_IRQ_3, state);
 }
 
-void t68k_state::cpu_space_map(address_map &map)
+void t68krc_state::cpu_space_map(address_map &map)
 {
 	map(0xfffff0, 0xffffff).m(m_maincpu, FUNC(m68000_base_device::autovectors_map));
 	map(0xfffff7, 0xfffff7).r(m_duart, FUNC(mc68681_device::get_irq_vector));
 }
 
-void t68k_state::t68k(machine_config &config)
+void t68krc_state::t68krc(machine_config &config)
 {
 	M68000(config, m_maincpu, 8_MHz_XTAL);
-	m_maincpu->set_addrmap(AS_PROGRAM, &t68k_state::t68k_map);
-	m_maincpu->set_addrmap(m68000_base_device::AS_CPU_SPACE, &t68k_state::cpu_space_map);
+	m_maincpu->set_addrmap(AS_PROGRAM, &t68krc_state::t68krc_map);
+	m_maincpu->set_addrmap(m68000_base_device::AS_CPU_SPACE, &t68krc_state::cpu_space_map);
 
 
 	MC68681(config, m_duart, 3.6864_MHz_XTAL);
 	m_duart->a_tx_cb().set("rs232", FUNC(rs232_port_device::write_txd));
-	m_duart->outport_cb().set(FUNC(t68k_state::duart_output));
-	m_duart->irq_cb().set(FUNC(t68k_state::duart_irq_handler));
+	m_duart->outport_cb().set(FUNC(t68krc_state::duart_output));
+	m_duart->irq_cb().set(FUNC(t68krc_state::duart_irq_handler));
 
 	rs232_port_device &rs232(RS232_PORT(config, "rs232", default_rs232_devices, "terminal"));
 	rs232.rxd_handler().set("duart", FUNC(mc68681_device::rx_a_w));
@@ -120,9 +122,9 @@ void t68k_state::t68k(machine_config &config)
  ROM Definitions
 ******************************************************************************/
 
-ROM_START( t68k )
+ROM_START( t68krc )
 	ROM_REGION16_BE(0x4000, "monitor", 0)
-	ROM_LOAD( "t68krc_r0.bin", 0x0000, 0x0310e, CRC(add1a6b2) SHA1(ff78e25158dc4c040a5cc98219ea8b68f795985b))
+	ROM_LOAD( "t68krcrc_r0.bin", 0x0000, 0x0310e, CRC(add1a6b2) SHA1(ff78e25158dc4c040a5cc98219ea8b68f795985b))
 ROM_END
 
-COMP( 2020, t68k, 0, 0, t68k, t68k, t68k_state, empty_init, "Hui-chien Shen", "T68k", MACHINE_IS_SKELETON )
+COMP( 2018, t68krc,    0, 0, t68krc,    t68krc, t68krc_state, empty_init, "Hui-chien Shen", "T68KRC",  MACHINE_IS_SKELETON )
