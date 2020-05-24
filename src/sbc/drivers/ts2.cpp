@@ -135,6 +135,7 @@ void ts2_state::ts2(machine_config &config)
 ROM_START( ts2 )
 	ROM_REGION16_BE(0x10000, "bios", 0)
 	ROM_LOAD( "tutor13.bin", 0x0000, 0x0c000, CRC(fb922bec) SHA1(94456894598e233f2e7ead53bb3df10dc5435d11))
+	//ROM_LOAD( "monitor.bin", 0x0000, 0x08c58, CRC(cd8577b8) SHA1(8ea36b7866d718cace5937f1402c7ddd7f9b68cf))
 ROM_END
 
 COMP( 2017, ts2, 0, 0, ts2, ts2, ts2_state, empty_init, "Jeff Tranter", "TS2", MACHINE_IS_SKELETON )
