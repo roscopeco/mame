@@ -13,6 +13,14 @@ CPUS["M6502"] = true
 CPUS["M6809"] = true
 
 MACHINES["68681"] = true
+
+--------------------------------------
+-- To be able to use IDE devices    --
+--------------------------------------
+BUSES["ATA"] = true
+SOUNDS["CDDA"] = true
+CPUS["FR"] = true
+
 --------------------------------------
 -- To be able to use serial devices --
 --------------------------------------
@@ -27,7 +35,6 @@ MACHINES["6821PIA"] = true
 MACHINES["INS8250"] = true
 MACHINES["INPUT_MERGER"] = true
 VIDEOS["MC6845"] = true
-
 
 function createProjects_sbc_sbc(_target, _subtarget)
 	project ("sbc_sbc")

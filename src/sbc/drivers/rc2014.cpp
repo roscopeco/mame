@@ -3,24 +3,42 @@
 #include "machine/6850acia.h"
 #include "bus/rs232/rs232.h"
 #include "machine/clock.h"
+#include "bus/ata/ataintf.h"
 
 class rc2014_state : public driver_device
 {
 public:
 	rc2014_state(const machine_config &mconfig, device_type type, const char *tag)
 		: driver_device(mconfig, type, tag)
+		, m_bank1_status(0)
 		, m_maincpu(*this, "maincpu")
+		, m_ata(*this, "ata")
+		, m_region_maincpu(*this, "maincpu")
+		, m_bank1(*this, "bank1")
 	{ }
 
 	void rc2014(machine_config &config);
 
 private:
 	DECLARE_WRITE_LINE_MEMBER( acia_irq_w );
+	DECLARE_READ8_MEMBER(ide_cs0_r);
+	DECLARE_WRITE8_MEMBER(ide_cs0_w);
+	DECLARE_WRITE8_MEMBER(bank_w);
+	DECLARE_WRITE8_MEMBER(ram_w);
 
 	void mem_map(address_map &map);
 	void mem_io(address_map &map);
 
+	void update_banks();
+
+	virtual void machine_start() override;
+	virtual void machine_reset() override;
+	
+	uint8_t m_bank1_status;
 	required_device<cpu_device> m_maincpu;
+	required_device<ata_interface_device> m_ata;
+	required_memory_region m_region_maincpu;
+	required_memory_bank m_bank1;
 };
 
 
@@ -29,21 +47,71 @@ WRITE_LINE_MEMBER( rc2014_state::acia_irq_w )
 	m_maincpu->set_input_line(0, state);
 }
 
+READ8_MEMBER(rc2014_state::ide_cs0_r)
+{
+	return m_ata->read_cs0(offset);
+}
+
+WRITE8_MEMBER(rc2014_state::ide_cs0_w)
+{
+	m_ata->write_cs0(offset, data);
+}
+
+WRITE8_MEMBER(rc2014_state::bank_w)
+{
+	m_bank1_status = (m_bank1_status==1) ? 0 : 1;
+	update_banks();
+}
+
+WRITE8_MEMBER(rc2014_state::ram_w)
+{
+	uint8_t *mem = m_region_maincpu->base();
+	mem[offset] = data;
+}
+
+/******************************************************************************
+ Machine Start/Reset
+******************************************************************************/
+
+void rc2014_state::machine_start()
+{
+}
+
+void rc2014_state::update_banks()
+{
+	address_space &space = m_maincpu->space(AS_PROGRAM);
+	uint8_t *mem = m_region_maincpu->base();
+
+	if (m_bank1_status==0) {
+		space.install_write_handler(0x0000, 0x3fff, write8_delegate(*this, FUNC(rc2014_state::ram_w)));
+		m_bank1->set_base(mem + 0x014000);
+	} else {
+		space.install_write_bank(0x0000, 0x3fff, "bank1");
+		m_bank1->set_base(mem + 0x0000);
+	}
+}
+
+void rc2014_state::machine_reset()
+{
+	m_bank1_status = 0;
+	update_banks();
+}
 /******************************************************************************
  Address Maps
 ******************************************************************************/
 
 void rc2014_state::mem_map(address_map &map)
 {
-	map(0x0000, 0x3fff).rom().region("maincpu", 0x4000);
+	map(0x0000, 0x3fff).rom().bankrw("bank1");
 	map(0x4000, 0xffff).ram();
 }
-
 
 void rc2014_state::mem_io(address_map &map)
 {
 	map.global_mask(0xff);
 	map(0x80, 0x81).rw("acia", FUNC(acia6850_device::read), FUNC(acia6850_device::write));
+	map(0x10, 0x17).rw(FUNC(rc2014_state::ide_cs0_r), FUNC(rc2014_state::ide_cs0_w));
+	map(0x38, 0x38).w(FUNC(rc2014_state::bank_w));
 }
 
 /******************************************************************************
@@ -86,6 +154,8 @@ void rc2014_state::rc2014(machine_config &config)
 	rs232.rxd_handler().set("acia", FUNC(acia6850_device::write_rxd));
 	rs232.cts_handler().set("acia", FUNC(acia6850_device::write_cts));
 	rs232.set_option_device_input_defaults("terminal", DEVICE_INPUT_DEFAULTS_NAME(terminal));
+
+	ATA_INTERFACE(config, m_ata).options(ata_devices, "hdd", nullptr, false);
 }
 
 
@@ -94,10 +164,10 @@ void rc2014_state::rc2014(machine_config &config)
 ******************************************************************************/
 
 ROM_START( rc2014 )
-	ROM_REGION( 0x10000, "maincpu", ROMREGION_ERASEFF )
-	//ROM_LOAD( "r0000000.bin",    0x0000, 0x2000, CRC(850e3ec7) SHA1(7c9613e160b324ee1ed42fc48d98bbc215791e81))
-	ROM_LOAD( "24886009.bin",    0x0000, 0x10000, CRC(9e9e6f00) SHA1(2e520dbec0b229e0afe3c30cd81f0f8422de97d9))
-	ROM_FILL(0x0001, 1, 0xc3) 
+	ROM_REGION( 0x20000, "maincpu", ROMREGION_ERASEFF )
+	//ROM_LOAD( "r0000000.bin",    0x10000, 0x2000, CRC(850e3ec7) SHA1(7c9613e160b324ee1ed42fc48d98bbc215791e81))
+	ROM_LOAD( "24886009.bin",    0x10000, 0x10000, CRC(9e9e6f00) SHA1(2e520dbec0b229e0afe3c30cd81f0f8422de97d9))
+	ROM_FILL(0x10001, 1, 0xc3) 
 ROM_END
 
 

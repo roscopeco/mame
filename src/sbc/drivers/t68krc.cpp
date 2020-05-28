@@ -2,6 +2,7 @@
 #include "bus/rs232/rs232.h"
 #include "cpu/m68000/m68000.h"
 #include "machine/mc68681.h"
+#include "bus/ata/ataintf.h"
 
 class t68krc_state : public driver_device
 {
@@ -11,6 +12,7 @@ public:
 		, m_maincpu(*this, "maincpu")
 		, m_duart(*this, "duart")
 		, m_ram(*this, "ram")
+		, m_ata(*this, "ata")
 	{
 	}
 
@@ -31,6 +33,7 @@ private:
 	required_device<cpu_device> m_maincpu;
 	required_device<mc68681_device> m_duart;
 	required_shared_ptr<uint16_t> m_ram;
+	required_device<ata_interface_device> m_ata;
 };
 
 /******************************************************************************
@@ -40,9 +43,10 @@ private:
 void t68krc_state::t68krc_map(address_map &map)
 {
 	map(0x000000, 0x1fffff).ram().share("ram");
+	map(0x700000, 0xafffff).rom().region("ramdisk", 0);	
 	//map(0xff8000, 0xff8fff) // RC2014 Bus
 	map(0xffd000, 0xffdfff).rom().region("monitor", 0);	
-	//map(0xffe000, 0xffefff) // IDE-CF
+	map(0xffe000, 0xffefff).rw(m_ata, FUNC(ata_interface_device::cs0_r), FUNC(ata_interface_device::cs0_w));
 	map(0xfff000, 0xffffff).rw("duart", FUNC(mc68681_device::read), FUNC(mc68681_device::write)).umask16(0x00ff);
 }
 
@@ -116,6 +120,8 @@ void t68krc_state::t68krc(machine_config &config)
 	rs232_port_device &rs232(RS232_PORT(config, "rs232", default_rs232_devices, "terminal"));
 	rs232.rxd_handler().set("duart", FUNC(mc68681_device::rx_a_w));
 	rs232.set_option_device_input_defaults("terminal", terminal_defaults);
+	
+	ATA_INTERFACE(config, m_ata).options(ata_devices, "hdd", nullptr, false);
 }
 
 /******************************************************************************
@@ -125,6 +131,8 @@ void t68krc_state::t68krc(machine_config &config)
 ROM_START( t68krc )
 	ROM_REGION16_BE(0x4000, "monitor", 0)
 	ROM_LOAD( "t68krcrc_r0.bin", 0x0000, 0x0310e, CRC(add1a6b2) SHA1(ff78e25158dc4c040a5cc98219ea8b68f795985b))
+	ROM_REGION16_BE(0x400000, "ramdisk", 0)
+	ROM_LOAD( "ramdisk.bin", 0x0000, 0x291000, CRC(5c7875d7) SHA1(bc92a0e883adb9c995046f46ec28e0f37ad172b7))
 ROM_END
 
 COMP( 2018, t68krc,    0, 0, t68krc,    t68krc, t68krc_state, empty_init, "Hui-chien Shen", "T68KRC",  MACHINE_IS_SKELETON )

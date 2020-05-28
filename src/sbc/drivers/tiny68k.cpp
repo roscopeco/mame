@@ -2,6 +2,7 @@
 #include "bus/rs232/rs232.h"
 #include "cpu/m68000/m68000.h"
 #include "machine/mc68681.h"
+#include "bus/ata/ataintf.h"
 
 class tiny68k_state : public driver_device
 {
@@ -11,6 +12,7 @@ public:
 		, m_maincpu(*this, "maincpu")
 		, m_duart(*this, "duart")
 		, m_ram(*this, "ram")
+		, m_ata(*this, "ata")
 	{
 	}
 
@@ -29,6 +31,7 @@ private:
 	required_device<cpu_device> m_maincpu;
 	required_device<mc68681_device> m_duart;
 	required_shared_ptr<uint16_t> m_ram;
+	required_device<ata_interface_device> m_ata;
 };
 
 /******************************************************************************
@@ -38,7 +41,8 @@ private:
 void tiny68k_state::tiny68k_map(address_map &map)
 {
 	map(0x000000, 0xff7fff).ram().share("ram");
-	//map(0xffe000, 0xffefff) // IDE-CF
+	 // IDE-CF
+	map(0xffe000, 0xffefff).rw(m_ata, FUNC(ata_interface_device::cs0_r), FUNC(ata_interface_device::cs0_w));
 	map(0xfff000, 0xffffff).rw("duart", FUNC(mc68681_device::read), FUNC(mc68681_device::write)).umask16(0x00ff);
 }
 
@@ -112,6 +116,8 @@ void tiny68k_state::tiny68k(machine_config &config)
 	rs232_port_device &rs232(RS232_PORT(config, "rs232", default_rs232_devices, "terminal"));
 	rs232.rxd_handler().set("duart", FUNC(mc68681_device::rx_a_w));
 	rs232.set_option_device_input_defaults("terminal", terminal_defaults);
+
+	ATA_INTERFACE(config, m_ata).options(ata_devices, "hdd", nullptr, false);
 }
 
 /******************************************************************************

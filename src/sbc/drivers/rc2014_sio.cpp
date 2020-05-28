@@ -3,28 +3,65 @@
 #include "machine/z80sio.h"
 #include "machine/clock.h"
 #include "bus/rs232/rs232.h"
+#include "bus/ata/ataintf.h"
 
 class rc2014_sio_state : public driver_device
 {
 public:
 	rc2014_sio_state(const machine_config &mconfig, device_type type, const char *tag)
 		: driver_device(mconfig, type, tag)
+		, m_bank1_status(0)
 		, m_maincpu(*this, "maincpu")
+		, m_ata(*this, "ata")
+		, m_region_maincpu(*this, "maincpu")
+		, m_bank1(*this, "bank1")
 	{ }
 
 	void rc2014_sio(machine_config &config);
 
 private:
 
+	DECLARE_READ8_MEMBER(ide_cs0_r);
+	DECLARE_WRITE8_MEMBER(ide_cs0_w);
+	DECLARE_WRITE8_MEMBER(bank_w);
+	DECLARE_WRITE8_MEMBER(ram_w);
+
 	void mem_map(address_map &map);
 	void mem_io(address_map &map);
 
-	required_device<cpu_device> m_maincpu;
+	void update_banks();
 
 	virtual void machine_start() override;
 	virtual void machine_reset() override;
+
+	uint8_t m_bank1_status;
+	required_device<cpu_device> m_maincpu;
+	required_device<ata_interface_device> m_ata;
+	required_memory_region m_region_maincpu;
+	required_memory_bank m_bank1;
 };
 
+READ8_MEMBER(rc2014_sio_state::ide_cs0_r)
+{
+	return m_ata->read_cs0(offset);
+}
+
+WRITE8_MEMBER(rc2014_sio_state::ide_cs0_w)
+{
+	m_ata->write_cs0(offset, data);
+}
+
+WRITE8_MEMBER(rc2014_sio_state::bank_w)
+{
+	m_bank1_status = (m_bank1_status==1) ? 0 : 1;
+	update_banks();
+}
+
+WRITE8_MEMBER(rc2014_sio_state::ram_w)
+{
+	uint8_t *mem = m_region_maincpu->base();
+	mem[offset] = data;
+}
 
 /******************************************************************************
  Machine Start/Reset
@@ -34,8 +71,24 @@ void rc2014_sio_state::machine_start()
 {
 }
 
+void rc2014_sio_state::update_banks()
+{
+	address_space &space = m_maincpu->space(AS_PROGRAM);
+	uint8_t *mem = m_region_maincpu->base();
+
+	if (m_bank1_status==0) {
+		space.install_write_handler(0x0000, 0x3fff, write8_delegate(*this, FUNC(rc2014_sio_state::ram_w)));
+		m_bank1->set_base(mem + 0x014000);
+	} else {
+		space.install_write_bank(0x0000, 0x3fff, "bank1");
+		m_bank1->set_base(mem + 0x0000);
+	}
+}
+
 void rc2014_sio_state::machine_reset()
 {
+	m_bank1_status = 0;
+	update_banks();
 }
 
 /******************************************************************************
@@ -44,7 +97,7 @@ void rc2014_sio_state::machine_reset()
 
 void rc2014_sio_state::mem_map(address_map &map)
 {
-	map(0x0000, 0x3fff).rom().region("maincpu", 0x4000);
+	map(0x0000, 0x3fff).rom().bankrw("bank1");
 	map(0x4000, 0xffff).ram();
 }
 
@@ -56,6 +109,8 @@ void rc2014_sio_state::mem_io(address_map &map)
 	map(0x81, 0x81).rw("sio", FUNC(z80sio_device::da_r), FUNC(z80sio_device::da_w));
 	map(0x82, 0x82).rw("sio", FUNC(z80sio_device::cb_r), FUNC(z80sio_device::cb_w));	
 	map(0x83, 0x83).rw("sio", FUNC(z80sio_device::db_r), FUNC(z80sio_device::db_w));
+	map(0x10, 0x17).rw(FUNC(rc2014_sio_state::ide_cs0_r), FUNC(rc2014_sio_state::ide_cs0_w));
+	map(0x38, 0x38).w(FUNC(rc2014_sio_state::bank_w));
 }
 // RC2014 standard addresses for Spencer's official SIO/2: (type 2)
 // 0x80   Channel A control registers (read and write)
@@ -108,8 +163,9 @@ void rc2014_sio_state::rc2014_sio(machine_config &config)
 
 	rs232_port_device &rs232(RS232_PORT(config, "rs232", default_rs232_devices, "terminal"));
 	rs232.rxd_handler().set("sio", FUNC(z80sio_device::rxa_w));
-	rs232.cts_handler().set("sio", FUNC(z80sio_device::ctsa_w));
 	rs232.set_option_device_input_defaults("terminal", DEVICE_INPUT_DEFAULTS_NAME(terminal));
+
+	ATA_INTERFACE(config, m_ata).options(ata_devices, "hdd", nullptr, false);
 }
 
 
@@ -118,9 +174,9 @@ void rc2014_sio_state::rc2014_sio(machine_config &config)
 ******************************************************************************/
 
 ROM_START( rc2014_sio )
-	ROM_REGION( 0x10000, "maincpu", ROMREGION_ERASEFF )
-	ROM_LOAD( "24886009.bin",    0x0000, 0x10000, CRC(9e9e6f00) SHA1(2e520dbec0b229e0afe3c30cd81f0f8422de97d9))
-	ROM_FILL(0x0001, 1, 0xc3) 
+	ROM_REGION( 0x20000, "maincpu", ROMREGION_ERASEFF )
+	ROM_LOAD( "24886009.bin",    0x10000, 0x10000, CRC(9e9e6f00) SHA1(2e520dbec0b229e0afe3c30cd81f0f8422de97d9))
+	ROM_FILL(0x10001, 1, 0xc3) 
 ROM_END
 
 
