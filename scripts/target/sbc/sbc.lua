@@ -58,6 +58,7 @@ function createProjects_sbc_sbc(_target, _subtarget)
 files{
 	MAME_DIR .. "src/sbc/drivers/rc2014.cpp",
 	MAME_DIR .. "src/sbc/drivers/rc2014_sio.cpp",
+	MAME_DIR .. "src/sbc/drivers/rc2014_wbw.cpp",
 	MAME_DIR .. "src/sbc/drivers/rosco.cpp",
 	MAME_DIR .. "src/sbc/drivers/grantz80.cpp",
 	MAME_DIR .. "src/sbc/drivers/grant6809.cpp",
