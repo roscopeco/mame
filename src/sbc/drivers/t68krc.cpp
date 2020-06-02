@@ -43,7 +43,6 @@ private:
 void t68krc_state::t68krc_map(address_map &map)
 {
 	map(0x000000, 0x1fffff).ram().share("ram");
-	map(0x700000, 0xafffff).rom().region("ramdisk", 0);	
 	//map(0xff8000, 0xff8fff) // RC2014 Bus
 	map(0xffd000, 0xffdfff).rom().region("monitor", 0);	
 	map(0xffe000, 0xffefff).rw(m_ata, FUNC(ata_interface_device::cs0_r), FUNC(ata_interface_device::cs0_w));
@@ -131,8 +130,6 @@ void t68krc_state::t68krc(machine_config &config)
 ROM_START( t68krc )
 	ROM_REGION16_BE(0x4000, "monitor", 0)
 	ROM_LOAD( "t68krcrc_r0.bin", 0x0000, 0x0310e, CRC(add1a6b2) SHA1(ff78e25158dc4c040a5cc98219ea8b68f795985b))
-	ROM_REGION16_BE(0x400000, "ramdisk", 0)
-	ROM_LOAD( "ramdisk.bin", 0x0000, 0x291000, CRC(5c7875d7) SHA1(bc92a0e883adb9c995046f46ec28e0f37ad172b7))
 ROM_END
 
 COMP( 2018, t68krc,    0, 0, t68krc,    t68krc, t68krc_state, empty_init, "Hui-chien Shen", "T68KRC",  MACHINE_IS_SKELETON )
