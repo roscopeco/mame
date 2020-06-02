@@ -31,6 +31,7 @@
 #include "qt/breakpointswindow.h"
 #include "qt/deviceswindow.h"
 #include "qt/deviceinformationwindow.h"
+#include "qt/termwindow.h"
 
 class debug_qt : public osd_module, public debug_module
 #if defined(WIN32) && !defined(SDLMAME_WIN32)
@@ -72,6 +73,7 @@ char *qtArgv[] = { qtArg0, nullptr };
 
 bool oneShot = true;
 MainWindow *mainQtWindow = nullptr;
+TermWindow *termWindow = nullptr;
 
 //============================================================
 //  XML configuration save/load
@@ -225,7 +227,7 @@ void bring_main_window_to_front()
 {
 	foreach (QWidget* widget, QApplication::topLevelWidgets())
 	{
-		if (!dynamic_cast<MainWindow*>(widget))
+		if (!dynamic_cast<MainWindow*>(widget) && !dynamic_cast<TermWindow*>(widget))
 			continue;
 		widget->activateWindow();
 		widget->raise();
@@ -303,6 +305,9 @@ void debug_qt::wait_for_debugger(device_t &device, bool firststop)
 		setup_additional_startup_windows(*m_machine, xmlConfigurations);
 		mainQtWindow->show();
 		oneShot = false;
+
+		termWindow = new TermWindow(m_machine, mainQtWindow);
+		termWindow->show();
 	}
 
 	// Insure all top level widgets are visible & bring main window to front

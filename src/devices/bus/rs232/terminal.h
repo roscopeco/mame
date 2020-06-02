@@ -23,6 +23,7 @@ protected:
 	virtual void device_reset() override;
 
 	virtual void tra_callback() override;
+public:
 	virtual void send_key(uint8_t code) override;
 
 private:

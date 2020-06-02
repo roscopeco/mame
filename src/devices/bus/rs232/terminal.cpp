@@ -3,6 +3,13 @@
 #include "emu.h"
 #include "terminal.h"
 
+static serial_terminal_device *serial_intf = nullptr;
+extern void osd_term_write(uint8_t data);
+
+void osd_send_key(uint8_t key)
+{
+	serial_intf->send_key(key);
+}
 serial_terminal_device::serial_terminal_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
 	: generic_terminal_device(mconfig, SERIAL_TERMINAL, tag, owner, clock, TERMINAL_WIDTH, TERMINAL_HEIGHT)
 	, device_buffered_serial_interface(mconfig, *this)
@@ -14,6 +21,7 @@ serial_terminal_device::serial_terminal_device(const machine_config &mconfig, co
 	, m_rs232_parity(*this, "RS232_PARITY")
 	, m_rs232_stopbits(*this, "RS232_STOPBITS")
 {
+	serial_intf = this;
 }
 
 static INPUT_PORTS_START(serial_terminal)
@@ -79,6 +87,7 @@ void serial_terminal_device::tra_callback()
 void serial_terminal_device::received_byte(uint8_t byte)
 {
 	term_write(byte);
+	osd_term_write(byte);
 }
 
 DEFINE_DEVICE_TYPE(SERIAL_TERMINAL, serial_terminal_device, "serial_terminal", "Serial Terminal")
