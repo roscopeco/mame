@@ -1,6 +1,6 @@
 #include "emu.h"
 #include <QtWidgets/QVBoxLayout>
-#include <QApplication>
+#include <QtWidgets/QApplication>
 
 #include "termwindow.h"
 #include "qtermwidget/lib/qtermwidget.h"
@@ -46,7 +46,7 @@ TermWindow::TermWindow(running_machine* machine, QWidget* parent) :
 	console->setScrollBarPosition(QTermWidget::ScrollBarRight);
    	console->startTerminalTeletype();
 	// Write what we input to remote terminal via socket
-	connect(console, &QTermWidget::sendData,[this](const char *data, int size){
+	connect(console, &QTermWidget::sendData,[](const char *data, int size){
 		for(int i=0;i<size;i++) {
 			osd_send_key(data[i]);
 		}

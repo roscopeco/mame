@@ -2242,6 +2242,9 @@ if _OPTIONS["targetos"]=="windows" then
 elseif _OPTIONS["targetos"]=="macosx" then
 	buildoptions {
 		"-F" .. backtick("qmake -query QT_INSTALL_LIBS"),
+		"-isystem /usr/local/opt/qt/lib/QtWidgets.framework/Headers",
+		"-isystem /usr/local/opt/qt/lib/QtGui.framework/Headers",
+		"-isystem /usr/local/opt/qt/lib/QtCore.framework/Headers"
 	}
 else
 	if _OPTIONS["QT_HOME"]~=nil then
@@ -2264,6 +2267,9 @@ configuration { "linux-* or freebsd" }
 	}		
 configuration { }
 if _OPTIONS["targetos"]=="macosx" then
+	buildoptions {
+		"-Wno-unused-label",
+	}
 	defines {
 		"HAVE_UTMPX",
 		"UTMPX_COMPAT"
