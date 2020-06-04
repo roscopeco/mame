@@ -285,11 +285,8 @@ if BASE_TARGETOS=="unix" then
 			}
 		else
 			if _OPTIONS["USE_LIBSDL"]~="1" then
-				linkoptions {
-					"-F" .. _OPTIONS["SDL_FRAMEWORK_PATH"],
-				}
 				links {
-					"SDL2.framework",
+					"SDL2",
 				}
 			else
 				local str = backtick(sdlconfigcmd() .. " --libs --static | sed 's/-lSDLmain//'")

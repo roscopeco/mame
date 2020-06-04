@@ -431,9 +431,9 @@ function osdmodulestargetconf()
 				"-F" .. backtick("qmake -query QT_INSTALL_LIBS"),
 			}
 			links {
-				"Qt5Core.framework",
-				"Qt5Gui.framework",
-				"Qt5Widgets.framework",
+				"QtCore.framework",
+				"QtGui.framework",
+				"QtWidgets.framework",
 			}
 		else
 			if _OPTIONS["QT_HOME"]~=nil then
@@ -587,10 +587,4 @@ if not _OPTIONS["USE_PCAP"] then
 	end
 end
 
-if not _OPTIONS["USE_QTDEBUG"] then
-	if _OPTIONS["targetos"]=="windows" or _OPTIONS["targetos"]=="macosx" or _OPTIONS["targetos"]=="solaris" or _OPTIONS["targetos"]=="haiku" or _OPTIONS["targetos"]=="asmjs" then
-		_OPTIONS["USE_QTDEBUG"] = "0"
-	else
-		_OPTIONS["USE_QTDEBUG"] = "1"
-	end
-end
+_OPTIONS["USE_QTDEBUG"] = "1"
