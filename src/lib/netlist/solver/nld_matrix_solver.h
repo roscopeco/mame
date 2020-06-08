@@ -12,6 +12,7 @@
 #include "netlist/nl_errstr.h"
 #include "netlist/plib/mat_cr.h"
 #include "netlist/plib/palloc.h"
+#include "netlist/plib/penum.h"
 #include "netlist/plib/pmatrix2d.h"
 #include "netlist/plib/putil.h"
 #include "netlist/plib/vector_ops.h"
@@ -29,7 +30,7 @@ namespace solver
 		CXX_STATIC
 	};
 
-	P_ENUM(matrix_sort_type_e,
+	PENUM(matrix_sort_type_e,
 		NOSORT,
 		ASCENDING,
 		DESCENDING,
@@ -37,7 +38,7 @@ namespace solver
 		PREFER_BAND_MATRIX
 	)
 
-	P_ENUM(matrix_type_e,
+	PENUM(matrix_type_e,
 		SOR_MAT,
 		MAT_CR,
 		MAT,
@@ -47,7 +48,7 @@ namespace solver
 		GMRES
 	)
 
-	P_ENUM(matrix_fp_type_e,
+	PENUM(matrix_fp_type_e,
 		  FLOAT
 		, DOUBLE
 		, LONGDOUBLE
@@ -288,7 +289,7 @@ namespace solver
 	private:
 
 		plib::aligned_vector<terms_for_net_t> m_rails_temp;
-		std::vector<unique_pool_ptr<proxied_analog_output_t>> m_inps;
+		std::vector<device_arena::unique_ptr<proxied_analog_output_t>> m_inps;
 
 		state_var<std::size_t> m_stat_calculations;
 		state_var<std::size_t> m_stat_newton_raphson;
@@ -304,7 +305,7 @@ namespace solver
 		std::size_t m_ops;
 
 		// base setup - called from constructor
-		void setup_base(const analog_net_t::list_t &nets) noexcept(false);
+		void setup_base(setup_t &setup, const analog_net_t::list_t &nets) noexcept(false);
 
 		void sort_terms(matrix_sort_type_e sort);
 
@@ -329,7 +330,6 @@ namespace solver
 	template <typename FT, int SIZE>
 	class matrix_solver_ext_t: public matrix_solver_t
 	{
-		friend class matrix_solver_t;
 	public:
 
 		using float_type = FT;
@@ -502,7 +502,6 @@ namespace solver
 				m_last_V[k] = v;
 				const nl_fptype hn = cur_ts;
 
-				//printf("%g %g %g %g\n", DD_n, hn, t.m_DD_n_m_1, t.m_h_n_m_1);
 				nl_fptype DD2 = (DD_n / hn - m_DD_n_m_1[k] / m_h_n_m_1[k]) / (hn + m_h_n_m_1[k]);
 				nl_fptype new_net_timestep(0);
 

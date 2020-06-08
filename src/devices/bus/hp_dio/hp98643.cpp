@@ -95,6 +95,7 @@ void dio16_98643_device::device_start()
 	save_item(NAME(m_sc));
 	save_item(NAME(m_installed_io));
 	save_item(NAME(m_ram));
+	m_installed_io = false;
 }
 
 void dio16_98643_device::device_reset()
@@ -160,13 +161,13 @@ WRITE16_MEMBER(dio16_98643_device::novram_w)
 	COMBINE_DATA(&m_novram[offset & 0x3f]);
 }
 
-WRITE16_MEMBER(dio16_98643_device::lance_dma_out)
+void dio16_98643_device::lance_dma_out(offs_t offset, uint16_t data, uint16_t mem_mask)
 {
 	LOG("%s: offset=%04x, data=%d\n", __func__, offset, data);
 	COMBINE_DATA(&m_ram[(offset >> 1) & 0x1fff]);
 }
 
-READ16_MEMBER(dio16_98643_device::lance_dma_in)
+uint16_t dio16_98643_device::lance_dma_in(offs_t offset)
 {
 	uint16_t ret = m_ram[(offset >> 1) & 0x1fff];
 

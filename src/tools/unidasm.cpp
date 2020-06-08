@@ -106,6 +106,7 @@ using util::BIT;
 #include "cpu/minx/minxd.h"
 #include "cpu/mips/mips3dsm.h"
 #include "cpu/mips/mips1dsm.h"
+#include "cpu/mn1880/mn1880d.h"
 #include "cpu/mn10200/mn102dis.h"
 #include "cpu/nanoprocessor/nanoprocessor_dasm.h"
 #include "cpu/nec/necdasm.h"
@@ -119,6 +120,7 @@ using util::BIT;
 #include "cpu/pic16/pic16d.h"
 #include "cpu/pic16c5x/16c5xdsm.h"
 #include "cpu/pic16c62x/16c62xdsm.h"
+#include "cpu/pic17/pic17d.h"
 #include "cpu/powerpc/ppc_dasm.h"
 #include "cpu/pps4/pps4dasm.h"
 #include "cpu/psx/psxdasm.h"
@@ -468,6 +470,8 @@ static const dasm_table_entry dasm_table[] =
 	{ "mips3be",         be,  0, []() -> util::disasm_interface * { return new mips3_disassembler; } },
 	{ "mips3le",         le,  0, []() -> util::disasm_interface * { return new mips3_disassembler; } },
 	{ "mn10200",         le,  0, []() -> util::disasm_interface * { return new mn10200_disassembler; } },
+	{ "mn1870",          be,  0, []() -> util::disasm_interface * { return new mn1870_disassembler; } },
+	{ "mn1880",          be,  0, []() -> util::disasm_interface * { return new mn1880_disassembler; } },
 	{ "nanoprocessor",   le,  0, []() -> util::disasm_interface * { return new hp_nanoprocessor_disassembler; } },
 	{ "nec",             le,  0, []() -> util::disasm_interface * { return new nec_disassembler(&nec_unidasm); } },
 	{ "ns32000",         le,  0, []() -> util::disasm_interface * { return new ns32000_disassembler; } },
@@ -480,6 +484,7 @@ static const dasm_table_entry dasm_table[] =
 	{ "pic16",           le, -1, []() -> util::disasm_interface * { return new pic16_disassembler; } },
 	{ "pic16c5x",        le, -1, []() -> util::disasm_interface * { return new pic16c5x_disassembler; } },
 	{ "pic16c62x",       le, -1, []() -> util::disasm_interface * { return new pic16c62x_disassembler; } },
+	{ "pic17",           le, -1, []() -> util::disasm_interface * { return new pic17_disassembler; } },
 	{ "powerpc",         be,  0, []() -> util::disasm_interface * { return new powerpc_disassembler; } },
 	{ "pps4",            le,  0, []() -> util::disasm_interface * { return new pps4_disassembler; } },
 	{ "psxcpu",          le,  0, []() -> util::disasm_interface * { return new psxcpu_disassembler; } },

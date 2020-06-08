@@ -8,6 +8,7 @@
 #ifndef PFMT_H_
 #define PFMT_H_
 
+#include "penum.h"
 #include "pstring.h"
 #include "ptypes.h"
 #include "putil.h"
@@ -21,12 +22,12 @@
 	{ \
 		template<typename... Args> explicit name(Args&&... args) \
 		: plib::perrmsg(str, std::forward<Args>(args)...) \
-		{ static_assert(narg == sizeof...(args), "Argument count mismatch"); } \
+		{ static_assert((narg) == sizeof...(args), "Argument count mismatch"); } \
 	};
 
 namespace plib {
 
-	P_ENUM(plog_level,
+	PENUM(plog_level,
 		DEBUG,
 		VERBOSE,
 		INFO,
@@ -202,15 +203,15 @@ namespace plib {
 		operator pstring() const { return m_str; }
 
 		template <typename T>
-		typename std::enable_if<plib::is_floating_point<T>::value, pfmt &>::type
+		std::enable_if_t<plib::is_floating_point<T>::value, pfmt &>
 		f(const T &x) {return format_element('f', x);  }
 
 		template <typename T>
-		typename std::enable_if<plib::is_floating_point<T>::value, pfmt &>::type
+		std::enable_if_t<plib::is_floating_point<T>::value, pfmt &>
 		e(const T &x) {return format_element('e', x);  }
 
 		template <typename T>
-		typename std::enable_if<plib::is_floating_point<T>::value, pfmt &>::type
+		std::enable_if_t<plib::is_floating_point<T>::value, pfmt &>
 		g(const T &x) {return format_element('g', x);  }
 
 		pfmt &operator ()(const void *x) {return format_element('p', x);  }
@@ -240,14 +241,14 @@ namespace plib {
 		}
 
 		template<typename T>
-		typename std::enable_if<plib::is_integral<T>::value, pfmt &>::type
+		std::enable_if_t<plib::is_integral<T>::value, pfmt &>
 		x(const T &x)
 		{
 			return format_element('x', x);
 		}
 
 		template<typename T>
-		typename std::enable_if<plib::is_integral<T>::value, pfmt &>::type
+		std::enable_if_t<plib::is_integral<T>::value, pfmt &>
 		o(const T &x)
 		{
 			return format_element('o', x);

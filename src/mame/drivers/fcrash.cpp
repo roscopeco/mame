@@ -1073,7 +1073,7 @@ void fcrash_state::init_cawingbl()
 {
 	m_maincpu->space(AS_PROGRAM).install_read_port(0x882000, 0x882001, "IN1");
 	m_maincpu->space(AS_PROGRAM).install_write_handler(0x882006, 0x882007, write16_delegate(*this, FUNC(fcrash_state::cawingbl_soundlatch_w)));
-	m_maincpu->space(AS_PROGRAM).install_read_handler(0x882008, 0x88200f, read16_delegate(*this, FUNC(fcrash_state::cps1_dsw_r)));
+	m_maincpu->space(AS_PROGRAM).install_read_handler(0x882008, 0x88200f, read16sm_delegate(*this, FUNC(fcrash_state::cps1_dsw_r)));
 
 	init_cps1();
 }
@@ -1081,8 +1081,8 @@ void fcrash_state::init_cawingbl()
 void fcrash_state::init_kodb()
 {
 	m_maincpu->space(AS_PROGRAM).install_read_port(0x800000, 0x800007, "IN1");
-	m_maincpu->space(AS_PROGRAM).install_read_handler(0x800018, 0x80001f, read16_delegate(*this, FUNC(fcrash_state::cps1_dsw_r)));
-	m_maincpu->space(AS_PROGRAM).install_write_handler(0x800180, 0x800187, write16_delegate(*this, FUNC(fcrash_state::cps1_soundlatch_w)));
+	m_maincpu->space(AS_PROGRAM).install_read_handler(0x800018, 0x80001f, read16sm_delegate(*this, FUNC(fcrash_state::cps1_dsw_r)));
+	m_maincpu->space(AS_PROGRAM).install_write_handler(0x800180, 0x800187, write16s_delegate(*this, FUNC(fcrash_state::cps1_soundlatch_w)));
 	m_maincpu->space(AS_PROGRAM).install_write_handler(0x980000, 0x98002f, write16_delegate(*this, FUNC(fcrash_state::kodb_layer_w)));
 
 	/* the original game alternates between 2 sprite ram areas to achieve flashing sprites - the bootleg doesn't do the write to the register to achieve this
@@ -2352,4 +2352,4 @@ GAME( 1999, sgyxz,      wof,     sgyxz,     sgyxz,     cps1bl_no_brgt, init_cps1
 GAME( 1992, wofabl,     wof,     wofabl,    wofabl,    cps1bl_no_brgt, init_cps1,      ROT0,    "bootleg",  "Sangokushi II (bootleg)",  MACHINE_IMPERFECT_GRAPHICS | MACHINE_SUPPORTS_SAVE )   // 921005 - Sangokushi 2
 GAME( 1992, wofr1bl,    wof,     wofr1bl,   wof,       cps1bl_no_brgt, init_wofr1bl,   ROT0,    "bootleg",  "Warriors of Fate (bootleg)", MACHINE_IMPERFECT_GRAPHICS | MACHINE_SUPPORTS_SAVE )   // 921002 ETC
 
-GAME( 1992, varthb,     varth,   varthb,    varth,     fcrash_state,   init_mtwinsb,   ROT270,  "bootleg",  "Varth: Operation Thunderstorm (bootleg)",  MACHINE_SUPPORTS_SAVE )
+GAME( 1992, varthb,     varth,   varthb,    varth,     fcrash_state,   init_mtwinsb,   ROT270,  "bootleg",  "Varth: Operation Thunderstorm (bootleg, set 1)",  MACHINE_SUPPORTS_SAVE )

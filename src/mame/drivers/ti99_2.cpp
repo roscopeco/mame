@@ -209,10 +209,10 @@ public:
 	void driver_reset() override;
 
 private:
-	DECLARE_WRITE8_MEMBER(intflag_write);
+	void intflag_write(offs_t offset, uint8_t data);
 
-	DECLARE_READ8_MEMBER(mem_read);
-	DECLARE_WRITE8_MEMBER(mem_write);
+	uint8_t mem_read(offs_t offset);
+	void mem_write(offs_t offset, uint8_t data);
 
 	DECLARE_WRITE_LINE_MEMBER(hold);
 	DECLARE_WRITE_LINE_MEMBER(holda);
@@ -288,7 +288,7 @@ void ti99_2_state::crumap(address_map &map)
     These CRU addresses are actually inside the 9995 CPU, but they are
     propagated to the outside world, so we can watch the changes.
 */
-WRITE8_MEMBER(ti99_2_state::intflag_write)
+void ti99_2_state::intflag_write(offs_t offset, uint8_t data)
 {
 	int addr = 0x1ee0 | (offset<<1);
 	switch (addr)
@@ -321,7 +321,7 @@ WRITE8_MEMBER(ti99_2_state::intflag_write)
 /*
     Called by CPU and video controller.
 */
-READ8_MEMBER(ti99_2_state::mem_read)
+uint8_t ti99_2_state::mem_read(offs_t offset)
 {
 	if (m_maincpu->is_onchip(offset)) return m_maincpu->debug_read_onchip_memory(offset&0xff);
 
@@ -348,7 +348,7 @@ READ8_MEMBER(ti99_2_state::mem_read)
 	return 0;
 }
 
-WRITE8_MEMBER(ti99_2_state::mem_write)
+void ti99_2_state::mem_write(offs_t offset, uint8_t data)
 {
 	int page = offset >> 12;
 

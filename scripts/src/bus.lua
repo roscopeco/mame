@@ -909,6 +909,8 @@ if (BUSES["COLECO_CART"]~=null) then
 	files {
 		MAME_DIR .. "src/devices/bus/coleco/cartridge/exp.cpp",
 		MAME_DIR .. "src/devices/bus/coleco/cartridge/exp.h",
+		MAME_DIR .. "src/devices/bus/coleco/cartridge/megacart.cpp",
+		MAME_DIR .. "src/devices/bus/coleco/cartridge/megacart.h",
 		MAME_DIR .. "src/devices/bus/coleco/cartridge/std.cpp",
 		MAME_DIR .. "src/devices/bus/coleco/cartridge/std.h",
 		MAME_DIR .. "src/devices/bus/coleco/cartridge/xin1.h",
@@ -1608,6 +1610,8 @@ if (BUSES["MSX_SLOT"]~=null) then
 		MAME_DIR .. "src/devices/bus/msx_cart/hfox.h",
 		MAME_DIR .. "src/devices/bus/msx_cart/holy_quran.cpp",
 		MAME_DIR .. "src/devices/bus/msx_cart/holy_quran.h",
+		MAME_DIR .. "src/devices/bus/msx_cart/ink.cpp",
+		MAME_DIR .. "src/devices/bus/msx_cart/ink.h",
 		MAME_DIR .. "src/devices/bus/msx_cart/konami.cpp",
 		MAME_DIR .. "src/devices/bus/msx_cart/konami.h",
 		MAME_DIR .. "src/devices/bus/msx_cart/korean.cpp",
@@ -2286,6 +2290,8 @@ if (BUSES["A2BUS"]~=null) then
 		MAME_DIR .. "src/devices/bus/a2bus/a2applicard.h",
 		MAME_DIR .. "src/devices/bus/a2bus/a2hsscsi.cpp",
 		MAME_DIR .. "src/devices/bus/a2bus/a2hsscsi.h",
+		MAME_DIR .. "src/devices/bus/a2bus/a2iwm.cpp",
+		MAME_DIR .. "src/devices/bus/a2bus/a2iwm.h",
 		MAME_DIR .. "src/devices/bus/a2bus/a2ultraterm.cpp",
 		MAME_DIR .. "src/devices/bus/a2bus/a2ultraterm.h",
 		MAME_DIR .. "src/devices/bus/a2bus/a2pic.cpp",
@@ -3306,6 +3312,8 @@ if (BUSES["COCO"]~=null) then
 		MAME_DIR .. "src/devices/bus/coco/coco_dcmodem.h",
 		MAME_DIR .. "src/devices/bus/coco/coco_orch90.cpp",
 		MAME_DIR .. "src/devices/bus/coco/coco_orch90.h",
+		MAME_DIR .. "src/devices/bus/coco/coco_ram.cpp",
+		MAME_DIR .. "src/devices/bus/coco/coco_ram.h",
 		MAME_DIR .. "src/devices/bus/coco/coco_ssc.cpp",
 		MAME_DIR .. "src/devices/bus/coco/coco_ssc.h",
 		MAME_DIR .. "src/devices/bus/coco/coco_pak.cpp",
@@ -3654,6 +3662,22 @@ if (BUSES["SBUS"]~=null) then
 		MAME_DIR .. "src/devices/bus/sbus/sunpc.h",
 		MAME_DIR .. "src/devices/bus/sbus/sbus.cpp",
 		MAME_DIR .. "src/devices/bus/sbus/sbus.h",
+	}
+end
+
+---------------------------------------------------
+--
+--@src/devices/bus/qbus/qbus.h,BUSES["QBUS"] = true
+---------------------------------------------------
+
+if (BUSES["QBUS"]~=null) then
+	files {
+		MAME_DIR .. "src/devices/bus/qbus/pc11.cpp",
+		MAME_DIR .. "src/devices/bus/qbus/pc11.h",
+		MAME_DIR .. "src/devices/bus/qbus/qbus.cpp",
+		MAME_DIR .. "src/devices/bus/qbus/qbus.h",
+		MAME_DIR .. "src/devices/bus/qbus/qtx.cpp",
+		MAME_DIR .. "src/devices/bus/qbus/qtx.h",
 	}
 end
 

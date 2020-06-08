@@ -45,27 +45,6 @@
 //-    |High | >1/3 VDD      | <2/3 VDD        | As previously established||
 //-
 
-
-/*
- * "Description: The Swiss army knife for timing purposes\n"
- * "    which has a ton of applications.\n"
- * "DipAlias: GND,TRIG,OUT,RESET,VCC,DISCH,THRES,CONT\n"
- * "Package: DIP\n"
- * "NamingConvention: Naming conventions follow Texas Instruments datasheet\n"
- * "Limitations: Internal resistor network currently fixed to 5k\n"
- * "     more limitations\n"
- * "Function Table:\n"
- *
- *  Function table created from truthtable if missing.
- *
- *  For package, refer to:
- *
- *  https://en.wikipedia.org/wiki/List_of_integrated_circuit_packaging_types
- *
- *  Special case: GATE -> use symbolic names
- *
- */
-
 #include "nld_ne555.h"
 #include "netlist/analog/nlid_twoterm.h"
 #include "netlist/solver/nld_solver.h"
@@ -137,29 +116,31 @@ namespace netlist
 		}
 	};
 
-	NETLIB_OBJECT_DERIVED(NE555_dip, NE555)
+	NETLIB_OBJECT(NE555_dip)
 	{
-		NETLIB_CONSTRUCTOR_DERIVED(NE555_dip, NE555)
+		NETLIB_CONSTRUCTOR(NE555_dip)
+		, A(*this, "A")
 		{
-			register_subalias("1", "GND");      // Pin 1
-			register_subalias("2", "TRIG");     // Pin 2
-			register_subalias("3", "OUT");      // Pin 3
-			register_subalias("4", "RESET");    // Pin 4
-			register_subalias("5", "CONT");     // Pin 5
-			register_subalias("6", "THRESH");   // Pin 6
-			register_subalias("7", "DISCH");    // Pin 7
-			register_subalias("8", "VCC");      // Pin 8
+			register_subalias("1", "A.GND");      // Pin 1
+			register_subalias("2", "A.TRIG");     // Pin 2
+			register_subalias("3", "A.OUT");      // Pin 3
+			register_subalias("4", "A.RESET");    // Pin 4
+			register_subalias("5", "A.CONT");     // Pin 5
+			register_subalias("6", "A.THRESH");   // Pin 6
+			register_subalias("7", "A.DISCH");    // Pin 7
+			register_subalias("8", "A.VCC");      // Pin 8
 		}
+		// FIXME: R_base needs to be removed from the code base
+		// The reset on R_Base executed after NE555 reset will
+		// overwrite values.
+		NETLIB_RESETI() { A.reset(); }
+		NETLIB_UPDATEI() {  }
+	private:
+		NETLIB_SUB(NE555) A;
 	};
 
 	NETLIB_RESET(NE555)
 	{
-		m_R1.reset();
-		m_R2.reset();
-		m_R3.reset();
-		m_ROUT.reset();
-		m_RDIS.reset();
-
 		/* FIXME make resistances a parameter, properly model other variants */
 		m_R1.set_R(nlconst::magic(5000));
 		m_R2.set_R(nlconst::magic(5000));

@@ -68,7 +68,7 @@ namespace analog
 		return d2;
 	}
 
-	NETLIB_OBJECT(twoterm)
+	NETLIB_BASE_OBJECT(twoterm)
 	{
 		// FIXME locate use case of owned = true and eliminate them if possible
 		NETLIB_CONSTRUCTOR_EX(twoterm, bool terminals_owned = false)
@@ -171,13 +171,19 @@ namespace analog
 
 	NETLIB_OBJECT_DERIVED(R_base, twoterm)
 	{
-		NETLIB_CONSTRUCTOR_DERIVED(R_base, twoterm)
+		NETLIB_CONSTRUCTOR(R_base)
 		{
 		}
 
 		void set_R(nl_fptype R) const noexcept
 		{
 			const nl_fptype G = plib::reciprocal(R);
+			set_mat( G, -G, nlconst::zero(),
+					-G,  G, nlconst::zero());
+		}
+
+		void set_G(nl_fptype G) const noexcept
+		{
 			set_mat( G, -G, nlconst::zero(),
 					-G,  G, nlconst::zero());
 		}
@@ -191,7 +197,7 @@ namespace analog
 
 	NETLIB_OBJECT_DERIVED(R, R_base)
 	{
-		NETLIB_CONSTRUCTOR_DERIVED(R, R_base)
+		NETLIB_CONSTRUCTOR(R)
 		, m_R(*this, "R", nlconst::magic(1e9))
 		{
 		}
@@ -218,13 +224,14 @@ namespace analog
 		param_fp_t m_R;
 		// protect set_R ... it's a recipe to desaster when used to bypass the parameter
 		using NETLIB_NAME(R_base)::set_R;
+		using NETLIB_NAME(R_base)::set_G;
 	};
 
 	// -----------------------------------------------------------------------------
 	// nld_POT
 	// -----------------------------------------------------------------------------
 
-	NETLIB_OBJECT(POT)
+	NETLIB_BASE_OBJECT(POT)
 	{
 		NETLIB_CONSTRUCTOR(POT)
 		, m_R1(*this, "_R1")
@@ -256,7 +263,7 @@ namespace analog
 		param_logic_t m_Reverse;
 	};
 
-	NETLIB_OBJECT(POT2)
+	NETLIB_BASE_OBJECT(POT2)
 	{
 		NETLIB_CONSTRUCTOR(POT2)
 		, m_R1(*this, "_R1")
@@ -290,7 +297,7 @@ namespace analog
 	NETLIB_OBJECT_DERIVED(C, twoterm)
 	{
 	public:
-		NETLIB_CONSTRUCTOR_DERIVED(C, twoterm)
+		NETLIB_CONSTRUCTOR(C)
 		, m_C(*this, "C", nlconst::magic(1e-6))
 		, m_cap(*this, "m_cap")
 		{
@@ -391,7 +398,7 @@ namespace analog
 	NETLIB_OBJECT_DERIVED(L, twoterm)
 	{
 	public:
-		NETLIB_CONSTRUCTOR_DERIVED(L, twoterm)
+		NETLIB_CONSTRUCTOR(L)
 		, m_L(*this, "L", nlconst::magic(1e-6))
 		, m_gmin(nlconst::zero())
 		, m_G(nlconst::zero())
@@ -423,6 +430,9 @@ namespace analog
 	///  the following parameters. A "Y" in the first column indicates that the
 	///  parameter is actually used in netlist.
 	///
+	///  NBV, BV and IBV are only used in the ZDIODE model. It is assumed
+	///  that DIODEs are not modeled up to their breakdown voltage.
+	///
 	///   |NL? |name  |parameter                        |units|default| example|area  |
 	///   |:--:|:-----|:--------------------------------|:----|------:|-------:|:----:|
 	///   | Y  |IS    |saturation current               |A    |1.0e-14| 1.0e-14|   *  |
@@ -437,21 +447,36 @@ namespace analog
 	///   |    |KF    |flicker noise coefficient        |-    |      0|        |      |
 	///   |    |AF    |flicker noise exponent           |-    |      1|        |      |
 	///   |    |FC    |coefficient for forward-bias depletion capacitance formula|-|0.5|| |
-	///   |    |BV    |reverse breakdown voltage        |V    |infinite|     40|      |
-	///   |    |IBV   |current at breakdown voltage     |V    |  0.001|        |      |
+	///   | Y  |NBV   |reverse emission coefficient     |-    |      3|       1|      |
+	///   | Y  |BV    |reverse breakdown voltage        |V    |infinite|     40|      |
+	///   | Y  |IBV   |current at breakdown voltage     |A    |  0.001|        |      |
 	///   |    |TNOM  |parameter measurement temperature|deg C|     27|      50|      |
 	///
-	class diode_model_t : public param_model_t
+	class diode_model_t
 	{
 	public:
-		diode_model_t(device_t &device, const pstring &name, const pstring &val)
-		: param_model_t(device, name, val)
-		, m_IS(*this, "IS")
-		, m_N(*this, "N")
+		diode_model_t(param_model_t &model)
+		: m_IS(model, "IS")
+		, m_N(model, "N")
 		{}
 
-		value_t m_IS;    //!< saturation current.
-		value_t m_N;     //!< emission coefficient.
+		param_model_t::value_t m_IS;    //!< saturation current.
+		param_model_t::value_t m_N;     //!< emission coefficient.
+	};
+
+	class zdiode_model_t : public diode_model_t
+	{
+	public:
+		zdiode_model_t(param_model_t &model)
+		: diode_model_t(model)
+		, m_NBV(model, "NBV")
+		, m_BV(model, "BV")
+		, m_IBV(model, "IBV")
+		{}
+
+		param_model_t::value_t m_NBV;    //!< reverse emission coefficient.
+		param_model_t::value_t m_BV;     //!< reverse breakdown voltage.
+		param_model_t::value_t m_IBV;    //!< current at breakdown voltage.
 	};
 
 	// -----------------------------------------------------------------------------
@@ -461,8 +486,9 @@ namespace analog
 	NETLIB_OBJECT_DERIVED(D, twoterm)
 	{
 	public:
-		NETLIB_CONSTRUCTOR_DERIVED_EX(D, twoterm, const pstring &model = "D")
+		NETLIB_CONSTRUCTOR_EX(D, const pstring &model = "D")
 		, m_model(*this, "MODEL", model)
+		, m_modacc(m_model)
 		, m_D(*this, "m_D")
 		{
 			register_subalias("A", P());
@@ -478,8 +504,42 @@ namespace analog
 		NETLIB_UPDATE_PARAMI();
 
 	private:
-		diode_model_t m_model;
+		param_model_t m_model;
+		diode_model_t m_modacc;
 		generic_diode<diode_e::BIPOLAR> m_D;
+	};
+
+	// -----------------------------------------------------------------------------
+	// nld_Z - Zener Diode
+	// -----------------------------------------------------------------------------
+
+	NETLIB_OBJECT_DERIVED(Z, twoterm)
+	{
+	public:
+		NETLIB_CONSTRUCTOR_EX(Z, const pstring &model = "D")
+		, m_model(*this, "MODEL", model)
+		, m_modacc(m_model)
+		, m_D(*this, "m_D")
+		, m_R(*this, "m_R")
+		{
+			register_subalias("A", P());
+			register_subalias("K", N());
+		}
+
+		NETLIB_IS_DYNAMIC(true)
+		NETLIB_UPDATE_TERMINALSI();
+		NETLIB_RESETI();
+
+	protected:
+		//NETLIB_UPDATEI();
+		NETLIB_UPDATE_PARAMI();
+
+	private:
+		param_model_t m_model;
+		zdiode_model_t m_modacc;
+		generic_diode<diode_e::BIPOLAR> m_D;
+		// REVERSE diode
+		generic_diode<diode_e::BIPOLAR> m_R;
 	};
 
 	// -----------------------------------------------------------------------------
@@ -491,18 +551,18 @@ namespace analog
 	NETLIB_OBJECT_DERIVED(VS, twoterm)
 	{
 	public:
-		NETLIB_CONSTRUCTOR_DERIVED(VS, twoterm)
+		NETLIB_CONSTRUCTOR(VS)
 		, m_t(*this, "m_t", nlconst::zero())
-		, m_R(*this, "R", nlconst::magic(0.1))
+		, m_R(*this, "RI", nlconst::magic(0.1))
 		, m_V(*this, "V", nlconst::zero())
 		, m_func(*this,"FUNC", "")
-		, m_compiled(this->name() + ".FUNCC", this, this->state().run_state_manager())
+		, m_compiled(*this, "m_compiled")
 		, m_funcparam({nlconst::zero()})
 		{
 			register_subalias("P", P());
 			register_subalias("N", N());
 			if (m_func() != "")
-				m_compiled.compile(m_func(), std::vector<pstring>({{pstring("T")}}));
+				m_compiled->compile(m_func(), std::vector<pstring>({{pstring("T")}}));
 		}
 
 		NETLIB_IS_TIMESTEP(m_func() != "")
@@ -512,7 +572,7 @@ namespace analog
 			m_t += step;
 			m_funcparam[0] = m_t;
 			this->set_G_V_I(plib::reciprocal(m_R()),
-					m_compiled.evaluate(m_funcparam),
+					m_compiled->evaluate(m_funcparam),
 					nlconst::zero());
 		}
 
@@ -529,7 +589,7 @@ namespace analog
 		param_fp_t m_R;
 		param_fp_t m_V;
 		param_str_t m_func;
-		plib::pfunction<nl_fptype> m_compiled;
+		state_var<plib::pfunction<nl_fptype>> m_compiled;
 		std::vector<nl_fptype> m_funcparam;
 	};
 
@@ -540,17 +600,17 @@ namespace analog
 	NETLIB_OBJECT_DERIVED(CS, twoterm)
 	{
 	public:
-		NETLIB_CONSTRUCTOR_DERIVED(CS, twoterm)
+		NETLIB_CONSTRUCTOR(CS)
 		, m_t(*this, "m_t", nlconst::zero())
 		, m_I(*this, "I", nlconst::one())
 		, m_func(*this,"FUNC", "")
-		, m_compiled(this->name() + ".FUNCC", this, this->state().run_state_manager())
+		, m_compiled(*this, "m_compiled")
 		, m_funcparam({nlconst::zero()})
 		{
 			register_subalias("P", P());
 			register_subalias("N", N());
 			if (m_func() != "")
-				m_compiled.compile(m_func(), std::vector<pstring>({{pstring("T")}}));
+				m_compiled->compile(m_func(), std::vector<pstring>({{pstring("T")}}));
 		}
 
 		NETLIB_IS_TIMESTEP(m_func() != "")
@@ -558,7 +618,7 @@ namespace analog
 		{
 			m_t += step;
 			m_funcparam[0] = m_t;
-			const nl_fptype I = m_compiled.evaluate(m_funcparam);
+			const nl_fptype I = m_compiled->evaluate(m_funcparam);
 			const auto zero(nlconst::zero());
 			set_mat(zero, zero, -I,
 					zero, zero,  I);
@@ -590,7 +650,7 @@ namespace analog
 		state_var<nl_fptype> m_t;
 		param_fp_t m_I;
 		param_str_t m_func;
-		plib::pfunction<nl_fptype> m_compiled;
+		state_var<plib::pfunction<nl_fptype>> m_compiled;
 		std::vector<nl_fptype> m_funcparam;
 	};
 
