@@ -49,12 +49,12 @@ WRITE_LINE_MEMBER( rc2014_state::acia_irq_w )
 
 READ8_MEMBER(rc2014_state::ide_cs0_r)
 {
-	return m_ata->read_cs0(offset);
+	return m_ata->cs0_r(offset);
 }
 
 WRITE8_MEMBER(rc2014_state::ide_cs0_w)
 {
-	m_ata->write_cs0(offset, data);
+	m_ata->cs0_w(offset, data);
 }
 
 WRITE8_MEMBER(rc2014_state::bank_w)

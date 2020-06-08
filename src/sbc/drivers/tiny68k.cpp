@@ -23,7 +23,7 @@ private:
 	virtual void machine_start() override;
 	virtual void machine_reset() override;
 
-	DECLARE_WRITE8_MEMBER(duart_output);
+	void duart_output(uint8_t data);
 	DECLARE_WRITE_LINE_MEMBER(duart_irq_handler);
 
 	void cpu_space_map(address_map &map);
@@ -85,7 +85,7 @@ void tiny68k_state::machine_reset()
  Machine Drivers
 ******************************************************************************/
 
-WRITE8_MEMBER(tiny68k_state::duart_output)
+void tiny68k_state::duart_output(uint8_t data)
 {
 //	printf("duart_output : %02x\n",data);
 }
