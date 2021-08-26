@@ -44,8 +44,8 @@
 
 #define DECLARE_READ_LINE_MEMBER(name)      int  name()
 #define READ_LINE_MEMBER(name)              int  name()
-#define DECLARE_WRITE_LINE_MEMBER(name)     void name(ATTR_UNUSED int state)
-#define WRITE_LINE_MEMBER(name)             void name(ATTR_UNUSED int state)
+#define DECLARE_WRITE_LINE_MEMBER(name)     void name([[maybe_unused]] int state)
+#define WRITE_LINE_MEMBER(name)             void name([[maybe_unused]] int state)
 
 
 
@@ -64,20 +64,16 @@ static const char DEVICE_SELF_OWNER[] = "^";
 //  TYPE DEFINITIONS
 //**************************************************************************
 
-namespace emu { namespace detail {
+namespace emu::detail {
 
 class device_type_impl_base;
 
 
-template <typename T> struct is_device_implementation
-{
-	static constexpr bool value = std::is_base_of<device_t, T>::value;
-};
+template <typename T>
+using is_device_implementation = std::bool_constant<std::is_base_of_v<device_t, T> >;
 
-template <typename T> struct is_device_interface
-{
-	static constexpr bool value = std::is_base_of<device_interface, T>::value && !is_device_implementation<T>::value;
-};
+template <typename T>
+using is_device_interface = std::bool_constant<std::is_base_of_v<device_interface, T> && !is_device_implementation<T>::value>;
 
 
 struct device_feature
@@ -205,7 +201,7 @@ private:
 	template <typename DeviceClass>
 	static std::unique_ptr<device_t> create_device(device_type_impl_base const &type, machine_config const &mconfig, char const *tag, device_t *owner, u32 clock)
 	{
-		return make_unique_clear<DeviceClass>(mconfig, tag, owner, clock);
+		return std::make_unique<DeviceClass>(mconfig, tag, owner, clock);
 	}
 
 	template <typename DriverClass>
@@ -298,7 +294,7 @@ public:
 	template <typename... Params>
 	std::unique_ptr<DeviceClass> create(machine_config &mconfig, char const *tag, device_t *owner, Params &&... args) const
 	{
-		return make_unique_clear<DeviceClass>(mconfig, tag, owner, std::forward<Params>(args)...);
+		return std::make_unique<DeviceClass>(mconfig, tag, owner, std::forward<Params>(args)...);
 	}
 
 	template <typename... Params> DeviceClass &operator()(machine_config &mconfig, char const *tag, Params &&... args) const;
@@ -310,7 +306,7 @@ public:
 
 inline device_registrar::const_iterator &device_registrar::const_iterator::operator++() { m_type = m_type->m_next; return *this; }
 
-} } // namespace emu::detail
+} // namespace emu::detail
 
 
 // device types
@@ -341,6 +337,7 @@ constexpr auto driver_device_creator = &emu::detail::driver_tag_func<DriverClass
 		extern template class device_finder<Class, true>;
 
 #define DECLARE_DEVICE_TYPE_NS(Type, Namespace, Class) \
+		namespace Namespace { class Class; } \
 		extern emu::detail::device_type_impl<Namespace::Class> const &Type; \
 		extern template class device_finder<Namespace::Class, false>; \
 		extern template class device_finder<Namespace::Class, true>;
@@ -411,18 +408,21 @@ class device_t : public delegate_late_bind
 
 	private:
 		// private helpers
-		device_t *find(const std::string &name) const
+		device_t &append(std::unique_ptr<device_t> &&device);
+		device_t &replace_and_remove(std::unique_ptr<device_t> &&device, device_t &existing);
+		void remove(device_t &device);
+		device_t *find(std::string_view name) const
 		{
-			device_t *curdevice;
-			for (curdevice = m_list.first(); curdevice != nullptr; curdevice = curdevice->next())
-				if (name.compare(curdevice->m_basetag) == 0)
-					return curdevice;
-			return nullptr;
+			auto result = m_tagmap.find(name);
+			if (result != m_tagmap.end())
+				return &result->second.get();
+			else
+				return nullptr;
 		}
 
 		// private state
 		simple_list<device_t>   m_list;         // list of sub-devices we own
-		mutable std::unordered_map<std::string,device_t *> m_tagmap;      // map of devices looked up and found by subtag
+		std::unordered_map<std::string_view, std::reference_wrapper<device_t>> m_tagmap;      // map of devices looked up and found by subtag
 	};
 
 	class interface_list
@@ -430,7 +430,6 @@ class device_t : public delegate_late_bind
 		friend class device_t;
 		friend class device_interface;
 		friend class device_memory_interface;
-		friend class device_state_interface;
 		friend class device_execute_interface;
 
 	public:
@@ -460,7 +459,7 @@ class device_t : public delegate_late_bind
 		};
 
 		// construction/destruction
-		interface_list() : m_head(nullptr), m_execute(nullptr), m_memory(nullptr), m_state(nullptr) { }
+		interface_list() : m_head(nullptr), m_execute(nullptr), m_memory(nullptr) { }
 
 		// getters
 		device_interface *first() const { return m_head; }
@@ -473,7 +472,6 @@ class device_t : public delegate_late_bind
 		device_interface *m_head;               // head of interface list
 		device_execute_interface *m_execute;    // pre-cached pointer to execute interface
 		device_memory_interface *m_memory;      // pre-cached pointer to memory interface
-		device_state_interface *m_state;        // pre-cached pointer to state interface
 	};
 
 protected:
@@ -554,28 +552,25 @@ public:
 	bool interface(device_execute_interface *&intf) const { intf = m_interfaces.m_execute; return (intf != nullptr); }
 	bool interface(device_memory_interface *&intf) { intf = m_interfaces.m_memory; return (intf != nullptr); }
 	bool interface(device_memory_interface *&intf) const { intf = m_interfaces.m_memory; return (intf != nullptr); }
-	bool interface(device_state_interface *&intf) { intf = m_interfaces.m_state; return (intf != nullptr); }
-	bool interface(device_state_interface *&intf) const { intf = m_interfaces.m_state; return (intf != nullptr); }
 	device_execute_interface &execute() const { assert(m_interfaces.m_execute != nullptr); return *m_interfaces.m_execute; }
 	device_memory_interface &memory() const { assert(m_interfaces.m_memory != nullptr); return *m_interfaces.m_memory; }
-	device_state_interface &state() const { assert(m_interfaces.m_state != nullptr); return *m_interfaces.m_state; }
 
 	// owned object helpers
 	subdevice_list &subdevices() { return m_subdevices; }
 	const subdevice_list &subdevices() const { return m_subdevices; }
 
 	// device-relative tag lookups
-	std::string subtag(std::string tag) const;
-	std::string siblingtag(std::string tag) const { return (m_owner != nullptr) ? m_owner->subtag(tag) : tag; }
-	memory_region *memregion(std::string tag) const;
-	memory_share *memshare(std::string tag) const;
-	memory_bank *membank(std::string tag) const;
-	ioport_port *ioport(std::string tag) const;
-	device_t *subdevice(const char *tag) const;
-	device_t *siblingdevice(const char *tag) const;
-	template<class DeviceClass> DeviceClass *subdevice(const char *tag) const { return downcast<DeviceClass *>(subdevice(tag)); }
-	template<class DeviceClass> DeviceClass *siblingdevice(const char *tag) const { return downcast<DeviceClass *>(siblingdevice(tag)); }
-	std::string parameter(const char *tag) const;
+	std::string subtag(std::string_view tag) const;
+	std::string siblingtag(std::string_view tag) const { return (m_owner != nullptr) ? m_owner->subtag(tag) : std::string(tag); }
+	memory_region *memregion(std::string_view tag) const;
+	memory_share *memshare(std::string_view tag) const;
+	memory_bank *membank(std::string_view tag) const;
+	ioport_port *ioport(std::string_view tag) const;
+	device_t *subdevice(std::string_view tag) const;
+	device_t *siblingdevice(std::string_view tag) const;
+	template<class DeviceClass> DeviceClass *subdevice(std::string_view tag) const { return downcast<DeviceClass *>(subdevice(tag)); }
+	template<class DeviceClass> DeviceClass *siblingdevice(std::string_view tag) const { return downcast<DeviceClass *>(siblingdevice(tag)); }
+	std::string parameter(std::string_view tag) const;
 
 	// configuration helpers
 	void add_machine_configuration(machine_config &config);
@@ -638,11 +633,12 @@ public:
 	device_debug *debug() const { return m_debug.get(); }
 
 	void set_system_bios(u8 bios) { m_system_bios = bios; }
-	bool findit(bool isvalidation) const;
+	bool findit(validity_checker *valid) const;
 
 	// misc
 	template <typename Format, typename... Params> void popmessage(Format &&fmt, Params &&... args) const;
 	template <typename Format, typename... Params> void logerror(Format &&fmt, Params &&... args) const;
+	void view_register(memory_view *view);
 
 protected:
 	// miscellaneous helpers
@@ -822,7 +818,7 @@ protected:
 
 private:
 	// internal helpers
-	device_t *subdevice_slow(const char *tag) const;
+	device_t *subdevice_slow(std::string_view tag) const;
 	void calculate_derived_clock();
 
 	// private state; accessor use required
@@ -835,6 +831,7 @@ private:
 	finder_base *           m_auto_finder_list;     // list of objects to auto-find
 	mutable std::vector<rom_entry>  m_rom_entries;
 	std::list<devcb_base *> m_callbacks;
+	std::vector<memory_view *> m_viewlist;          // list of views
 
 	// string formatting buffer for logerror
 	mutable util::ovectorstream m_string_buffer;
@@ -1007,13 +1004,13 @@ private:
 };
 
 
-// ======================> device_iterator
+// ======================> device_enumerator
 
 // helper class to iterate over the hierarchy of devices depth-first
-class device_iterator
+class device_enumerator
 {
 public:
-	class auto_iterator
+	class iterator
 	{
 	public:
 		typedef std::ptrdiff_t difference_type;
@@ -1023,7 +1020,7 @@ public:
 		typedef std::forward_iterator_tag iterator_category;
 
 		// construction
-		auto_iterator(device_t *devptr, int curdepth, int maxdepth)
+		iterator(device_t *devptr, int curdepth, int maxdepth)
 			: m_curdevice(devptr)
 			, m_curdepth(curdepth)
 			, m_maxdepth(maxdepth)
@@ -1035,12 +1032,12 @@ public:
 		int depth() const { return m_curdepth; }
 
 		// required operator overrides
-		bool operator==(auto_iterator const &iter) const { return m_curdevice == iter.m_curdevice; }
-		bool operator!=(auto_iterator const &iter) const { return m_curdevice != iter.m_curdevice; }
+		bool operator==(iterator const &iter) const { return m_curdevice == iter.m_curdevice; }
+		bool operator!=(iterator const &iter) const { return m_curdevice != iter.m_curdevice; }
 		device_t &operator*() const { assert(m_curdevice); return *m_curdevice; }
 		device_t *operator->() const { return m_curdevice; }
-		auto_iterator &operator++() { advance(); return *this; }
-		auto_iterator operator++(int) { auto_iterator const result(*this); ++*this; return result; }
+		iterator &operator++() { advance(); return *this; }
+		iterator operator++(int) { iterator const result(*this); ++*this; return result; }
 
 	protected:
 		// search depth-first for the next device
@@ -1081,18 +1078,17 @@ public:
 		}
 
 		// protected state
-		device_t *      m_curdevice;
-		int             m_curdepth;
-		const int       m_maxdepth;
+		device_t *  m_curdevice;
+		int         m_curdepth;
+		int         m_maxdepth;
 	};
 
 	// construction
-	device_iterator(device_t &root, int maxdepth = 255)
-		: m_root(root), m_maxdepth(maxdepth) { }
+	device_enumerator(device_t &root, int maxdepth = 255) : m_root(root), m_maxdepth(maxdepth) { }
 
 	// standard iterators
-	auto_iterator begin() const { return auto_iterator(&m_root, 0, m_maxdepth); }
-	auto_iterator end() const { return auto_iterator(nullptr, 0, m_maxdepth); }
+	iterator begin() const { return iterator(&m_root, 0, m_maxdepth); }
+	iterator end() const { return iterator(nullptr, 0, m_maxdepth); }
 
 	// return first item
 	device_t *first() const { return begin().current(); }
@@ -1134,32 +1130,31 @@ public:
 
 private:
 	// internal state
-	device_t &      m_root;
-	int             m_maxdepth;
+	device_t &  m_root;
+	int         m_maxdepth;
 };
 
 
-// ======================> device_type_iterator
+// ======================> device_type_enumerator
 
 // helper class to find devices of a given type in the device hierarchy
 template <class DeviceType, class DeviceClass = DeviceType>
-class device_type_iterator
+class device_type_enumerator
 {
 public:
-	class auto_iterator : protected device_iterator::auto_iterator
+	class iterator : protected device_enumerator::iterator
 	{
 	public:
-		using device_iterator::auto_iterator::difference_type;
-		using device_iterator::auto_iterator::iterator_category;
-		using device_iterator::auto_iterator::depth;
+		using device_enumerator::iterator::difference_type;
+		using device_enumerator::iterator::iterator_category;
+		using device_enumerator::iterator::depth;
 
 		typedef DeviceClass value_type;
 		typedef DeviceClass *pointer;
 		typedef DeviceClass &reference;
 
 		// construction
-		auto_iterator(device_t *devptr, int curdepth, int maxdepth)
-			: device_iterator::auto_iterator(devptr, curdepth, maxdepth)
+		iterator(device_t *devptr, int curdepth, int maxdepth) : device_enumerator::iterator(devptr, curdepth, maxdepth)
 		{
 			// make sure the first device is of the specified type
 			while (m_curdevice && (m_curdevice->type().type() != typeid(DeviceType)))
@@ -1167,8 +1162,8 @@ public:
 		}
 
 		// required operator overrides
-		bool operator==(auto_iterator const &iter) const { return m_curdevice == iter.m_curdevice; }
-		bool operator!=(auto_iterator const &iter) const { return m_curdevice != iter.m_curdevice; }
+		bool operator==(iterator const &iter) const { return m_curdevice == iter.m_curdevice; }
+		bool operator!=(iterator const &iter) const { return m_curdevice != iter.m_curdevice; }
 
 		// getters returning specified device type
 		DeviceClass *current() const { return downcast<DeviceClass *>(m_curdevice); }
@@ -1176,25 +1171,23 @@ public:
 		DeviceClass *operator->() const { return downcast<DeviceClass *>(m_curdevice); }
 
 		// search for devices of the specified type
-		auto_iterator &operator++()
+		iterator &operator++()
 		{
-			advance();
-			while (m_curdevice && (m_curdevice->type().type() != typeid(DeviceType)))
-				advance();
+			do { advance(); } while (m_curdevice && (m_curdevice->type().type() != typeid(DeviceType)));
 			return *this;
 		}
 
-		auto_iterator operator++(int) { auto_iterator const result(*this); ++*this; return result; }
+		iterator operator++(int) { iterator const result(*this); ++*this; return result; }
 	};
 
 	// construction
-	device_type_iterator(device_t &root, int maxdepth = 255) : m_root(root), m_maxdepth(maxdepth) { }
+	device_type_enumerator(device_t &root, int maxdepth = 255) : m_root(root), m_maxdepth(maxdepth) { }
 
 	// standard iterators
-	auto_iterator begin() const { return auto_iterator(&m_root, 0, m_maxdepth); }
-	auto_iterator end() const { return auto_iterator(nullptr, 0, m_maxdepth); }
-	auto_iterator cbegin() const { return auto_iterator(&m_root, 0, m_maxdepth); }
-	auto_iterator cend() const { return auto_iterator(nullptr, 0, m_maxdepth); }
+	iterator begin() const { return iterator(&m_root, 0, m_maxdepth); }
+	iterator end() const { return iterator(nullptr, 0, m_maxdepth); }
+	iterator cbegin() const { return iterator(&m_root, 0, m_maxdepth); }
+	iterator cend() const { return iterator(nullptr, 0, m_maxdepth); }
 
 	// return first item
 	DeviceClass *first() const { return begin().current(); }
@@ -1232,20 +1225,19 @@ private:
 };
 
 
-// ======================> device_interface_iterator
+// ======================> device_interface_enumerator
 
 // helper class to find devices with a given interface in the device hierarchy
 // also works for finding devices derived from a given subclass
-template<class InterfaceClass>
-class device_interface_iterator
+template <class InterfaceClass>
+class device_interface_enumerator
 {
 public:
-	class auto_iterator : public device_iterator::auto_iterator
+	class iterator : public device_enumerator::iterator
 	{
-public:
+	public:
 		// construction
-		auto_iterator(device_t *devptr, int curdepth, int maxdepth)
-			: device_iterator::auto_iterator(devptr, curdepth, maxdepth)
+		iterator(device_t *devptr, int curdepth, int maxdepth) : device_enumerator::iterator(devptr, curdepth, maxdepth)
 		{
 			// set the iterator for the first device with the interface
 			find_interface();
@@ -1256,14 +1248,15 @@ public:
 		InterfaceClass &operator*() const { assert(m_interface != nullptr); return *m_interface; }
 
 		// search for devices with the specified interface
-		const auto_iterator &operator++() { advance(); find_interface(); return *this; }
+		const iterator &operator++() { advance(); find_interface(); return *this; }
+		iterator operator++(int) { iterator const result(*this); ++*this; return result; }
 
-private:
+	private:
 		// private helper
 		void find_interface()
 		{
 			// advance until finding a device with the interface
-			for ( ; m_curdevice != nullptr; advance())
+			for ( ; m_curdevice; advance())
 				if (m_curdevice->interface(m_interface))
 					return;
 
@@ -1275,14 +1268,12 @@ private:
 		InterfaceClass *m_interface;
 	};
 
-public:
 	// construction
-	device_interface_iterator(device_t &root, int maxdepth = 255)
-		: m_root(root), m_maxdepth(maxdepth) { }
+	device_interface_enumerator(device_t &root, int maxdepth = 255) : m_root(root), m_maxdepth(maxdepth) { }
 
 	// standard iterators
-	auto_iterator begin() const { return auto_iterator(&m_root, 0, m_maxdepth); }
-	auto_iterator end() const { return auto_iterator(nullptr, 0, m_maxdepth); }
+	iterator begin() const { return iterator(&m_root, 0, m_maxdepth); }
+	iterator end() const { return iterator(nullptr, 0, m_maxdepth); }
 
 	// return first item
 	InterfaceClass *first() const { return begin().current(); }
@@ -1339,15 +1330,15 @@ private:
 //  name relative to this device
 //-------------------------------------------------
 
-inline device_t *device_t::subdevice(const char *tag) const
+inline device_t *device_t::subdevice(std::string_view tag) const
 {
-	// empty string or nullptr means this device
-	if (tag == nullptr || *tag == 0)
+	// empty string means this device (DEVICE_SELF)
+	if (tag.empty())
 		return const_cast<device_t *>(this);
 
 	// do a quick lookup and return that if possible
 	auto quick = m_subdevices.m_tagmap.find(tag);
-	return (quick != m_subdevices.m_tagmap.end()) ? quick->second : subdevice_slow(tag);
+	return (quick != m_subdevices.m_tagmap.end()) ? &quick->second.get() : subdevice_slow(tag);
 }
 
 
@@ -1356,21 +1347,21 @@ inline device_t *device_t::subdevice(const char *tag) const
 //  by name relative to this device's parent
 //-------------------------------------------------
 
-inline device_t *device_t::siblingdevice(const char *tag) const
+inline device_t *device_t::siblingdevice(std::string_view tag) const
 {
-	// empty string or nullptr means this device
-	if (tag == nullptr || *tag == 0)
+	// empty string means this device (DEVICE_SELF)
+	if (tag.empty())
 		return const_cast<device_t *>(this);
 
 	// leading caret implies the owner, just skip it
-	if (tag[0] == '^') tag++;
+	if (tag[0] == '^') tag.remove_prefix(1);
 
 	// query relative to the parent, if we have one
 	if (m_owner != nullptr)
 		return m_owner->subdevice(tag);
 
 	// otherwise, it's nullptr unless the tag is absolute
-	return (tag[0] == ':') ? subdevice(tag) : nullptr;
+	return (!tag.empty() && tag[0] == ':') ? subdevice(tag) : nullptr;
 }
 
 
@@ -1389,4 +1380,4 @@ inline device_t::interface_list::auto_iterator device_t::interface_list::auto_it
 }
 
 
-#endif  /* MAME_EMU_DEVICE_H */
+#endif // MAME_EMU_DEVICE_H

@@ -33,6 +33,10 @@
 
     Tattoo Assassins uses DE Pinball soundboard 520-5077-00 R
 
+    How to calibrate guns in Locked 'n Loaded and Gun Hard:
+    - keep SERVICE1 pressed (default 9) and press the test mode switch (default F2)
+    - complete guns' calibration
+    - exit test mode
 
     TODO:
 
@@ -40,6 +44,7 @@
     special blending effects.  It's exact effect is unclear.
 
     Video backgrounds(intel DVI) in Dragongun?
+    reference video(dragngunj): https://youtu.be/TVc0SsTVJ94
 
     Locked 'n Loaded (parent set) is a slightly different hardware
     revision: board # DE-0420-1 where the US set is DE-0359-2.
@@ -2106,6 +2111,10 @@ void dragngun_state::dragngun(machine_config &config)
 	DECO_ZOOMSPR(config, m_sprgenzoom, 0);
 	m_sprgenzoom->set_gfxdecode(m_gfxdecode);
 
+	// I750, these aren't emulated
+	//I82750PB(config, m_i82750pb, XTAL(25'000'000));
+	//I82750DB(config, m_i82750db, XTAL(25'000'000));
+
 	GFXDECODE(config, m_gfxdecode, m_palette, gfx_dragngun);
 	PALETTE(config, m_palette).set_entries(2048);
 
@@ -3916,6 +3925,6 @@ GAME( 1994, tattassa,   tattass,  tattass,   tattass,  nslasher_state, init_tatt
 GAME( 1993, dragngun,   0,        dragngun,  dragngun, dragngun_state, init_dragngun,  ROT0, "Data East Corporation", "Dragon Gun (US)",                                    MACHINE_IMPERFECT_GRAPHICS | MACHINE_IMPERFECT_SOUND | MACHINE_SUPPORTS_SAVE ) // OKI3 Bankswitching aren't verified
 GAME( 1993, dragngunj,  dragngun, dragngun,  dragngun, dragngun_state, init_dragngunj, ROT0, "Data East Corporation", "Dragon Gun (Japan)",                                 MACHINE_IMPERFECT_GRAPHICS | MACHINE_IMPERFECT_SOUND | MACHINE_SUPPORTS_SAVE ) // ""
 
-GAME( 1994, lockload,   0,        lockload,  lockload, dragngun_state, init_lockload,  ROT0, "Data East Corporation", "Locked 'n Loaded (World)",                           MACHINE_IMPERFECT_GRAPHICS | MACHINE_IMPERFECT_SOUND | MACHINE_NOT_WORKING | MACHINE_SUPPORTS_SAVE )
-GAME( 1994, gunhard,    lockload, lockload,  lockload, dragngun_state, init_lockload,  ROT0, "Data East Corporation", "Gun Hard (Japan)",                                   MACHINE_IMPERFECT_GRAPHICS | MACHINE_IMPERFECT_SOUND | MACHINE_NOT_WORKING | MACHINE_SUPPORTS_SAVE )
-GAME( 1994, lockloadu,  lockload, lockloadu, lockload, dragngun_state, init_lockload,  ROT0, "Data East Corporation", "Locked 'n Loaded (US, Dragon Gun conversion)",       MACHINE_IMPERFECT_GRAPHICS | MACHINE_IMPERFECT_SOUND | MACHINE_NOT_WORKING | MACHINE_SUPPORTS_SAVE )
+GAME( 1994, lockload,   0,        lockload,  lockload, dragngun_state, init_lockload,  ROT0, "Data East Corporation", "Locked 'n Loaded (World)",                           MACHINE_IMPERFECT_GRAPHICS | MACHINE_IMPERFECT_SOUND | MACHINE_NOT_WORKING | MACHINE_SUPPORTS_SAVE ) // hangs during attract mode if let running for a while without coining up; shooting in the lower corners during calibration of player's 2 gun hangs the game
+GAME( 1994, gunhard,    lockload, lockload,  lockload, dragngun_state, init_lockload,  ROT0, "Data East Corporation", "Gun Hard (Japan)",                                   MACHINE_IMPERFECT_GRAPHICS | MACHINE_IMPERFECT_SOUND | MACHINE_NOT_WORKING | MACHINE_SUPPORTS_SAVE ) // "
+GAME( 1994, lockloadu,  lockload, lockloadu, lockload, dragngun_state, init_lockload,  ROT0, "Data East Corporation", "Locked 'n Loaded (US, Dragon Gun conversion)",       MACHINE_IMPERFECT_GRAPHICS | MACHINE_IMPERFECT_SOUND | MACHINE_NOT_WORKING | MACHINE_SUPPORTS_SAVE ) // "

@@ -144,7 +144,7 @@ P2 outputs (40-pin IDC)
 
 #include "intellec4.h"
 
-namespace bus { namespace intellec4 {
+namespace bus::intellec4 {
 
 class imm4_22_device : public device_t, public device_univ_card_interface, public device_image_interface
 {
@@ -172,9 +172,9 @@ protected:
 	virtual DECLARE_WRITE_LINE_MEMBER(reset_4002_in) override;
 
 private:
-	DECLARE_WRITE8_MEMBER(ram_out);
-	DECLARE_WRITE8_MEMBER(rom_out);
-	DECLARE_READ8_MEMBER(rom_in);
+	void ram_out(offs_t offset, u8 data);
+	void rom_out(offs_t offset, u8 data);
+	u8 rom_in(offs_t offset);
 
 	void allocate();
 	void map_ram_io();
@@ -192,7 +192,7 @@ private:
 	std::unique_ptr<u8 []>  m_prom;
 };
 
-} } // namespace bus::intellec4
+} // namespace bus::intellec4
 
 DECLARE_DEVICE_TYPE_NS(INTELLEC4_INST_DATA_STORAGE, bus::intellec4, imm4_22_device)
 

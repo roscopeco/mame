@@ -518,7 +518,7 @@ void visicom_state::dma_w(offs_t offset, uint8_t data)
 	for (int x = 0; x < 8; x++)
 	{
 		int color = (BIT(color1, 7) << 1) | BIT(color0, 7);
-		m_vdc->m_bitmap.pix32(y, sx + x) = VISICOM_PALETTE[color];
+		m_vdc->m_bitmap.pix(y, sx + x) = VISICOM_PALETTE[color];
 		color0 <<= 1;
 		color1 <<= 1;
 	}
@@ -604,7 +604,7 @@ DEVICE_IMAGE_LOAD_MEMBER( studio2_state::cart_load )
 
 			if (image.length() < 0x200)
 			{
-				image.seterror(IMAGE_ERROR_UNSPECIFIED, "Invalid ROM file");
+				image.seterror(image_error::INVALIDIMAGE, "Invalid ROM file");
 				return image_init_result::FAIL;
 			}
 
@@ -613,14 +613,14 @@ DEVICE_IMAGE_LOAD_MEMBER( studio2_state::cart_load )
 			// validate
 			if (strncmp((const char *)header, "RCA2", 4))
 			{
-				image.seterror(IMAGE_ERROR_UNSPECIFIED, "Not an .ST2 file");
+				image.seterror(image_error::INVALIDIMAGE, "Not an .ST2 file");
 				return image_init_result::FAIL;
 			}
 
 			blocks = header[4];
 			if ((blocks < 2) || (blocks > 11))
 			{
-				image.seterror(IMAGE_ERROR_UNSPECIFIED, "Invalid .ST2 file");
+				image.seterror(image_error::INVALIDIMAGE, "Invalid .ST2 file");
 				return image_init_result::FAIL;
 			}
 
@@ -654,7 +654,7 @@ DEVICE_IMAGE_LOAD_MEMBER( studio2_state::cart_load )
 			size = image.length();
 			if (size > 0x400)
 			{
-				image.seterror(IMAGE_ERROR_UNSPECIFIED, "Unsupported cartridge size");
+				image.seterror(image_error::INVALIDIMAGE, "Unsupported cartridge size");
 				return image_init_result::FAIL;
 			}
 			else

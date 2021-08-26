@@ -15,14 +15,6 @@
 
 
 //**************************************************************************
-//  CONSTANTS
-//**************************************************************************
-
-#define ADAM_LEFT_EXPANSION_SLOT_TAG        "slot1"
-#define ADAM_CENTER_EXPANSION_SLOT_TAG      "slot2"
-#define ADAM_RIGHT_EXPANSION_SLOT_TAG       "slot3"
-
-//**************************************************************************
 //  TYPE DEFINITIONS
 //**************************************************************************
 
@@ -100,7 +92,7 @@ protected:
 
 	adam_expansion_slot_device *m_slot;
 
-	optional_shared_ptr<uint8_t> m_rom;
+	std::unique_ptr<uint8_t[]> m_rom;
 };
 
 

@@ -7,6 +7,7 @@
     Core MAME screen device.
 
 ***************************************************************************/
+
 #ifndef MAME_EMU_SCREEN_H
 #define MAME_EMU_SCREEN_H
 
@@ -237,7 +238,7 @@ public:
 		m_vblank = m_refresh / vtotal * (vtotal - (vbstart - vbend));
 		m_width = htotal;
 		m_height = vtotal;
-		m_visarea.set(hbend, hbstart - 1, vbend, vbstart - 1);
+		m_visarea.set(hbend, hbstart ? hbstart - 1 : htotal - 1, vbend, vbstart - 1);
 		return *this;
 	}
 	screen_device &set_raw(const XTAL &xtal, u16 htotal, u16 hbend, u16 hbstart, u16 vtotal, u16 vbend, u16 vbstart)
@@ -319,7 +320,7 @@ public:
 
 	/// \brief Set visible area to full area
 	///
-	/// Set visible screen area to the full screen area (i.e. noi
+	/// Set visible screen area to the full screen area (i.e. no
 	/// horizontal or vertical blanking period).  This is generally not
 	/// possible for raster displays, but is useful for other display
 	/// simulations.  Must be called after calling #set_size.
@@ -397,6 +398,7 @@ public:
 	attotime time_until_vblank_end() const;
 	attotime time_until_update() const { return (m_video_attributes & VIDEO_UPDATE_AFTER_VBLANK) ? time_until_vblank_end() : time_until_vblank_start(); }
 	attotime scan_period() const { return attotime(0, m_scantime); }
+	attotime pixel_period() const { return attotime(0, m_pixeltime); }
 	attotime frame_period() const { return attotime(0, m_frame_period); }
 	u64 frame_number() const { return m_frame_number; }
 
@@ -406,6 +408,7 @@ public:
 
 	// updating
 	int partial_updates() const { return m_partial_updates_this_frame; }
+	int partial_scan_hpos() const { return m_partial_scan_hpos; }
 	bool update_partial(int scanline);
 	void update_now();
 	void reset_partial_updates();
@@ -547,7 +550,7 @@ private:
 DECLARE_DEVICE_TYPE(SCREEN, screen_device)
 
 // iterator helper
-typedef device_type_iterator<screen_device> screen_device_iterator;
+typedef device_type_enumerator<screen_device> screen_device_enumerator;
 
 /*!
  @defgroup Screen device configuration functions

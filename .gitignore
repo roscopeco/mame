@@ -12,6 +12,7 @@
 /*
 /*/
 !/roms/
+!/.github/
 !/3rdparty/
 !/android-project/
 !/benchmarks/
@@ -34,7 +35,6 @@
 !/tests/
 !/doxygen/
 !/web/
-!/.drone.yml
 !/.gitattributes
 !/.gitignore
 !/.travis.yml

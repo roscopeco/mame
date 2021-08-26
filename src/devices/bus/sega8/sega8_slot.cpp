@@ -25,7 +25,6 @@
 
  ***********************************************************************************************************/
 
-
 #include "emu.h"
 #include "sega8_slot.h"
 
@@ -233,14 +232,15 @@ static const sega8_slot slot_list[] =
 	{ SEGA8_DAHJEE_TYPEB, "dahjee_typeb" },
 	{ SEGA8_SEOJIN, "seojin" },
 	{ SEGA8_MULTICART, "multicart" },
-	{ SEGA8_MEGACART, "megacart" }
+	{ SEGA8_MEGACART, "megacart" },
+	{ SEGA8_X_TERMINATOR, "xterminator" }
 };
 
 static int sega8_get_pcb_id(const char *slot)
 {
 	for (auto & elem : slot_list)
 	{
-		if (!core_stricmp(elem.slot_option, slot))
+		if (!strcmp(elem.slot_option, slot))
 			return elem.pcb_id;
 	}
 
@@ -358,6 +358,12 @@ void sega8_cart_slot_device::setup_ram()
 			m_cart->ram_alloc(0x10000);
 			m_cart->set_has_battery(false);
 		}
+		else if (m_type == SEGA8_X_TERMINATOR)
+		{
+			// X-Terminator seems to have 8192 bytes of RAM
+			// Unknown if the RAM is battery backed
+			m_cart->ram_alloc(0x2000);
+		}
 		else
 		{
 			// for generic carts loaded from fullpath we have no way to know exactly if there was RAM,
@@ -391,7 +397,7 @@ image_init_result sega8_cart_slot_device::call_load()
 
 		if (m_is_card && len > 0x8000)
 		{
-			seterror(IMAGE_ERROR_UNSPECIFIED, "Attempted loading a card larger than 32KB");
+			seterror(image_error::INVALIDIMAGE, "Attempted loading a card larger than 32KB");
 			return image_init_result::FAIL;
 		}
 
@@ -647,6 +653,8 @@ int sega8_cart_slot_device::get_cart_type(const uint8_t *ROM, uint32_t len) cons
 	if (len == 0x400000)
 		type = SEGA8_MEGACART;
 
+	if (len == 0x2000)
+		type = SEGA8_X_TERMINATOR;
 
 	return type;
 }
@@ -939,4 +947,5 @@ void gg_cart(device_slot_interface &device)
 	device.option_add_internal("eeprom",  SEGA8_ROM_EEPROM);
 	device.option_add_internal("codemasters",  SEGA8_ROM_CODEMASTERS);
 	device.option_add_internal("mgear",  SEGA8_ROM_MGEAR);
+	device.option_add_internal("xterminator", SEGA8_ROM_X_TERMINATOR);
 }

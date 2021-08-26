@@ -110,7 +110,7 @@ protected:
 	devcb_read16 m_portb_in;
 	devcb_read16 m_portc_in;
 
-	devcb_read16::array<2> m_adc_in;
+	devcb_read16::array<4> m_adc_in;
 
 	devcb_read16 m_guny_in;
 	devcb_read16 m_gunx_in;
@@ -122,8 +122,6 @@ protected:
 	devcb_write_line m_spi_tx;
 
 	devcb_write8 m_chip_sel;
-
-	emu_timer *m_screenpos_timer;
 
 	uint8_t m_fiq_vector;
 

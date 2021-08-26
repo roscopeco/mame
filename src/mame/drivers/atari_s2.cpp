@@ -28,17 +28,19 @@ ToDo:
 #include "machine/timer.h"
 #include "machine/watchdog.h"
 #include "sound/dac.h"
-#include "sound/volt_reg.h"
 #include "speaker.h"
 
 #include "atari_s2.lh"
 
+
+namespace {
 
 class atari_s2_state : public genpin_class
 {
 public:
 	atari_s2_state(const machine_config &mconfig, device_type type, const char *tag)
 		: genpin_class(mconfig, type, tag)
+		, m_p_prom(*this, "proms")
 		, m_maincpu(*this, "maincpu")
 		, m_dac(*this, "dac")
 		, m_dac1(*this, "dac1")
@@ -47,6 +49,10 @@ public:
 
 	void atari_s2(machine_config &config);
 	void atari_s3(machine_config &config);
+
+protected:
+	virtual void machine_reset() override;
+	virtual void machine_start() override { m_digits.resolve(); }
 
 private:
 	void sound0_w(uint8_t data);
@@ -69,9 +75,7 @@ private:
 	uint8_t m_vol;
 	uint8_t m_t_c;
 	uint8_t m_segment[7];
-	uint8_t *m_p_prom;
-	virtual void machine_reset() override;
-	virtual void machine_start() override { m_digits.resolve(); }
+	required_region_ptr<uint8_t> m_p_prom;
 	required_device<cpu_device> m_maincpu;
 	required_device<dac_4bit_binary_weighted_device> m_dac;
 	required_device<dac_3bit_binary_weighted_device> m_dac1;
@@ -470,7 +474,6 @@ TIMER_DEVICE_CALLBACK_MEMBER( atari_s2_state::irq )
 
 void atari_s2_state::machine_reset()
 {
-	m_p_prom = memregion("proms")->base();
 	m_vol = 0;
 	m_dac->set_output_gain(0,0);
 	m_dac1->set_output_gain(0,0);
@@ -493,9 +496,6 @@ void atari_s2_state::atari_s2(machine_config &config)
 
 	DAC_4BIT_BINARY_WEIGHTED(config, m_dac, 0).add_route(ALL_OUTPUTS, "speaker", 0.15); // r23-r26 (68k,33k,18k,8.2k)
 	DAC_3BIT_BINARY_WEIGHTED(config, m_dac1, 0).add_route(ALL_OUTPUTS, "speaker", 0.15); // r18-r20 (100k,47k,100k)
-	voltage_regulator_device &vref(VOLTAGE_REGULATOR(config, "vref"));
-	vref.add_route(0, "dac", 1.0, DAC_VREF_POS_INPUT).add_route(0, "dac", -1.0, DAC_VREF_NEG_INPUT);
-	vref.add_route(0, "dac1", 1.0, DAC_VREF_POS_INPUT).add_route(0, "dac1", -1.0, DAC_VREF_NEG_INPUT);
 
 	/* Video */
 	config.set_default_layout(layout_atari_s2);
@@ -521,7 +521,7 @@ ROM_START(supermap)
 	ROM_LOAD("atari_j.rom", 0x3800, 0x0800, CRC(26521779) SHA1(2cf1c66441aee99b9d01859d495c12025b5ef094))
 
 	ROM_REGION(0x0200, "proms", 0)
-	ROM_LOAD("82s130.bin", 0x0000, 0x0200, CRC(da1f77b4) SHA1(b21fdc1c6f196c320ec5404013d672c35f95890b))
+	ROM_LOAD("20967-01.j3", 0x0000, 0x0200, CRC(da1f77b4) SHA1(b21fdc1c6f196c320ec5404013d672c35f95890b))
 ROM_END
 
 /*-------------------------------------------------------------------
@@ -534,7 +534,7 @@ ROM_START(hercules)
 	ROM_LOAD("atari_j.rom", 0x3800, 0x0800, CRC(26521779) SHA1(2cf1c66441aee99b9d01859d495c12025b5ef094))
 
 	ROM_REGION(0x0200, "proms", 0)
-	ROM_LOAD("82s130.bin", 0x0000, 0x0200, CRC(da1f77b4) SHA1(b21fdc1c6f196c320ec5404013d672c35f95890b))
+	ROM_LOAD("20967-01.j3", 0x0000, 0x0200, CRC(da1f77b4) SHA1(b21fdc1c6f196c320ec5404013d672c35f95890b))
 ROM_END
 
 /*-------------------------------------------------------------------
@@ -547,7 +547,7 @@ ROM_START(roadrunr)
 	ROM_LOAD("3800.716", 0x3800, 0x0800, CRC(77262408) SHA1(3045a732c39c96002f495f64ed752279f7d43ee7))
 
 	ROM_REGION(0x0200, "proms", 0)
-	ROM_LOAD("82s130.bin", 0x0000, 0x0200, CRC(da1f77b4) SHA1(b21fdc1c6f196c320ec5404013d672c35f95890b))
+	ROM_LOAD("20967-01.j3", 0x0000, 0x0200, BAD_DUMP CRC(da1f77b4) SHA1(b21fdc1c6f196c320ec5404013d672c35f95890b)) // PinMAME note: unknown so far if using the 20967-01 is correct for Road Runner, but sounds good
 ROM_END
 
 /*-------------------------------------------------------------------
@@ -560,9 +560,12 @@ ROM_START(fourx4)
 	ROM_LOAD("c000a70c.bin", 0xc000, 0x2000, CRC(c31ca8d3) SHA1(53f20eff0084771dc61d19db7ddae52e4423e75e)) \
 	ROM_RELOAD(0xe000, 0x2000)
 
-	ROM_REGION(0x0200, "proms", 0)
-	ROM_LOAD("82s130.bin", 0x0000, 0x0200, CRC(da1f77b4) SHA1(b21fdc1c6f196c320ec5404013d672c35f95890b))
+	ROM_REGION(0x0200, "proms", ROMREGION_ERASE00)
+	// doesn't have PROMs according to PinMAME
 ROM_END
+
+} // Anonymous namespace
+
 
 GAME( 1979, supermap, 0, atari_s2, atari_s2, atari_s2_state, empty_init, ROT0, "Atari", "Superman (Pinball)", MACHINE_MECHANICAL | MACHINE_NOT_WORKING | MACHINE_IMPERFECT_SOUND)
 GAME( 1979, hercules, 0, atari_s2, atari_s2, atari_s2_state, empty_init, ROT0, "Atari", "Hercules",           MACHINE_MECHANICAL | MACHINE_NOT_WORKING | MACHINE_IMPERFECT_SOUND)

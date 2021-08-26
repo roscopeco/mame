@@ -27,7 +27,7 @@ Verified Dip locations and recommended settings with manual
 #include "includes/skyfox.h"
 
 #include "cpu/z80/z80.h"
-#include "sound/2203intf.h"
+#include "sound/ymopn.h"
 #include "speaker.h"
 
 
@@ -37,7 +37,7 @@ Verified Dip locations and recommended settings with manual
 
 ***************************************************************************/
 
-WRITE8_MEMBER(skyfox_state::output_w)
+void skyfox_state::output_w(offs_t offset, uint8_t data)
 {
 	// TODO: untangle
 	switch (offset)

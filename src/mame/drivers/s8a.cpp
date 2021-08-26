@@ -26,11 +26,12 @@ ToDo:
 #include "cpu/m6800/m6800.h"
 #include "machine/6821pia.h"
 #include "sound/dac.h"
-#include "sound/volt_reg.h"
 #include "speaker.h"
 
 #include "s8a.lh"
 
+
+namespace {
 
 class s8a_state : public genpin_class
 {
@@ -45,6 +46,7 @@ public:
 		, m_pia28(*this, "pia28")
 		, m_pia30(*this, "pia30")
 		, m_digits(*this, "digit%u", 0U)
+		, m_swarray(*this, "SW.%u", 0U)
 	{ }
 
 	void s8a(machine_config &config);
@@ -53,6 +55,10 @@ public:
 
 	DECLARE_INPUT_CHANGED_MEMBER(main_nmi);
 	DECLARE_INPUT_CHANGED_MEMBER(audio_nmi);
+
+protected:
+	virtual void machine_start() override { m_digits.resolve(); }
+	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
 
 private:
 	uint8_t sound_r();
@@ -72,19 +78,16 @@ private:
 	DECLARE_WRITE_LINE_MEMBER(pia28_ca2_w) { }; // comma3&4
 	DECLARE_WRITE_LINE_MEMBER(pia28_cb2_w) { }; // comma1&2
 	DECLARE_WRITE_LINE_MEMBER(pia_irq);
-	DECLARE_MACHINE_RESET(s8a);
 
 	void s8a_audio_map(address_map &map);
 	void s8a_main_map(address_map &map);
 
 	uint8_t m_sound_data;
 	uint8_t m_strobe;
-	uint8_t m_kbdrow;
+	uint8_t m_switch_col;
 	bool m_data_ok;
 	emu_timer* m_irq_timer;
-	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
 	static const device_timer_id TIMER_IRQ = 0;
-	virtual void machine_start() override { m_digits.resolve(); }
 	required_device<m6802_cpu_device> m_maincpu;
 	required_device<cpu_device> m_audiocpu;
 	required_device<pia6821_device> m_pias;
@@ -93,6 +96,7 @@ private:
 	required_device<pia6821_device> m_pia28;
 	required_device<pia6821_device> m_pia30;
 	output_finder<61> m_digits;
+	required_ioport_array<8> m_swarray;
 };
 
 void s8a_state::s8a_main_map(address_map &map)
@@ -115,10 +119,7 @@ void s8a_state::s8a_audio_map(address_map &map)
 }
 
 static INPUT_PORTS_START( s8a )
-	PORT_START("X0")
-	PORT_BIT( 0xff, IP_ACTIVE_LOW, IPT_UNUSED )
-
-	PORT_START("X1")
+	PORT_START("SW.0")
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_TILT )
 	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_COIN1 )
 	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_START )
@@ -128,7 +129,7 @@ static INPUT_PORTS_START( s8a )
 	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_OTHER ) PORT_CODE(KEYCODE_M)
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_OTHER ) PORT_CODE(KEYCODE_L)
 
-	PORT_START("X2")
+	PORT_START("SW.1")
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_OTHER ) PORT_CODE(KEYCODE_A)
 	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_OTHER ) PORT_CODE(KEYCODE_S)
 	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_OTHER ) PORT_CODE(KEYCODE_D)
@@ -138,22 +139,22 @@ static INPUT_PORTS_START( s8a )
 	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_OTHER ) PORT_CODE(KEYCODE_J)
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_OTHER ) PORT_CODE(KEYCODE_K)
 
-	PORT_START("X4")
+	PORT_START("SW.2")
 	PORT_BIT( 0xff, IP_ACTIVE_LOW, IPT_UNUSED )
 
-	PORT_START("X8")
+	PORT_START("SW.3")
 	PORT_BIT( 0xff, IP_ACTIVE_LOW, IPT_UNUSED )
 
-	PORT_START("X10")
+	PORT_START("SW.4")
 	PORT_BIT( 0xff, IP_ACTIVE_LOW, IPT_UNUSED )
 
-	PORT_START("X20")
+	PORT_START("SW.5")
 	PORT_BIT( 0xff, IP_ACTIVE_LOW, IPT_UNUSED )
 
-	PORT_START("X40")
+	PORT_START("SW.6")
 	PORT_BIT( 0xff, IP_ACTIVE_LOW, IPT_UNUSED )
 
-	PORT_START("X80")
+	PORT_START("SW.7")
 	PORT_BIT( 0xff, IP_ACTIVE_LOW, IPT_UNUSED )
 
 	PORT_START("DIAGS")
@@ -226,14 +227,22 @@ void s8a_state::dig1_w(uint8_t data)
 
 uint8_t s8a_state::switch_r()
 {
-	char kbdrow[8];
-	sprintf(kbdrow,"X%X",m_kbdrow);
-	return ioport(kbdrow)->read() ^ 0xff;
+	uint8_t retval = 0xff;
+	// scan all 8 input columns, since multiple can be selected at once
+	for (int i = 0; i < 7; i++)
+	{
+		if (m_switch_col & (1<<i))
+			retval &= m_swarray[i]->read();
+	}
+	//retval &= ioport("OPTOS")->read(); // optos should be read here as well, and are always active even if no column is selected
+	return ~retval;
 }
 
 void s8a_state::switch_w(uint8_t data)
 {
-	m_kbdrow = data;
+	// this drives the pulldown 2N3904 NPN transistors Q7-Q14, each of which drives one column of the switch matrix low
+	// it is possible for multiple columns to be enabled at once, this is handled in switch_r above.
+	m_switch_col = data;
 }
 
 uint8_t s8a_state::sound_r()
@@ -279,10 +288,6 @@ void s8a_state::device_timer(emu_timer &timer, device_timer_id id, int param, vo
 	}
 }
 
-MACHINE_RESET_MEMBER( s8a_state, s8a )
-{
-}
-
 void s8a_state::init_s8a()
 {
 	m_irq_timer = timer_alloc(TIMER_IRQ);
@@ -295,7 +300,6 @@ void s8a_state::s8a(machine_config &config)
 	M6802(config, m_maincpu, XTAL(4'000'000));
 	m_maincpu->set_ram_enable(false);
 	m_maincpu->set_addrmap(AS_PROGRAM, &s8a_state::s8a_main_map);
-	MCFG_MACHINE_RESET_OVERRIDE(s8a_state, s8a)
 
 	/* Video */
 	config.set_default_layout(layout_s8a);
@@ -306,6 +310,7 @@ void s8a_state::s8a(machine_config &config)
 	/* Devices */
 	PIA6821(config, m_pia21, 0);
 	m_pia21->readpa_handler().set(FUNC(s8a_state::sound_r));
+	m_pia21->set_port_a_input_overrides_output_mask(0xff);
 	m_pia21->readca1_handler().set(FUNC(s8a_state::pia21_ca1_r));
 	m_pia21->writepa_handler().set(FUNC(s8a_state::sound_w));
 	m_pia21->writepb_handler().set(FUNC(s8a_state::sol2_w));
@@ -331,6 +336,7 @@ void s8a_state::s8a(machine_config &config)
 
 	PIA6821(config, m_pia30, 0);
 	m_pia30->readpa_handler().set(FUNC(s8a_state::switch_r));
+	m_pia30->set_port_a_input_overrides_output_mask(0xff);
 	m_pia30->writepb_handler().set(FUNC(s8a_state::switch_w));
 	m_pia30->irqa_handler().set(FUNC(s8a_state::pia_irq));
 	m_pia30->irqb_handler().set(FUNC(s8a_state::pia_irq));
@@ -343,15 +349,13 @@ void s8a_state::s8a(machine_config &config)
 
 	SPEAKER(config, "speaker").front_center();
 	MC1408(config, "dac", 0).add_route(ALL_OUTPUTS, "speaker", 0.5);
-	voltage_regulator_device &vref(VOLTAGE_REGULATOR(config, "vref"));
-	vref.add_route(0, "dac", 1.0, DAC_VREF_POS_INPUT);
-	vref.add_route(0, "dac", -1.0, DAC_VREF_NEG_INPUT);
 
 	PIA6821(config, m_pias, 0);
 	m_pias->readpa_handler().set(FUNC(s8a_state::sound_r));
+	m_pias->set_port_a_input_overrides_output_mask(0xff);
 	m_pias->writepb_handler().set("dac", FUNC(dac_byte_interface::data_w));
 	m_pias->irqa_handler().set_inputline("audiocpu", M6808_IRQ_LINE);
-	m_pias->irqa_handler().set_inputline("audiocpu", M6808_IRQ_LINE);
+	m_pias->irqb_handler().set_inputline("audiocpu", M6808_IRQ_LINE);
 }
 
 
@@ -366,5 +370,7 @@ ROM_START(scrzy_l1)
 	// 1st and 2nd halves are identical
 	ROM_LOAD("ic49.bin", 0x0000, 0x4000, CRC(bcc8ccc4) SHA1(2312f9cc4f5a2dadfbfa61d13c31bb5838adf152) )
 ROM_END
+
+} // Anonymous namespace
 
 GAME( 1984, scrzy_l1, 0, s8a, s8a, s8a_state, init_s8a, ROT0, "Williams", "Still Crazy", MACHINE_MECHANICAL | MACHINE_NOT_WORKING )

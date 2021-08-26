@@ -229,8 +229,7 @@ To Do:
 #include "machine/subsino.h"
 #include "machine/ticket.h"
 #include "sound/okim6295.h"
-#include "sound/ym2413.h"
-#include "sound/3812intf.h"
+#include "sound/ymopl.h"
 #include "video/ramdac.h"
 #include "emupal.h"
 #include "screen.h"
@@ -246,6 +245,9 @@ To Do:
 #include "tisub.lh"
 #include "stisub.lh"
 
+
+namespace {
+
 class subsino_state : public driver_device
 {
 public:
@@ -253,7 +255,7 @@ public:
 		driver_device(mconfig, type, tag),
 		m_colorram(*this, "colorram"),
 		m_videoram(*this, "videoram"),
-		m_reel_scroll(*this, "reel_scroll.%u", 0U),
+		m_reel_scroll(*this, "reel_scroll.%u", 0U, 0x40U, ENDIANNESS_LITTLE),
 		m_reel_ram(*this, "reel_ram.%u", 0U),
 		m_stbsub_out_c(*this, "stbsub_out_c"),
 		m_maincpu(*this, "maincpu"),
@@ -293,7 +295,7 @@ protected:
 private:
 	required_shared_ptr<uint8_t> m_colorram;
 	required_shared_ptr<uint8_t> m_videoram;
-	optional_shared_ptr_array<uint8_t, 3> m_reel_scroll;
+	memory_share_array_creator<uint8_t, 3> m_reel_scroll;
 	optional_shared_ptr_array<uint8_t, 3> m_reel_ram;
 	optional_shared_ptr<uint8_t> m_stbsub_out_c;
 	required_device<cpu_device> m_maincpu;
@@ -1213,7 +1215,7 @@ static INPUT_PORTS_START( victor21 )
 	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_BUTTON2 )        PORT_CODE(KEYCODE_V)    PORT_NAME("Split")
 	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_GAMBLE_DEAL )    PORT_CODE(KEYCODE_Z)    PORT_NAME("Deal / Hit")
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_POKER_BET )      PORT_IMPULSE(3)
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_GAMBLE_BET )     PORT_IMPULSE(3)
 	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_GAMBLE_STAND )   PORT_CODE(KEYCODE_X)
 	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_BUTTON1 )        PORT_CODE(KEYCODE_A)    PORT_NAME("Bet x10")    // multibet
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_GAMBLE_D_UP )    PORT_CODE(KEYCODE_C)
@@ -1223,15 +1225,15 @@ static INPUT_PORTS_START( victor21 )
 	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_GAMBLE_KEYIN )   // key in
 	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_COIN2 )          PORT_IMPULSE(3) // coin 2
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_COIN3 )          PORT_IMPULSE(3) // coin 3
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_9)    PORT_NAME("Stats")  // Bookkeeping.
-	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_0)    PORT_NAME("Settings")   // Game Rate.
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_GAMBLE_BOOK )                            PORT_NAME("Stats")  // Bookkeeping.
+	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_GAMBLE_SERVICE )                         PORT_NAME("Settings")   // Game Rate.
 	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_GAMBLE_PAYOUT )  // no payout?
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_GAMBLE_KEYOUT )  // key out
 
 	PORT_START( "INC" )
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_UNKNOWN )
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_R)    PORT_NAME("Reset")  // hard reset
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_MEMORY_RESET )                           PORT_NAME("Reset")  // hard reset
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_UNKNOWN )
@@ -1323,7 +1325,7 @@ static INPUT_PORTS_START( victor5 )
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_POKER_HOLD4 )    PORT_NAME("Hold 4 / Big")
 	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_POKER_HOLD5 )    PORT_NAME("Hold 5 / Small")
 	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_GAMBLE_DEAL )    PORT_NAME("Deal / Take")
-	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_POKER_BET )      PORT_IMPULSE(3)
+	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_GAMBLE_BET )     PORT_IMPULSE(3)
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_UNKNOWN )
 
 	PORT_START( "INB" )
@@ -1331,15 +1333,15 @@ static INPUT_PORTS_START( victor5 )
 	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_GAMBLE_KEYIN )   // key in
 	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_UNKNOWN )
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_9)    PORT_NAME("Stats")  // Bookkeeping.
-	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_0)    PORT_NAME("Settings")   // Game Rate & others.
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_GAMBLE_BOOK )                            PORT_NAME("Stats")  // Bookkeeping.
+	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_GAMBLE_SERVICE )                         PORT_NAME("Settings")   // Game Rate & others.
 	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_GAMBLE_PAYOUT )  // payout
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_GAMBLE_KEYOUT )  // key out
 
 	PORT_START( "INC" )
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_UNKNOWN )
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_R)    PORT_NAME("Reset")  // hard reset
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_MEMORY_RESET )                           PORT_NAME("Reset")  // hard reset
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_UNKNOWN )
@@ -1454,12 +1456,12 @@ static INPUT_PORTS_START( tisub )
 
 	PORT_START( "INA" )
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_GAMBLE_D_UP )    PORT_NAME("Double / Info")
-	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_POKER_HOLD1 )    PORT_NAME("Hold 1")
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_POKER_HOLD2 )    PORT_NAME("Hold 2 / Big")
-	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_POKER_HOLD3 )    PORT_NAME("Hold 3 / Small")
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_SLOT_STOP1 )     PORT_NAME("Stop 1")
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_SLOT_STOP2 )     PORT_NAME("Stop 2 / Big")
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_SLOT_STOP3 )     PORT_NAME("Stop 3 / Small")
 	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_UNKNOWN )
-	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_GAMBLE_DEAL )    PORT_NAME("Start / Take")
-	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_POKER_BET )      PORT_IMPULSE(3)
+	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_START1 )         PORT_NAME("Start / Take")
+	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_GAMBLE_BET )     PORT_IMPULSE(3)
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_UNKNOWN )
 
 	PORT_START( "INB" )
@@ -1467,15 +1469,15 @@ static INPUT_PORTS_START( tisub )
 	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_GAMBLE_KEYIN )   // key in
 	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_UNKNOWN )
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_9)    PORT_NAME("Stats / Test")   // Bookkeeping.
-	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_0)    PORT_NAME("Settings")       // Current settings.
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_GAMBLE_BOOK )                            PORT_NAME("Stats / Test")   // Bookkeeping.
+	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_GAMBLE_SERVICE )                         PORT_NAME("Settings")       // Current settings.
 	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_GAMBLE_PAYOUT )  // payout
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_GAMBLE_KEYOUT )  // key out
 
 	PORT_START( "INC" )
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_UNKNOWN )
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_R)    PORT_NAME("Reset")  // hard reset
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_MEMORY_RESET )                           PORT_NAME("Reset")  // hard reset
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_UNKNOWN )
@@ -1589,8 +1591,8 @@ static INPUT_PORTS_START( stbsub )
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_UNKNOWN )
-	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_START )          PORT_CODE(KEYCODE_N)    PORT_NAME("Start / Stop All")
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_POKER_BET )      PORT_CODE(KEYCODE_C)    PORT_NAME("Bet / Stop 2")
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_START1 )                                 PORT_NAME("Start / Stop All")
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_SLOT_STOP2 )                             PORT_NAME("Bet / Stop 2")
 	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_GAMBLE_D_UP )    PORT_CODE(KEYCODE_Z)    PORT_NAME("Double / Info")
 	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_UNKNOWN )
@@ -1600,19 +1602,19 @@ static INPUT_PORTS_START( stbsub )
 	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_GAMBLE_KEYIN )   // key in
 	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_UNKNOWN )
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_9)    PORT_NAME("Stats / Test")   // Bookkeeping.
-	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_0)    PORT_NAME("Settings")       // Current settings.
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_GAMBLE_BOOK )                            PORT_NAME("Stats / Test")   // Bookkeeping.
+	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_GAMBLE_SERVICE )                         PORT_NAME("Settings")       // Current settings.
 	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_GAMBLE_PAYOUT )  // payout
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_GAMBLE_KEYOUT )  // key out
 
 	PORT_START("INC")
-	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_GAMBLE_LOW )     PORT_CODE(KEYCODE_V)    PORT_NAME("Small / Black / Stop 3")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_SLOT_STOP3 )                             PORT_NAME("Small / Black / Stop 3")
 	PORT_BIT( 0x02, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_READ_LINE_DEVICE_MEMBER("hopper", ticket_dispenser_device, line_r) // hopper sensor
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_R)    PORT_NAME("Reset")  // hard reset
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_MEMORY_RESET )                           PORT_NAME("Reset")  // hard reset
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_GAMBLE_HIGH )    PORT_CODE(KEYCODE_B)    PORT_NAME("Big / Red")
 	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_UNKNOWN )
-	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_GAMBLE_TAKE )    PORT_CODE(KEYCODE_X)    PORT_NAME("Take / Stop 1")
+	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_SLOT_STOP1 )                             PORT_NAME("Take / Stop 1")
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_UNKNOWN )
 INPUT_PORTS_END
 
@@ -1725,8 +1727,8 @@ static INPUT_PORTS_START( tesorone )
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_UNKNOWN )
-	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_START )          PORT_CODE(KEYCODE_N)    PORT_NAME("Start / Stop All")
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_POKER_BET )      PORT_CODE(KEYCODE_C)    PORT_NAME("Bet / Stop 2")
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_START1 )                                 PORT_NAME("Start / Stop All")
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_SLOT_STOP2 )                             PORT_NAME("Bet / Stop 2")
 	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_GAMBLE_D_UP )    PORT_CODE(KEYCODE_Z)    PORT_NAME("Double / Info")
 	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_UNKNOWN )
@@ -1736,19 +1738,19 @@ static INPUT_PORTS_START( tesorone )
 	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_GAMBLE_KEYIN )   // key in
 	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_UNKNOWN )
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_9)    PORT_NAME("Stats / Test")   // Bookkeeping.
-	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_0)    PORT_NAME("Settings")       // Current settings.
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_GAMBLE_BOOK )                            PORT_NAME("Stats / Test")   // Bookkeeping.
+	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_GAMBLE_SERVICE )                         PORT_NAME("Settings")       // Current settings.
 	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_GAMBLE_PAYOUT )  // payout
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_GAMBLE_KEYOUT )  // key out
 
 	PORT_START("INC")
-	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_GAMBLE_LOW )     PORT_CODE(KEYCODE_V)    PORT_NAME("Small / Black / Stop 3")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_SLOT_STOP3 )                             PORT_NAME("Small / Black / Stop 3")
 	PORT_BIT( 0x02, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_READ_LINE_DEVICE_MEMBER("hopper", ticket_dispenser_device, line_r) // hopper sensor
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_R)    PORT_NAME("Reset")  // hard reset
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_MEMORY_RESET )                           PORT_NAME("Reset")  // hard reset
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_GAMBLE_HIGH )    PORT_CODE(KEYCODE_B)    PORT_NAME("Big / Red")
 	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_UNKNOWN )
-	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_GAMBLE_TAKE )    PORT_CODE(KEYCODE_X)    PORT_NAME("Take / Stop 1")
+	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_SLOT_STOP1 )                             PORT_NAME("Take / Stop 1")
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_UNKNOWN )
 INPUT_PORTS_END
 
@@ -1863,7 +1865,7 @@ static INPUT_PORTS_START( crsbingo )
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_POKER_HOLD4 )    PORT_NAME("Hold 4 / Big")
 	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_POKER_HOLD5 )    PORT_NAME("Hold 5 / Small")
 	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_GAMBLE_DEAL )    PORT_NAME("Deal / Take")
-	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_POKER_BET )      PORT_IMPULSE(3)
+	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_GAMBLE_BET )     PORT_IMPULSE(3)
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_UNKNOWN )
 
 	PORT_START( "INB" )
@@ -1871,15 +1873,15 @@ static INPUT_PORTS_START( crsbingo )
 	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_GAMBLE_KEYIN )   // key in
 	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_UNKNOWN )
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_9)    PORT_NAME("Stats")      // Bookkeeping.
-	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_0)    PORT_NAME("Settings")   // Game Rate & others.
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_GAMBLE_BOOK )                            PORT_NAME("Stats")      // Bookkeeping.
+	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_GAMBLE_SERVICE )                         PORT_NAME("Settings")   // Game Rate & others.
 	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_GAMBLE_PAYOUT )  // payout
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_GAMBLE_KEYOUT )  // key out
 
 	PORT_START( "INC" )
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_UNKNOWN )
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_R)    PORT_NAME("Reset")  // hard reset
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_MEMORY_RESET )                           PORT_NAME("Reset")  // hard reset
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_UNKNOWN )
@@ -1955,7 +1957,7 @@ static INPUT_PORTS_START( sharkpy )
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_POKER_HOLD4 )    PORT_NAME("Hold 4 / Big")
 	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_POKER_HOLD5 )    PORT_NAME("Hold 5 / Small")
 	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_GAMBLE_DEAL )    PORT_NAME("Deal / Take")
-	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_POKER_BET )      PORT_NAME("Bet")    PORT_IMPULSE(3)
+	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_GAMBLE_BET )     PORT_NAME("Bet")    PORT_IMPULSE(3)
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_UNKNOWN )
 
 	PORT_START( "INB" )
@@ -1963,15 +1965,15 @@ static INPUT_PORTS_START( sharkpy )
 	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_UNKNOWN )
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_9)    PORT_NAME("Stats / Test")   // Bookkeeping.
-	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_0)    PORT_NAME("Settings")   // Game Rate & others.
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_GAMBLE_BOOK )                            PORT_NAME("Stats / Test")   // Bookkeeping.
+	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_GAMBLE_SERVICE )                         PORT_NAME("Settings")   // Game Rate & others.
 	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_GAMBLE_PAYOUT )  // payout?
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_GAMBLE_KEYOUT )  // key out?
 
 	PORT_START( "INC" )
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_UNKNOWN )
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_R)    PORT_NAME("Reset")  // hard reset
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_MEMORY_RESET )                           PORT_NAME("Reset")  // hard reset
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_UNKNOWN )
@@ -2071,15 +2073,15 @@ static INPUT_PORTS_START( sharkpye )
 	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_GAMBLE_KEYIN )
 	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_UNKNOWN )
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_9)    PORT_NAME("Stats / Test")   // Bookkeeping.
-	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_0)    PORT_NAME("Settings")   // Game Rate & others.
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_GAMBLE_BOOK )                            PORT_NAME("Stats / Test")   // Bookkeeping.
+	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_GAMBLE_SERVICE )                         PORT_NAME("Settings")   // Game Rate & others.
 	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_GAMBLE_KEYOUT )
 
 	PORT_START( "INC" )
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_POKER_HOLD4 )    PORT_NAME("Hold 4 / Small")
 	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_UNKNOWN )
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_R)    PORT_NAME("Reset Switch")   // hard reset
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_MEMORY_RESET )                           PORT_NAME("Reset Switch")   // hard reset
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_POKER_HOLD5 )    PORT_NAME("Hold 5 / Big")
 	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_UNKNOWN )
@@ -2159,7 +2161,7 @@ static INPUT_PORTS_START( smoto16 )
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_POKER_HOLD4 )    PORT_NAME("Hold 4 / Select")
 	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_POKER_HOLD5 )
 	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_GAMBLE_DEAL )    PORT_NAME("Deal / Take")
-	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_POKER_BET )      PORT_NAME("Bet / Speed")    PORT_IMPULSE(3)
+	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_GAMBLE_BET )     PORT_NAME("Bet / Speed")    PORT_IMPULSE(3)
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_UNKNOWN )
 
 	PORT_START( "INB" ) // d006
@@ -2167,15 +2169,15 @@ static INPUT_PORTS_START( smoto16 )
 	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x04, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_READ_LINE_DEVICE_MEMBER("hopper", ticket_dispenser_device, line_r) // hopper sensor
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_UNKNOWN )
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_9)    PORT_NAME("Stats / Test")   // Bookkeeping.
-	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_0)    PORT_NAME("Settings")   // Game Rate & others.
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_GAMBLE_BOOK )                            PORT_NAME("Stats / Test")   // Bookkeeping.
+	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_GAMBLE_SERVICE )                         PORT_NAME("Settings")   // Game Rate & others.
 	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_GAMBLE_PAYOUT )  // payout
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_GAMBLE_KEYOUT )  // key out?
 
 	PORT_START( "INC" ) // d00c
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x02, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_READ_LINE_DEVICE_MEMBER("hopper", ticket_dispenser_device, line_r) // hopper sensor
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_R)    PORT_NAME("Reset")  // hard reset
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_MEMORY_RESET )                           PORT_NAME("Reset")  // hard reset
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_UNKNOWN )
@@ -2255,7 +2257,7 @@ static INPUT_PORTS_START( smoto20 )
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_POKER_HOLD4 )    PORT_NAME("Hold 4 / Select")
 	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_POKER_HOLD5 )
 	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_GAMBLE_DEAL )    PORT_NAME("Deal / Take")
-	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_POKER_BET )      PORT_NAME("Bet / Speed")    PORT_IMPULSE(3)
+	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_GAMBLE_BET )     PORT_NAME("Bet / Speed")    PORT_IMPULSE(3)
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_UNKNOWN )
 
 	PORT_START( "INB" ) // d006
@@ -2263,15 +2265,15 @@ static INPUT_PORTS_START( smoto20 )
 	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x04, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_READ_LINE_DEVICE_MEMBER("hopper", ticket_dispenser_device, line_r) // hopper sensor
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_UNKNOWN )
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_9)    PORT_NAME("Stats / Test")   // Bookkeeping.
-	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_0)    PORT_NAME("Settings")   // Game Rate & others.
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_GAMBLE_BOOK )                            PORT_NAME("Stats / Test")   // Bookkeeping.
+	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_GAMBLE_SERVICE )                         PORT_NAME("Settings")   // Game Rate & others.
 	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_GAMBLE_PAYOUT )  // payout
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_GAMBLE_KEYOUT )  // key out?
 
 	PORT_START( "INC" ) // d00c
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x02, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_READ_LINE_DEVICE_MEMBER("hopper", ticket_dispenser_device, line_r) // hopper sensor
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_R)    PORT_NAME("Reset")  // hard reset
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_MEMORY_RESET )                           PORT_NAME("Reset")  // hard reset
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_UNKNOWN )
@@ -2371,15 +2373,15 @@ static INPUT_PORTS_START( victor6 )
 	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_GAMBLE_KEYIN )
 	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_UNKNOWN )
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_9)    PORT_NAME("Stats / Test")   // Bookkeeping.
-	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_0)    PORT_NAME("Settings")   // Game Rate & others.
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_GAMBLE_BOOK )                            PORT_NAME("Stats / Test")   // Bookkeeping.
+	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_GAMBLE_SERVICE )                         PORT_NAME("Settings")   // Game Rate & others.
 	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_GAMBLE_KEYOUT )
 
 	PORT_START( "INC" )
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_POKER_HOLD4 )    PORT_NAME("Hold 4 / Small")
 	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_UNKNOWN )
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_R)    PORT_NAME("Reset Switch")   // hard reset
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_MEMORY_RESET )                           PORT_NAME("Reset Switch")   // hard reset
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_POKER_HOLD5 )    PORT_NAME("Hold 5 / Big")
 	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_UNKNOWN )
@@ -2479,15 +2481,15 @@ static INPUT_PORTS_START( victor6a )
 	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_GAMBLE_KEYIN )
 	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_UNKNOWN )
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_9)    PORT_NAME("Stats / Test")   // Bookkeeping.
-	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_0)    PORT_NAME("Settings")   // Game Rate & others.
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_GAMBLE_BOOK )                            PORT_NAME("Stats / Test")   // Bookkeeping.
+	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_GAMBLE_SERVICE )                         PORT_NAME("Settings")   // Game Rate & others.
 	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_GAMBLE_KEYOUT )
 
 	PORT_START( "INC" )
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_POKER_HOLD4 )    PORT_NAME("Hold 4 / Small")
 	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_UNKNOWN )
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_R)    PORT_NAME("Reset Switch")   // hard reset
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_MEMORY_RESET )                           PORT_NAME("Reset Switch")   // hard reset
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_POKER_HOLD5 )    PORT_NAME("Hold 5 / Big")
 	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_UNKNOWN )
@@ -2587,15 +2589,15 @@ static INPUT_PORTS_START( victor6b )
 	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_GAMBLE_KEYIN )
 	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_UNKNOWN )
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_9)    PORT_NAME("Stats / Test")   // Bookkeeping.
-	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_0)    PORT_NAME("Settings")   // Game Rate & others.
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_GAMBLE_BOOK )                            PORT_NAME("Stats / Test")   // Bookkeeping.
+	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_GAMBLE_SERVICE )                         PORT_NAME("Settings")   // Game Rate & others.
 	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_GAMBLE_KEYOUT )
 
 	PORT_START( "INC" )
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_POKER_HOLD4 )    PORT_NAME("Hold 4 / Small")
 	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_UNKNOWN )
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_SERVICE )        PORT_CODE(KEYCODE_R)    PORT_NAME("Reset Switch")   // hard reset
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_MEMORY_RESET )                           PORT_NAME("Reset Switch")   // hard reset
 	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_POKER_HOLD5 )    PORT_NAME("Hold 5 / Big")
 	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_UNKNOWN )
@@ -3737,6 +3739,10 @@ void subsino_state::init_victor5()
 {
 	subsino_decrypt(machine(), victor5_bitswaps, victor5_xors, 0xc000);
 
+	m_flash_packet = 0;
+	m_flash_packet_start = 0;
+	m_flash_val = 0;
+
 	save_item(NAME(m_flash_packet));
 	save_item(NAME(m_flash_packet_start));
 	save_item(NAME(m_flash_val));
@@ -3750,6 +3756,10 @@ void subsino_state::init_victor21()
 void subsino_state::init_crsbingo()
 {
 	subsino_decrypt(machine(), crsbingo_bitswaps, crsbingo_xors, 0xc000);
+
+	m_flash_packet = 0;
+	m_flash_packet_start = 0;
+	m_flash_val = 0;
 
 	save_item(NAME(m_flash_packet));
 	save_item(NAME(m_flash_packet_start));
@@ -3813,8 +3823,6 @@ void subsino_state::init_stbsub()
 
 	for (uint8_t reel = 0; reel < 3; reel++)
 	{
-		m_reel_scroll[reel].allocate(0x40);
-
 		m_reel_attr[reel] = std::make_unique<uint8_t[]>(0x200);
 
 		save_pointer(NAME(m_reel_attr[reel]), 0x200, reel);
@@ -3829,8 +3837,6 @@ void subsino_state::init_stisub()
 
 	for (uint8_t reel = 0; reel < 3; reel++)
 	{
-		m_reel_scroll[reel].allocate(0x40);
-
 		m_reel_attr[reel] = std::make_unique<uint8_t[]>(0x200);
 
 		save_pointer(NAME(m_reel_attr[reel]), 0x200, reel);
@@ -3849,8 +3855,6 @@ void subsino_state::init_tesorone()
 
 	for (uint8_t reel = 0; reel < 3; reel++)
 	{
-		m_reel_scroll[reel].allocate(0x40);
-
 		m_reel_attr[reel] = std::make_unique<uint8_t[]>(0x200);
 
 		save_pointer(NAME(m_reel_attr[reel]), 0x200, reel);
@@ -3869,8 +3873,6 @@ void subsino_state::init_tesorone230()
 
 	for (uint8_t reel = 0; reel < 3; reel++)
 	{
-		m_reel_scroll[reel].allocate(0x40);
-
 		m_reel_attr[reel] = std::make_unique<uint8_t[]>(0x200);
 
 		save_pointer(NAME(m_reel_attr[reel]), 0x200, reel);
@@ -3882,13 +3884,14 @@ void subsino_state::init_mtrainnv()
 {
 	for (uint8_t reel = 0; reel < 3; reel++)
 	{
-		m_reel_scroll[reel].allocate(0x40);
-
 		m_reel_attr[reel] = std::make_unique<uint8_t[]>(0x200);
 
 		save_pointer(NAME(m_reel_attr[reel]), 0x200, reel);
 	}
 }
+
+} // Anonymous namespace
+
 
 /***************************************************************************
 *                               Game Drivers                               *

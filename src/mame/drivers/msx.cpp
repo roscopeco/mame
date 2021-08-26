@@ -533,7 +533,6 @@ PCB Layouts missing
 #include "machine/msx_matsushita.h"
 #include "machine/msx_s1985.h"
 #include "machine/msx_systemflags.h"
-#include "sound/volt_reg.h"
 #include "screen.h"
 #include "softlist.h"
 #include "speaker.h"
@@ -1273,10 +1272,12 @@ void msx2_state::msxr_floplist(machine_config &config)
 	SOFTWARE_LIST(config, "msx1_flp_l").set_compatible("msx1_flop");    // maybe not?
 }
 
-FLOPPY_FORMATS_MEMBER( msx_state::floppy_formats )
-	FLOPPY_MSX_FORMAT,
-	FLOPPY_DMK_FORMAT
-FLOPPY_FORMATS_END
+void msx_state::floppy_formats(format_registration &fr)
+{
+	fr.add_mfm_containers();
+	fr.add(FLOPPY_MSX_FORMAT);
+	fr.add(FLOPPY_DMK_FORMAT);
+}
 
 static void msx_floppies(device_slot_interface &device)
 {
@@ -1369,8 +1370,6 @@ void msx_state::msx(machine_config &config)
 	/* sound hardware */
 	SPEAKER(config, "speaker").front_center();
 	DAC_1BIT(config, m_dac, 0).add_route(ALL_OUTPUTS, "speaker", 0.1);
-	voltage_regulator_device &vref(VOLTAGE_REGULATOR(config, "vref", 0));
-	vref.add_route(0, "dac", 1.0, DAC_VREF_POS_INPUT);
 
 	AY8910(config, m_ay8910, 10.738635_MHz_XTAL / 3 / 2);
 	m_ay8910->set_flags(AY8910_SINGLE_OUTPUT);
@@ -1441,8 +1440,6 @@ void msx2_state::msx2(machine_config &config)
 	/* sound hardware */
 	SPEAKER(config, "speaker").front_center();
 	DAC_1BIT(config, m_dac, 0).add_route(ALL_OUTPUTS, "speaker", 0.1);
-	voltage_regulator_device &vref(VOLTAGE_REGULATOR(config, "vref", 0));
-	vref.add_route(0, "dac", 1.0, DAC_VREF_POS_INPUT);
 
 	AY8910(config, m_ay8910, 21.477272_MHz_XTAL / 6 / 2);
 	m_ay8910->set_flags(AY8910_SINGLE_OUTPUT);
@@ -1504,8 +1501,6 @@ void msx2_state::msx2p(machine_config &config)
 	/* sound hardware */
 	SPEAKER(config, "speaker").front_center();
 	DAC_1BIT(config, m_dac, 0).add_route(ALL_OUTPUTS, "speaker", 0.1);
-	voltage_regulator_device &vref(VOLTAGE_REGULATOR(config, "vref", 0));
-	vref.add_route(0, "dac", 1.0, DAC_VREF_POS_INPUT);
 
 	AY8910(config, m_ay8910, 21.477272_MHz_XTAL / 6 / 2);
 	m_ay8910->set_flags(AY8910_SINGLE_OUTPUT);

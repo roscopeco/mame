@@ -141,7 +141,7 @@ void fs3216_state::machine_reset()
 
 MC6845_UPDATE_ROW(fs3216_state::crt_update_row)
 {
-	u32 *px = &bitmap.pix32(y);
+	u32 *px = &bitmap.pix(y);
 
 	for (int i = 0; i < x_count; i++)
 	{
@@ -343,9 +343,9 @@ void fs3216_state::floppy_control_w(u8 data)
 		m_floppy_status &= 0xef;
 	}
 
+	m_fdc->reset_w(!BIT(data, 1));
 	if (!BIT(data, 1))
 	{
-		m_fdc->soft_reset();
 		m_fdc_dma_count = 0;
 		m_fdc->tc_w(0);
 	}
@@ -494,7 +494,7 @@ void fs3216_state::fs3216(machine_config &config)
 	m_fdc->us_wr_callback().set(FUNC(fs3216_state::fdc_us_w));
 
 	for (int i = 0; i < 4; i++)
-		FLOPPY_CONNECTOR(config, m_floppy[i], fs3216_floppies, i < 1 ? "525dd" : nullptr, floppy_image_device::default_floppy_formats);
+		FLOPPY_CONNECTOR(config, m_floppy[i], fs3216_floppies, i < 1 ? "525dd" : nullptr, floppy_image_device::default_mfm_floppy_formats);
 
 	X2212(config, m_earom);
 

@@ -154,17 +154,17 @@ WRITE_LINE_MEMBER(freekick_state::spinner_select_w)
 	m_spinner = state;
 }
 
-WRITE8_MEMBER(freekick_state::gigas_spinner_select_w)
+void freekick_state::gigas_spinner_select_w(uint8_t data)
 {
 	m_spinner = data & 1;
 }
 
-READ8_MEMBER(freekick_state::spinner_r)
+uint8_t freekick_state::spinner_r()
 {
 	return ioport(m_spinner ? "IN3" : "IN2")->read();
 }
 
-WRITE8_MEMBER(freekick_state::pbillrd_bankswitch_w)
+void freekick_state::pbillrd_bankswitch_w(uint8_t data)
 {
 	m_bank1->set_entry(data & 1);
 	if(m_bank1d)
@@ -184,7 +184,7 @@ WRITE_LINE_MEMBER(freekick_state::vblank_irq)
 		m_maincpu->set_input_line(INPUT_LINE_NMI, ASSERT_LINE);
 }
 
-WRITE8_MEMBER(freekick_state::oigas_5_w)
+void freekick_state::oigas_5_w(uint8_t data)
 {
 	if (data > 0xc0 && data < 0xe0)
 		m_cnt = 1;
@@ -196,7 +196,7 @@ WRITE8_MEMBER(freekick_state::oigas_5_w)
 	}
 }
 
-READ8_MEMBER(freekick_state::oigas_3_r)
+uint8_t freekick_state::oigas_3_r()
 {
 	switch (++m_cnt)
 	{
@@ -233,17 +233,17 @@ READ8_MEMBER(freekick_state::oigas_3_r)
 	return 0;
 }
 
-READ8_MEMBER(freekick_state::oigas_2_r)
+uint8_t freekick_state::oigas_2_r()
 {
 	return 1;
 }
 
-READ8_MEMBER(freekick_state::freekick_ff_r)
+uint8_t freekick_state::freekick_ff_r()
 {
 	return m_ff_data;
 }
 
-WRITE8_MEMBER(freekick_state::freekick_ff_w)
+void freekick_state::freekick_ff_w(uint8_t data)
 {
 	m_ff_data = data;
 }
@@ -1599,10 +1599,10 @@ void freekick_state::init_gigasb()
 
 void freekick_state::init_pbillrds()
 {
-	uint8_t *decrypted_opcodes = auto_alloc_array(machine(), uint8_t, 0x10000);
-	downcast<mc8123_device &>(*m_maincpu).decode(memregion("maincpu")->base(), decrypted_opcodes, 0x10000);
-	membank("bank0d")->set_base(decrypted_opcodes);
-	m_bank1d->configure_entries(0, 2, decrypted_opcodes + 0x8000, 0x4000);
+	m_decrypted_opcodes = std::make_unique<uint8_t[]>(0x10000);
+	downcast<mc8123_device &>(*m_maincpu).decode(memregion("maincpu")->base(), m_decrypted_opcodes.get(), 0x10000);
+	membank("bank0d")->set_base(m_decrypted_opcodes.get());
+	m_bank1d->configure_entries(0, 2, &m_decrypted_opcodes[0x8000], 0x4000);
 }
 
 
@@ -1615,10 +1615,10 @@ void freekick_state::init_pbillrdbl()
 
 void freekick_state::init_gigas()
 {
-	uint8_t *decrypted_opcodes = auto_alloc_array(machine(), uint8_t, 0xc000);
-	downcast<mc8123_device &>(*m_maincpu).decode(memregion("maincpu")->base(), decrypted_opcodes, 0xc000);
-	membank("bank0d")->set_base(decrypted_opcodes);
-	m_bank1d->set_base(decrypted_opcodes + 0x8000);
+	m_decrypted_opcodes = std::make_unique<uint8_t[]>(0xc000);
+	downcast<mc8123_device &>(*m_maincpu).decode(memregion("maincpu")->base(), m_decrypted_opcodes.get(), 0xc000);
+	membank("bank0d")->set_base(m_decrypted_opcodes.get());
+	m_bank1d->set_base(&m_decrypted_opcodes[0x8000]);
 }
 
 

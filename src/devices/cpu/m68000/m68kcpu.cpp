@@ -1108,8 +1108,6 @@ void m68000_base_device::device_reset()
 	m68ki_clear_trace();
 	/* Interrupt mask to level 7 */
 	m_int_mask = 0x0700;
-	m_int_level = 0;
-	m_virq_state = 0;
 	/* Reset VBR */
 	m_vbr = 0;
 	/* Go to supervisor mode */
@@ -1683,7 +1681,6 @@ void m68000_base_device::define_state(void)
 	state_add(M68K_SR,         "SR",        m_iotemp).callimport().callexport().mask(m_sr_mask);
 	state_add(STATE_GENFLAGS,  "GENFLAGS",  m_iotemp).noshow().callimport().callexport().formatstr("%16s");
 	state_add(M68K_SP,         "SP",        m_dar[15]);
-	state_add(STATE_GENSP,     "GENSP",     m_dar[15]).noshow();
 	state_add(M68K_USP,        "USP",       m_iotemp).callimport().callexport();
 	if (m_cpu_type & MASK_020_OR_LATER)
 	{

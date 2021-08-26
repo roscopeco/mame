@@ -92,7 +92,7 @@ public:
 	void act_f1(machine_config &config);
 
 private:
-	DECLARE_FLOPPY_FORMATS(floppy_formats);
+	static void floppy_formats(format_registration &fr);
 
 	virtual void machine_start() override;
 
@@ -149,7 +149,7 @@ u32 f1_state::screen_update(screen_device &screen, bitmap_ind16 &bitmap, const r
 				{
 					int color = (BIT(data, 15) << 1) | BIT(data, 7);
 
-					bitmap.pix16(y, (sx * 8) + x) = color;
+					bitmap.pix(y, (sx * 8) + x) = color;
 
 					data <<= 1;
 				}
@@ -160,8 +160,8 @@ u32 f1_state::screen_update(screen_device &screen, bitmap_ind16 &bitmap, const r
 				{
 					int color = (BIT(data, 15) << 3) | (BIT(data, 14) << 2) | (BIT(data, 7) << 1) | BIT(data, 6);
 
-					bitmap.pix16(y, (sx * 8) + (x * 2)) = color;
-					bitmap.pix16(y, (sx * 8) + (x * 2) + 1) = color;
+					bitmap.pix(y, (sx * 8) + (x * 2)) = color;
+					bitmap.pix(y, (sx * 8) + (x * 2) + 1) = color;
 
 					data <<= 2;
 				}
@@ -338,9 +338,12 @@ void f1_state::m1_w(u8 data)
 //  floppy
 //-------------------------------------------------
 
-FLOPPY_FORMATS_MEMBER( f1_state::floppy_formats )
-	FLOPPY_APRIDISK_FORMAT
-FLOPPY_FORMATS_END
+void f1_state::floppy_formats(format_registration &fr)
+{
+	fr.add_mfm_containers();
+
+	fr.add(FLOPPY_APRIDISK_FORMAT);
+}
 
 void apricotf_floppies(device_slot_interface &device)
 {

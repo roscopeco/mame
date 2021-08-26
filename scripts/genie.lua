@@ -14,7 +14,7 @@ newoption {
 premake.check_paths = true
 premake.make.override = { "TARGET" }
 
-premake.xcode.parameters = { 'CLANG_CXX_LANGUAGE_STANDARD = "c++14"', 'CLANG_CXX_LIBRARY = "libc++"' }
+premake.xcode.parameters = { 'CLANG_CXX_LANGUAGE_STANDARD = "c++17"', 'CLANG_CXX_LIBRARY = "libc++"' }
 
 MAME_DIR = (path.getabsolute("..") .. "/")
 --MAME_DIR = string.gsub(MAME_DIR, "(%s)", "\\%1")
@@ -98,6 +98,14 @@ function addprojectflags()
 			"-flifetime-dse=1",
 		}
 	end
+end
+
+function opt_tool(hash, entry)
+   if _OPTIONS["with-tools"] then
+	  hash[entry] = true
+	  return true
+   end
+   return hash[entry]
 end
 
 CPUS = {}
@@ -192,6 +200,11 @@ newoption {
 newoption {
 	trigger = "LD",
 	description = "LD replacement",
+}
+
+newoption {
+	trigger = "AR",
+	description = "AR replacement",
 }
 
 newoption {
@@ -477,6 +490,7 @@ language "C++"
 
 flags {
 	"StaticRuntime",
+	"Cpp17",
 }
 
 configuration { "vs20*" }
@@ -678,14 +692,21 @@ else
 		"LSB_FIRST",
 	}
 	if _OPTIONS["targetos"]=="macosx" then
-		configuration { "x64" }
+		configuration { "arm64" }
+			buildoptions {
+				"-arch arm64",
+			}
+			linkoptions {
+				"-arch arm64",
+			}
+		configuration { "x64", "not arm64" }
 			buildoptions {
 				"-arch x86_64",
 			}
 			linkoptions {
 				"-arch x86_64",
 			}
-		configuration { "x32" }
+		configuration { "x32", "not arm64" }
 			buildoptions {
 				"-arch i386",
 			}
@@ -753,23 +774,13 @@ end
 	}
 
 local version = str_to_version(_OPTIONS["gcc_version"])
-if string.find(_OPTIONS["gcc"], "clang") and ((version < 30500) or (_OPTIONS["targetos"]=="macosx" and (version <= 60000))) then
 	buildoptions_cpp {
-		"-std=c++1y",
+		"-std=c++17",
 	}
 
 	buildoptions_objcpp {
-		"-std=c++1y",
+		"-std=c++17",
 	}
-else
-	buildoptions_cpp {
-		"-std=c++14",
-	}
-
-	buildoptions_objcpp {
-		"-std=c++14",
-	}
-end
 -- this speeds it up a bit by piping between the preprocessor/compiler/assembler
 	if not ("pnacl" == _OPTIONS["gcc"]) then
 		buildoptions {
@@ -996,11 +1007,11 @@ end
 	buildoptions {
 		"-Wall",
 		"-Wcast-align",
-		"-Wundef",
 		"-Wformat-security",
+		"-Wundef",
 		"-Wwrite-strings",
-		"-Wno-sign-compare",
 		"-Wno-conversion",
+		"-Wno-sign-compare",
 		"-Wno-error=deprecated-declarations",
 	}
 -- warnings only applicable to C compiles
@@ -1062,28 +1073,32 @@ end
 
 		local version = str_to_version(_OPTIONS["gcc_version"])
 		if string.find(_OPTIONS["gcc"], "clang") or string.find(_OPTIONS["gcc"], "pnacl") or string.find(_OPTIONS["gcc"], "asmjs") or string.find(_OPTIONS["gcc"], "android") then
-			if (version < 30400) then
-				print("Clang version 3.4 or later needed")
+			if (version < 60000) then
+				print("Clang version 6.0 or later needed")
 				os.exit(-1)
 			end
 			buildoptions {
-				"-Wno-cast-align",
-				"-Wno-tautological-compare",
-				"-Wno-unused-value",
-				"-Wno-constant-logical-operand",
 				"-fdiagnostics-show-note-include-stack",
+				"-Wno-cast-align",
+				"-Wno-constant-logical-operand",
+				"-Wno-extern-c-compat",
+				"-Wno-ignored-qualifiers",
+				"-Wno-pragma-pack", -- clang 6.0 complains when the packing change lifetime is not contained within a header file.
+				"-Wno-tautological-compare",
+				"-Wno-unknown-attributes",
+				"-Wno-unknown-warning-option",
+				"-Wno-unused-value",
+				"-Wno-unused-const-variable",
 			}
-			if (version >= 30500) then
-				buildoptions {
-					"-Wno-unknown-warning-option",
-					"-Wno-extern-c-compat",
-					"-Wno-unknown-attributes",
-					"-Wno-ignored-qualifiers"
+			if (version < 70000) or ((version < 100001) and (_OPTIONS["targetos"] == 'macosx')) then
+				buildoptions { -- clang 6.0 complains that [[maybe_unused]] is ignored for static data members
+					"-Wno-error=ignored-attributes",
+					"-Wno-error=unused-const-variable",
 				}
 			end
-			if (version >= 60000) then
+			if ((version >= 100000) and (_OPTIONS["targetos"] ~= 'macosx')) or (version >= 120000) then
 				buildoptions {
-					"-Wno-pragma-pack" -- clang 6.0 complains when the packing change lifetime is not contained within a header file.
+					"-Wno-xor-used-as-pow", -- clang 10.0 complains that expressions like 10 ^ 7 look like exponention
 				}
 			end
 		else
@@ -1091,10 +1106,17 @@ end
 				print("GCC version 7.0 or later needed")
 				os.exit(-1)
 			end
+				buildoptions_cpp {
+					"-Wimplicit-fallthrough",
+				}
+				buildoptions_objcpp {
+					"-Wimplicit-fallthrough",
+				}
 				buildoptions {
 					"-Wno-unused-result", -- needed for fgets,fread on linux
 					-- array bounds checking seems to be buggy in 4.8.1 (try it on video/stvvdp1.c and video/model1.c without -Wno-array-bounds)
 					"-Wno-array-bounds",
+					"-Wno-error=attributes", -- GCC fails to recognize some uses of [[maybe_unused]]
 				}
 			if (version >= 80000) then
 				buildoptions {
@@ -1109,6 +1131,14 @@ end
 			if (version >= 100000) then
 				buildoptions {
 					"-Wno-return-local-addr", -- sqlite3.c in GCC 10
+				}
+			end
+			if (version >= 110000) then
+				buildoptions {
+					"-Wno-nonnull",                 -- luaengine.cpp lambdas do not need "this" captured but GCC 11.1 erroneously insists
+					"-Wno-stringop-overread",       -- machine/bbc.cpp in GCC 11.1
+					"-Wno-misleading-indentation",  -- sqlite3.c in GCC 11.1
+					"-Wno-maybe-uninitialized"      -- expat in GCC 11.1
 				}
 			end
 		end
@@ -1165,12 +1195,13 @@ configuration { "asmjs" }
 		"-s USE_SDL_TTF=2",
 	}
 	buildoptions_cpp {
-		"-std=c++14",
+		"-std=c++17",
 		"-s DISABLE_EXCEPTION_CATCHING=2",
-		"-s EXCEPTION_CATCHING_WHITELIST=\"['_ZN15running_machine17start_all_devicesEv','_ZN12cli_frontend7executeEiPPc','_ZN8chd_file11open_commonEb','_ZN8chd_file13read_metadataEjjRNSt3__212basic_stringIcNS0_11char_traitsIcEENS0_9allocatorIcEEEE','_ZN8chd_file13read_metadataEjjRNSt3__26vectorIhNS0_9allocatorIhEEEE']\"",
+		"-s EXCEPTION_CATCHING_WHITELIST=\"['_ZN15running_machine17start_all_devicesEv','_ZN12cli_frontend7executeEiPPc','_ZN8chd_file11open_commonEb','_ZN8chd_file13read_metadataEjjRNSt3__212basic_stringIcNS0_11char_traitsIcEENS0_9allocatorIcEEEE','_ZN8chd_file13read_metadataEjjRNSt3__26vectorIhNS0_9allocatorIhEEEE','_ZNK19netlist_mame_device19base_validity_checkER16validity_checker']\"",
 	}
 	linkoptions {
 		"-Wl,--start-group",
+		"-r",
 	}
 	archivesplit_size "20"
 
@@ -1182,7 +1213,7 @@ configuration { "android*" }
 		"-Wno-incompatible-ms-struct",
 	}
 	buildoptions_cpp {
-		"-std=c++14",
+		"-std=c++17",
 		"-Wno-extern-c-compat",
 		"-Wno-tautological-constant-out-of-range-compare",
 		"-Wno-tautological-pointer-compare",
@@ -1200,7 +1231,7 @@ configuration { "pnacl" }
 		"-Wno-inline-new-delete",
 	}
 	buildoptions_cpp {
-		"-std=c++14",
+		"-std=c++17",
 	}
 	archivesplit_size "20"
 
@@ -1259,15 +1290,18 @@ configuration { "osx* or xcode4" }
 		}
 
 configuration { "mingw*" }
-		if _OPTIONS["osd"]~="sdl"
-		then
+		if _OPTIONS["osd"]=="sdl" then
+			linkoptions {
+				"-Wl,--start-group",
+			}
+		else
 			linkoptions {
 				"-static",
 			}
+			flags {
+				"LinkSupportCircularDependencies",
+			}
 		end
-		flags {
-			"LinkSupportCircularDependencies",
-		}
 		links {
 			"user32",
 			"winmm",
@@ -1280,14 +1314,6 @@ configuration { "mingw*" }
 			"shell32",
 			"userenv",
 		}
-
-configuration { "mingw-clang" }
-	local version = str_to_version(_OPTIONS["gcc_version"])
-	if _OPTIONS["gcc"]~=nil and string.find(_OPTIONS["gcc"], "clang") and ((version < 30900)) then
-		linkoptions {
-			"-pthread",
-		}
-	end
 
 configuration { "vsllvm" }
 	defines {
@@ -1356,6 +1382,7 @@ end
 			"/wd4457", -- warning C4457: declaration of 'xxx' hides function parameter
 			"/wd4458", -- warning C4458: declaration of 'xxx' hides class member
 			"/wd4459", -- warning C4459: declaration of 'xxx' hides global declaration
+			"/wd4611", -- warning C4611: interaction between '_setjmp' and C++ object destruction is non-portable
 			"/wd4702", -- warning C4702: unreachable code
 			"/wd4706", -- warning C4706: assignment within conditional expression
 			"/wd4804", -- warning C4804: '>>': unsafe use of type 'bool' in operation
@@ -1420,6 +1447,8 @@ if _OPTIONS["vs"]=="clangcl" then
 			"-Wno-unused-local-typedef",
 			"-Wno-unused-private-field",
 			"-Wno-unused-variable",
+			"-Wno-xor-used-as-pow",
+			"-Wno-microsoft-cast",
 		}
 end
 
@@ -1487,8 +1516,8 @@ if (not os.isfile(path.join("src", "osd",  _OPTIONS["osd"] .. ".lua"))) then
 end
 dofile(path.join("src", "osd", _OPTIONS["osd"] .. ".lua"))
 dofile(path.join("src", "lib.lua"))
-if (MACHINES["NETLIST"]~=null or _OPTIONS["with-tools"]) then
-dofile(path.join("src", "netlist.lua"))
+if opt_tool(MACHINES, "NETLIST") then
+   dofile(path.join("src", "netlist.lua"))
 end
 --if (STANDALONE~=true) then
 dofile(path.join("src", "formats.lua"))
@@ -1548,3 +1577,28 @@ if _OPTIONS["with-benchmarks"] then
 	group "benchmarks"
 	dofile(path.join("src", "benchmarks.lua"))
 end
+
+function generate_has_header(hashname, hash)
+   fname = GEN_DIR .. "has_" .. hashname:lower() .. ".h"
+   file = io.open(fname, "w")
+   file:write("// Generated file, edition is futile\n")
+   file:write("\n")
+   file:write(string.format("#ifndef GENERATED_HAS_%s_H\n", hashname))
+   file:write(string.format("#define GENERATED_HAS_%s_H\n", hashname))
+   file:write("\n")
+   for k, v in pairs(hash) do
+	  if v then
+		 file:write(string.format("#define HAS_%s_%s\n", hashname, k))
+	  end
+   end
+   file:write("\n")
+   file:write("#endif\n")
+   file:close()
+end
+
+generate_has_header("CPUS", CPUS)
+generate_has_header("SOUNDS", SOUNDS)
+generate_has_header("MACHINES", MACHINES)
+generate_has_header("VIDEOS", VIDEOS)
+generate_has_header("BUSES", BUSES)
+generate_has_header("FORMATS", FORMATS)

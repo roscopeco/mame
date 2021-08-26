@@ -1,5 +1,5 @@
 // license:BSD-3-Clause
-// copyright-holders:David Haywood, Robbbert
+// copyright-holders:David Haywood, Angelo Salese
 /************************************************************************************************
   Poker Monarch
 

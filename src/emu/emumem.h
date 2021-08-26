@@ -17,6 +17,7 @@
 #ifndef MAME_EMU_EMUMEM_H
 #define MAME_EMU_EMUMEM_H
 
+#include <optional>
 #include <type_traits>
 
 using s8 = std::int8_t;
@@ -80,9 +81,16 @@ struct data_accessors
 };
 
 // a line in the memory structure dump
+struct memory_entry_context {
+	memory_view *view;
+	bool disabled;
+	int slot;
+};
+
 struct memory_entry {
 	offs_t start, end;
 	class handler_entry *entry;
+	std::vector<memory_entry_context> context;
 };
 
 
@@ -154,13 +162,13 @@ using write32smo_delegate = device_delegate<void (u32)>;
 using write64smo_delegate = device_delegate<void (u64)>;
 
 
-namespace emu { namespace detail {
+namespace emu::detail {
 
 // TODO: replace with std::void_t when we move to C++17
 template <typename... T> struct void_wrapper { using type = void; };
 template <typename... T> using void_t = typename void_wrapper<T...>::type;
 
-template <typename D, typename T, typename Enable = void> struct rw_device_class  { };
+template <typename D, typename T, typename Enable = void> struct rw_device_class { };
 
 template <typename D, typename T, typename Ret, typename... Params>
 struct rw_device_class<D, Ret (T::*)(Params...), std::enable_if_t<std::is_constructible<D, device_t &, const char *, Ret (T::*)(Params...), const char *>::value> > { using type = T; };
@@ -456,12 +464,12 @@ constexpr int handler_entry_dispatch_lowbits(int highbits, int width, int ashift
 		width + ashift;
 }
 
-} } // namespace emu::detail
+} // namespace emu::detail
 
 
 // ======================> memory_units_descritor forwards declaration
 
-template<int Width, int AddrShift, endianness_t Endian> class memory_units_descriptor;
+template<int Width, int AddrShift> class memory_units_descriptor;
 
 
 
@@ -480,6 +488,7 @@ public:
 	static constexpr u32 F_DISPATCH    = 0x00000001; // handler that forwards the access to other handlers
 	static constexpr u32 F_UNITS       = 0x00000002; // handler that merges/splits an access among multiple handlers (unitmask support)
 	static constexpr u32 F_PASSTHROUGH = 0x00000004; // handler that passes through the request to another handler
+	static constexpr u32 F_VIEW        = 0x00000008; // handler for a view (kinda like dispatch except not entirely)
 
 	// Start/end of range flags
 	static constexpr u8 START = 1;
@@ -507,6 +516,7 @@ public:
 	inline u32 flags() const { return m_flags; }
 
 	inline bool is_dispatch() const { return m_flags & F_DISPATCH; }
+	inline bool is_view() const { return m_flags & F_VIEW; }
 	inline bool is_units() const { return m_flags & F_UNITS; }
 	inline bool is_passthrough() const { return m_flags & F_PASSTHROUGH; }
 
@@ -515,6 +525,9 @@ public:
 	virtual std::string name() const = 0;
 	virtual void enumerate_references(handler_entry::reflist &refs) const;
 	u32 get_refcount() const { return m_refcount; }
+
+	virtual void select_a(int slot);
+	virtual void select_u(int slot);
 
 protected:
 	// Address range storage
@@ -545,9 +558,9 @@ protected:
 
 // Provides the populate/read/get_ptr/lookup API
 
-template<int Width, int AddrShift, endianness_t Endian> class handler_entry_read_passthrough;
+template<int Width, int AddrShift> class handler_entry_read_passthrough;
 
-template<int Width, int AddrShift, endianness_t Endian> class handler_entry_read : public handler_entry
+template<int Width, int AddrShift> class handler_entry_read : public handler_entry
 {
 public:
 	using uX = typename emu::detail::handler_entry_size<Width>::uX;
@@ -555,8 +568,8 @@ public:
 	static constexpr u32 NATIVE_MASK = Width + AddrShift >= 0 ? make_bitmask<u32>(Width + AddrShift) : 0;
 
 	struct mapping {
-		handler_entry_read<Width, AddrShift, Endian> *original;
-		handler_entry_read<Width, AddrShift, Endian> *patched;
+		handler_entry_read<Width, AddrShift> *original;
+		handler_entry_read<Width, AddrShift> *patched;
 		u8 ukey;
 	};
 
@@ -565,9 +578,9 @@ public:
 
 	virtual uX read(offs_t offset, uX mem_mask) const = 0;
 	virtual void *get_ptr(offs_t offset) const;
-	virtual void lookup(offs_t address, offs_t &start, offs_t &end, handler_entry_read<Width, AddrShift, Endian> *&handler) const;
+	virtual void lookup(offs_t address, offs_t &start, offs_t &end, handler_entry_read<Width, AddrShift> *&handler) const;
 
-	inline void populate(offs_t start, offs_t end, offs_t mirror, handler_entry_read<Width, AddrShift, Endian> *handler) {
+	inline void populate(offs_t start, offs_t end, offs_t mirror, handler_entry_read<Width, AddrShift> *handler) {
 		start &= ~NATIVE_MASK;
 		end |= NATIVE_MASK;
 		if(mirror)
@@ -576,10 +589,10 @@ public:
 			populate_nomirror(start, end, start, end, handler);
 	}
 
-	virtual void populate_nomirror(offs_t start, offs_t end, offs_t ostart, offs_t oend, handler_entry_read<Width, AddrShift, Endian> *handler);
-	virtual void populate_mirror(offs_t start, offs_t end, offs_t ostart, offs_t oend, offs_t mirror, handler_entry_read<Width, AddrShift, Endian> *handler);
+	virtual void populate_nomirror(offs_t start, offs_t end, offs_t ostart, offs_t oend, handler_entry_read<Width, AddrShift> *handler);
+	virtual void populate_mirror(offs_t start, offs_t end, offs_t ostart, offs_t oend, offs_t mirror, handler_entry_read<Width, AddrShift> *handler);
 
-	inline void populate_mismatched(offs_t start, offs_t end, offs_t mirror, const memory_units_descriptor<Width, AddrShift, Endian> &descriptor) {
+	inline void populate_mismatched(offs_t start, offs_t end, offs_t mirror, const memory_units_descriptor<Width, AddrShift> &descriptor) {
 		start &= ~NATIVE_MASK;
 		end |= NATIVE_MASK;
 		std::vector<mapping> mappings;
@@ -589,10 +602,10 @@ public:
 			populate_mismatched_nomirror(start, end, start, end, descriptor, START|END, mappings);
 	}
 
-	virtual void populate_mismatched_nomirror(offs_t start, offs_t end, offs_t ostart, offs_t oend, const memory_units_descriptor<Width, AddrShift, Endian> &descriptor, u8 rkey, std::vector<mapping> &mappings);
-	virtual void populate_mismatched_mirror(offs_t start, offs_t end, offs_t ostart, offs_t oend, offs_t mirror, const memory_units_descriptor<Width, AddrShift, Endian> &descriptor, std::vector<mapping> &mappings);
+	virtual void populate_mismatched_nomirror(offs_t start, offs_t end, offs_t ostart, offs_t oend, const memory_units_descriptor<Width, AddrShift> &descriptor, u8 rkey, std::vector<mapping> &mappings);
+	virtual void populate_mismatched_mirror(offs_t start, offs_t end, offs_t ostart, offs_t oend, offs_t mirror, const memory_units_descriptor<Width, AddrShift> &descriptor, std::vector<mapping> &mappings);
 
-	inline void populate_passthrough(offs_t start, offs_t end, offs_t mirror, handler_entry_read_passthrough<Width, AddrShift, Endian> *handler) {
+	inline void populate_passthrough(offs_t start, offs_t end, offs_t mirror, handler_entry_read_passthrough<Width, AddrShift> *handler) {
 		start &= ~NATIVE_MASK;
 		end |= NATIVE_MASK;
 		std::vector<mapping> mappings;
@@ -602,23 +615,26 @@ public:
 			populate_passthrough_nomirror(start, end, start, end, handler, mappings);
 	}
 
-	virtual void populate_passthrough_nomirror(offs_t start, offs_t end, offs_t ostart, offs_t oend, handler_entry_read_passthrough<Width, AddrShift, Endian> *handler, std::vector<mapping> &mappings);
-	virtual void populate_passthrough_mirror(offs_t start, offs_t end, offs_t ostart, offs_t oend, offs_t mirror, handler_entry_read_passthrough<Width, AddrShift, Endian> *handler, std::vector<mapping> &mappings);
+	virtual void populate_passthrough_nomirror(offs_t start, offs_t end, offs_t ostart, offs_t oend, handler_entry_read_passthrough<Width, AddrShift> *handler, std::vector<mapping> &mappings);
+	virtual void populate_passthrough_mirror(offs_t start, offs_t end, offs_t ostart, offs_t oend, offs_t mirror, handler_entry_read_passthrough<Width, AddrShift> *handler, std::vector<mapping> &mappings);
 
 	// Remove a set of passthrough handlers, leaving the lower handler in their place
 	virtual void detach(const std::unordered_set<handler_entry *> &handlers);
 
 	// Return the internal structures of the root dispatch
-	virtual const handler_entry_read<Width, AddrShift, Endian> *const *get_dispatch() const;
+	virtual const handler_entry_read<Width, AddrShift> *const *get_dispatch() const;
+
+	virtual void init_handlers(offs_t start_entry, offs_t end_entry, u32 lowbits, handler_entry_read<Width, AddrShift> **dispatch, handler_entry::range *ranges);
+	virtual handler_entry_read<Width, AddrShift> *dup();
 };
 
 // =====================-> The parent class of all write handlers
 
 // Provides the populate/write/get_ptr/lookup API
 
-template<int Width, int AddrShift, endianness_t Endian> class handler_entry_write_passthrough;
+template<int Width, int AddrShift> class handler_entry_write_passthrough;
 
-template<int Width, int AddrShift, endianness_t Endian> class handler_entry_write : public handler_entry
+template<int Width, int AddrShift> class handler_entry_write : public handler_entry
 {
 public:
 	using uX = typename emu::detail::handler_entry_size<Width>::uX;
@@ -626,8 +642,8 @@ public:
 	static constexpr u32 NATIVE_MASK = Width + AddrShift >= 0 ? make_bitmask<u32>(Width + AddrShift) : 0;
 
 	struct mapping {
-		handler_entry_write<Width, AddrShift, Endian> *original;
-		handler_entry_write<Width, AddrShift, Endian> *patched;
+		handler_entry_write<Width, AddrShift> *original;
+		handler_entry_write<Width, AddrShift> *patched;
 		u8 ukey;
 	};
 
@@ -636,9 +652,9 @@ public:
 
 	virtual void write(offs_t offset, uX data, uX mem_mask) const = 0;
 	virtual void *get_ptr(offs_t offset) const;
-	virtual void lookup(offs_t address, offs_t &start, offs_t &end, handler_entry_write<Width, AddrShift, Endian> *&handler) const;
+	virtual void lookup(offs_t address, offs_t &start, offs_t &end, handler_entry_write<Width, AddrShift> *&handler) const;
 
-	inline void populate(offs_t start, offs_t end, offs_t mirror, handler_entry_write<Width, AddrShift, Endian> *handler) {
+	inline void populate(offs_t start, offs_t end, offs_t mirror, handler_entry_write<Width, AddrShift> *handler) {
 		start &= ~NATIVE_MASK;
 		end |= NATIVE_MASK;
 		if(mirror)
@@ -647,10 +663,10 @@ public:
 			populate_nomirror(start, end, start, end, handler);
 	}
 
-	virtual void populate_nomirror(offs_t start, offs_t end, offs_t ostart, offs_t oend, handler_entry_write<Width, AddrShift, Endian> *handler);
-	virtual void populate_mirror(offs_t start, offs_t end, offs_t ostart, offs_t oend, offs_t mirror, handler_entry_write<Width, AddrShift, Endian> *handler);
+	virtual void populate_nomirror(offs_t start, offs_t end, offs_t ostart, offs_t oend, handler_entry_write<Width, AddrShift> *handler);
+	virtual void populate_mirror(offs_t start, offs_t end, offs_t ostart, offs_t oend, offs_t mirror, handler_entry_write<Width, AddrShift> *handler);
 
-	inline void populate_mismatched(offs_t start, offs_t end, offs_t mirror, const memory_units_descriptor<Width, AddrShift, Endian> &descriptor) {
+	inline void populate_mismatched(offs_t start, offs_t end, offs_t mirror, const memory_units_descriptor<Width, AddrShift> &descriptor) {
 		start &= ~NATIVE_MASK;
 		end |= NATIVE_MASK;
 
@@ -661,10 +677,10 @@ public:
 			populate_mismatched_nomirror(start, end, start, end, descriptor, START|END, mappings);
 	}
 
-	virtual void populate_mismatched_nomirror(offs_t start, offs_t end, offs_t ostart, offs_t oend, const memory_units_descriptor<Width, AddrShift, Endian> &descriptor, u8 rkey, std::vector<mapping> &mappings);
-	virtual void populate_mismatched_mirror(offs_t start, offs_t end, offs_t ostart, offs_t oend, offs_t mirror, const memory_units_descriptor<Width, AddrShift, Endian> &descriptor, std::vector<mapping> &mappings);
+	virtual void populate_mismatched_nomirror(offs_t start, offs_t end, offs_t ostart, offs_t oend, const memory_units_descriptor<Width, AddrShift> &descriptor, u8 rkey, std::vector<mapping> &mappings);
+	virtual void populate_mismatched_mirror(offs_t start, offs_t end, offs_t ostart, offs_t oend, offs_t mirror, const memory_units_descriptor<Width, AddrShift> &descriptor, std::vector<mapping> &mappings);
 
-	inline void populate_passthrough(offs_t start, offs_t end, offs_t mirror, handler_entry_write_passthrough<Width, AddrShift, Endian> *handler) {
+	inline void populate_passthrough(offs_t start, offs_t end, offs_t mirror, handler_entry_write_passthrough<Width, AddrShift> *handler) {
 		start &= ~NATIVE_MASK;
 		end |= NATIVE_MASK;
 		std::vector<mapping> mappings;
@@ -674,21 +690,24 @@ public:
 			populate_passthrough_nomirror(start, end, start, end, handler, mappings);
 	}
 
-	virtual void populate_passthrough_nomirror(offs_t start, offs_t end, offs_t ostart, offs_t oend, handler_entry_write_passthrough<Width, AddrShift, Endian> *handler, std::vector<mapping> &mappings);
-	virtual void populate_passthrough_mirror(offs_t start, offs_t end, offs_t ostart, offs_t oend, offs_t mirror, handler_entry_write_passthrough<Width, AddrShift, Endian> *handler, std::vector<mapping> &mappings);
+	virtual void populate_passthrough_nomirror(offs_t start, offs_t end, offs_t ostart, offs_t oend, handler_entry_write_passthrough<Width, AddrShift> *handler, std::vector<mapping> &mappings);
+	virtual void populate_passthrough_mirror(offs_t start, offs_t end, offs_t ostart, offs_t oend, offs_t mirror, handler_entry_write_passthrough<Width, AddrShift> *handler, std::vector<mapping> &mappings);
 
 	// Remove a set of passthrough handlers, leaving the lower handler in their place
 	virtual void detach(const std::unordered_set<handler_entry *> &handlers);
 
 	// Return the internal structures of the root dispatch
-	virtual const handler_entry_write<Width, AddrShift, Endian> *const *get_dispatch() const;
+	virtual const handler_entry_write<Width, AddrShift> *const *get_dispatch() const;
+
+	virtual void init_handlers(offs_t start_entry, offs_t end_entry, u32 lowbits, handler_entry_write<Width, AddrShift> **dispatch, handler_entry::range *ranges);
+	virtual handler_entry_write<Width, AddrShift> *dup();
 };
 
 // =====================-> Passthrough handler management structure
 class memory_passthrough_handler
 {
-	template<int Width, int AddrShift, endianness_t Endian> friend class handler_entry_read_passthrough;
-	template<int Width, int AddrShift, endianness_t Endian> friend class handler_entry_write_passthrough;
+	template<int Width, int AddrShift> friend class handler_entry_read_passthrough;
+	template<int Width, int AddrShift> friend class handler_entry_write_passthrough;
 
 public:
 	memory_passthrough_handler(address_space &space) : m_space(space) {}
@@ -705,8 +724,8 @@ private:
 
 // =====================-> Forward declaration for address_space
 
-template<int Width, int AddrShift, endianness_t Endian> class handler_entry_read_unmapped;
-template<int Width, int AddrShift, endianness_t Endian> class handler_entry_write_unmapped;
+template<int Width, int AddrShift> class handler_entry_read_unmapped;
+template<int Width, int AddrShift> class handler_entry_write_unmapped;
 
 // ======================> address offset -> byte offset
 
@@ -974,14 +993,14 @@ template<int Width, int AddrShift, endianness_t Endian, int TargetWidth, bool Al
 
 // ======================> Direct dispatching
 
-template<int Level, int Width, int AddrShift, endianness_t Endian> typename emu::detail::handler_entry_size<Width>::uX dispatch_read(offs_t mask, offs_t offset, typename emu::detail::handler_entry_size<Width>::uX mem_mask, const handler_entry_read<Width, AddrShift, Endian> *const *dispatch)
+template<int Level, int Width, int AddrShift> typename emu::detail::handler_entry_size<Width>::uX dispatch_read(offs_t mask, offs_t offset, typename emu::detail::handler_entry_size<Width>::uX mem_mask, const handler_entry_read<Width, AddrShift> *const *dispatch)
 {
 	static constexpr u32 LowBits  = emu::detail::handler_entry_dispatch_level_to_lowbits(Level, Width, AddrShift);
 	return dispatch[(offset & mask) >> LowBits]->read(offset, mem_mask);
 }
 
 
-template<int Level, int Width, int AddrShift, endianness_t Endian> void dispatch_write(offs_t mask, offs_t offset, typename emu::detail::handler_entry_size<Width>::uX data, typename emu::detail::handler_entry_size<Width>::uX mem_mask, const handler_entry_write<Width, AddrShift, Endian> *const *dispatch)
+template<int Level, int Width, int AddrShift> void dispatch_write(offs_t mask, offs_t offset, typename emu::detail::handler_entry_size<Width>::uX data, typename emu::detail::handler_entry_size<Width>::uX mem_mask, const handler_entry_write<Width, AddrShift> *const *dispatch)
 {
 	static constexpr u32 LowBits  = emu::detail::handler_entry_dispatch_level_to_lowbits(Level, Width, AddrShift);
 	return dispatch[(offset & mask) >> LowBits]->write(offset, data, mem_mask);
@@ -992,7 +1011,7 @@ template<int Level, int Width, int AddrShift, endianness_t Endian> void dispatch
 
 // memory_access_specific does uncached but faster accesses by shortcutting the address_space virtual call
 
-namespace emu { namespace detail {
+namespace emu::detail {
 
 template<int Level, int Width, int AddrShift, endianness_t Endian> class memory_access_specific
 {
@@ -1049,15 +1068,15 @@ private:
 
 	offs_t                      m_addrmask;                // address mask
 
-	const handler_entry_read<Width, AddrShift, Endian> *const *m_dispatch_read;
-	const handler_entry_write<Width, AddrShift, Endian> *const *m_dispatch_write;
+	const handler_entry_read<Width, AddrShift> *const *m_dispatch_read;
+	const handler_entry_write<Width, AddrShift> *const *m_dispatch_write;
 
 	NativeType read_native(offs_t address, NativeType mask = ~NativeType(0)) {
-		return dispatch_read<Level, Width, AddrShift, Endian>(offs_t(-1), address & m_addrmask, mask, m_dispatch_read);;
+		return dispatch_read<Level, Width, AddrShift>(offs_t(-1), address & m_addrmask, mask, m_dispatch_read);
 	}
 
 	void write_native(offs_t address, NativeType data, NativeType mask = ~NativeType(0)) {
-		dispatch_write<Level, Width, AddrShift, Endian>(offs_t(-1), address & m_addrmask, data, mask, m_dispatch_write);;
+		dispatch_write<Level, Width, AddrShift>(offs_t(-1), address & m_addrmask, data, mask, m_dispatch_write);
 	}
 
 	void set(address_space *space, std::pair<const void *, const void *> rw);
@@ -1150,25 +1169,24 @@ public:
 private:
 	address_space *             m_space;
 
-	int                         m_notifier_id;             // id to remove the notifier on destruction
-
 	offs_t                      m_addrmask;                // address mask
 	offs_t                      m_addrstart_r;             // minimum valid address for reading
 	offs_t                      m_addrend_r;               // maximum valid address for reading
 	offs_t                      m_addrstart_w;             // minimum valid address for writing
 	offs_t                      m_addrend_w;               // maximum valid address for writing
-	handler_entry_read <Width, AddrShift, Endian> *m_cache_r;  // read cache
-	handler_entry_write<Width, AddrShift, Endian> *m_cache_w;  // write cache
+	handler_entry_read <Width, AddrShift> *m_cache_r;  // read cache
+	handler_entry_write<Width, AddrShift> *m_cache_w;  // write cache
 
-	handler_entry_read <Width, AddrShift, Endian> *m_root_read;  // decode tree roots
-	handler_entry_write<Width, AddrShift, Endian> *m_root_write;
+	handler_entry_read <Width, AddrShift> *m_root_read;  // decode tree roots
+	handler_entry_write<Width, AddrShift> *m_root_write;
 
 	NativeType read_native(offs_t address, NativeType mask = ~NativeType(0));
 	void write_native(offs_t address, NativeType data, NativeType mask = ~NativeType(0));
 
 	void set(address_space *space, std::pair<void *, void *> rw);
 };
-}}
+
+} // namespace emu::detail
 
 
 // ======================> memory_access cache/specific type dispatcher
@@ -1232,129 +1250,16 @@ public:
 
 // ======================> address_space
 
-// address_space holds live information about an address space
-class address_space
-{
-	friend class memory_bank;
-	friend class memory_block;
-	template<int Width, int AddrShift, endianness_t Endian> friend class handler_entry_read_unmapped;
-	template<int Width, int AddrShift, endianness_t Endian> friend class handler_entry_write_unmapped;
-
-	struct notifier_t {
-		std::function<void (read_or_write)> m_notifier;
-		int m_id;
-	};
-
-protected:
-	// construction/destruction
-	address_space(memory_manager &manager, device_memory_interface &memory, int spacenum);
-
+class address_space_installer {
 public:
-	virtual ~address_space();
-
-	// getters
-	device_t &device() const { return m_device; }
-	const char *name() const { return m_name; }
-	int spacenum() const { return m_spacenum; }
-	address_map *map() const { return m_map.get(); }
-
-	template<int Width, int AddrShift, endianness_t Endian> void cache(emu::detail::memory_access_cache<Width, AddrShift, Endian> &v) {
-		if(AddrShift != m_config.addr_shift())
-			fatalerror("Requesting cache() with address shift %d while the config says %d\n", AddrShift, m_config.addr_shift());
-		if(8 << Width != m_config.data_width())
-			fatalerror("Requesting cache() with data width %d while the config says %d\n", 8 << Width, m_config.data_width());
-		if(Endian != m_config.endianness())
-			fatalerror("Requesting cache() with endianness %s while the config says %s\n",
-					   endianness_names[Endian], endianness_names[m_config.endianness()]);
-
-		v.set(this, get_cache_info());
-	}
-
-	template<int Level, int Width, int AddrShift, endianness_t Endian> void specific(emu::detail::memory_access_specific<Level, Width, AddrShift, Endian> &v) {
-		if(Level != emu::detail::handler_entry_dispatch_level(m_config.addr_width()))
-			fatalerror("Requesting specific() with wrong level, bad address width (the config says %d)\n", m_config.addr_width());
-		if(AddrShift != m_config.addr_shift())
-			fatalerror("Requesting specific() with address shift %d while the config says %d\n", AddrShift, m_config.addr_shift());
-		if(8 << Width != m_config.data_width())
-			fatalerror("Requesting specific() with data width %d while the config says %d\n", 8 << Width, m_config.data_width());
-		if(Endian != m_config.endianness())
-			fatalerror("Requesting spefific() with endianness %s while the config says %s\n",
-					   endianness_names[Endian], endianness_names[m_config.endianness()]);
-
-		v.set(this, get_specific_info());
-	}
-
-	int add_change_notifier(std::function<void (read_or_write)> n);
-	void remove_change_notifier(int id);
-
-	void invalidate_caches(read_or_write mode) {
-		if(u32(mode) & ~m_in_notification) {
-			u32 old = m_in_notification;
-			m_in_notification |= u32(mode);
-			for(const auto &n : m_notifiers)
-				n.m_notifier(mode);
-			m_in_notification = old;
-		}
-	}
-
-	virtual void validate_reference_counts() const = 0;
-
-	virtual void remove_passthrough(std::unordered_set<handler_entry *> &handlers) = 0;
-
+	const address_space_config &space_config() const { return m_config; }
 	int data_width() const { return m_config.data_width(); }
 	int addr_width() const { return m_config.addr_width(); }
 	int logaddr_width() const { return m_config.logaddr_width(); }
 	int alignment() const { return m_config.alignment(); }
 	endianness_t endianness() const { return m_config.endianness(); }
 	int addr_shift() const { return m_config.addr_shift(); }
-	u64 unmap() const { return m_unmap; }
 	bool is_octal() const { return m_config.is_octal(); }
-
-	offs_t addrmask() const { return m_addrmask; }
-	u8 addrchars() const { return m_addrchars; }
-	offs_t logaddrmask() const { return m_logaddrmask; }
-	u8 logaddrchars() const { return m_logaddrchars; }
-
-	// debug helpers
-	virtual std::string get_handler_string(read_or_write readorwrite, offs_t byteaddress) const = 0;
-	virtual void dump_maps(std::vector<memory_entry> &read_map, std::vector<memory_entry> &write_map) const = 0;
-	bool log_unmap() const { return m_log_unmap; }
-	void set_log_unmap(bool log) { m_log_unmap = log; }
-
-	// general accessors
-	virtual void accessors(data_accessors &accessors) const = 0;
-	virtual void *get_read_ptr(offs_t address) const = 0;
-	virtual void *get_write_ptr(offs_t address) const = 0;
-
-	// read accessors
-	virtual u8 read_byte(offs_t address) = 0;
-	virtual u16 read_word(offs_t address) = 0;
-	virtual u16 read_word(offs_t address, u16 mask) = 0;
-	virtual u16 read_word_unaligned(offs_t address) = 0;
-	virtual u16 read_word_unaligned(offs_t address, u16 mask) = 0;
-	virtual u32 read_dword(offs_t address) = 0;
-	virtual u32 read_dword(offs_t address, u32 mask) = 0;
-	virtual u32 read_dword_unaligned(offs_t address) = 0;
-	virtual u32 read_dword_unaligned(offs_t address, u32 mask) = 0;
-	virtual u64 read_qword(offs_t address) = 0;
-	virtual u64 read_qword(offs_t address, u64 mask) = 0;
-	virtual u64 read_qword_unaligned(offs_t address) = 0;
-	virtual u64 read_qword_unaligned(offs_t address, u64 mask) = 0;
-
-	// write accessors
-	virtual void write_byte(offs_t address, u8 data) = 0;
-	virtual void write_word(offs_t address, u16 data) = 0;
-	virtual void write_word(offs_t address, u16 data, u16 mask) = 0;
-	virtual void write_word_unaligned(offs_t address, u16 data) = 0;
-	virtual void write_word_unaligned(offs_t address, u16 data, u16 mask) = 0;
-	virtual void write_dword(offs_t address, u32 data) = 0;
-	virtual void write_dword(offs_t address, u32 data, u32 mask) = 0;
-	virtual void write_dword_unaligned(offs_t address, u32 data) = 0;
-	virtual void write_dword_unaligned(offs_t address, u32 data, u32 mask) = 0;
-	virtual void write_qword(offs_t address, u64 data) = 0;
-	virtual void write_qword(offs_t address, u64 data, u64 mask) = 0;
-	virtual void write_qword_unaligned(offs_t address, u64 data) = 0;
-	virtual void write_qword_unaligned(offs_t address, u64 data, u64 mask) = 0;
 
 	// address-to-byte conversion helpers
 	offs_t address_to_byte(offs_t address) const { return m_config.addr2byte(address); }
@@ -1362,7 +1267,12 @@ public:
 	offs_t byte_to_address(offs_t address) const { return m_config.byte2addr(address); }
 	offs_t byte_to_address_end(offs_t address) const { return m_config.byte2addr_end(address); }
 
-	// umap ranges (short form)
+	offs_t addrmask() const { return m_addrmask; }
+	u8 addrchars() const { return m_addrchars; }
+	offs_t logaddrmask() const { return m_logaddrmask; }
+	u8 logaddrchars() const { return m_logaddrchars; }
+
+	// unmap ranges (short form)
 	void unmap_read(offs_t addrstart, offs_t addrend, offs_t addrmirror = 0) { unmap_generic(addrstart, addrend, addrmirror, read_or_write::READ, false); }
 	void unmap_write(offs_t addrstart, offs_t addrend, offs_t addrmirror = 0) { unmap_generic(addrstart, addrend, addrmirror, read_or_write::WRITE, false); }
 	void unmap_readwrite(offs_t addrstart, offs_t addrend, offs_t addrmirror = 0) { unmap_generic(addrstart, addrend, addrmirror, read_or_write::READWRITE, false); }
@@ -1374,29 +1284,23 @@ public:
 	void install_read_port(offs_t addrstart, offs_t addrend, const char *rtag) { install_read_port(addrstart, addrend, 0, rtag); }
 	void install_write_port(offs_t addrstart, offs_t addrend, const char *wtag) { install_write_port(addrstart, addrend, 0, wtag); }
 	void install_readwrite_port(offs_t addrstart, offs_t addrend, const char *rtag, const char *wtag) { install_readwrite_port(addrstart, addrend, 0, rtag, wtag); }
-	void install_read_bank(offs_t addrstart, offs_t addrend, const char *tag) { install_read_bank(addrstart, addrend, 0, tag); }
-	void install_write_bank(offs_t addrstart, offs_t addrend, const char *tag) { install_write_bank(addrstart, addrend, 0, tag); }
-	void install_readwrite_bank(offs_t addrstart, offs_t addrend, const char *tag) { install_readwrite_bank(addrstart, addrend, 0, tag); }
 	void install_read_bank(offs_t addrstart, offs_t addrend, memory_bank *bank) { install_read_bank(addrstart, addrend, 0, bank); }
 	void install_write_bank(offs_t addrstart, offs_t addrend, memory_bank *bank) { install_write_bank(addrstart, addrend, 0, bank); }
 	void install_readwrite_bank(offs_t addrstart, offs_t addrend, memory_bank *bank) { install_readwrite_bank(addrstart, addrend, 0, bank); }
-	void install_rom(offs_t addrstart, offs_t addrend, void *baseptr = nullptr) { install_rom(addrstart, addrend, 0, baseptr); }
-	void install_writeonly(offs_t addrstart, offs_t addrend, void *baseptr = nullptr) { install_writeonly(addrstart, addrend, 0, baseptr); }
-	void install_ram(offs_t addrstart, offs_t addrend, void *baseptr = nullptr) { install_ram(addrstart, addrend, 0, baseptr); }
+	void install_rom(offs_t addrstart, offs_t addrend, void *baseptr) { install_rom(addrstart, addrend, 0, baseptr); }
+	void install_writeonly(offs_t addrstart, offs_t addrend, void *baseptr) { install_writeonly(addrstart, addrend, 0, baseptr); }
+	void install_ram(offs_t addrstart, offs_t addrend, void *baseptr) { install_ram(addrstart, addrend, 0, baseptr); }
 
 	// install ports, banks, RAM (with mirror/mask)
 	void install_read_port(offs_t addrstart, offs_t addrend, offs_t addrmirror, const char *rtag) { install_readwrite_port(addrstart, addrend, addrmirror, rtag, ""); }
 	void install_write_port(offs_t addrstart, offs_t addrend, offs_t addrmirror, const char *wtag) { install_readwrite_port(addrstart, addrend, addrmirror, "", wtag); }
 	virtual void install_readwrite_port(offs_t addrstart, offs_t addrend, offs_t addrmirror, std::string rtag, std::string wtag) = 0;
-	void install_read_bank(offs_t addrstart, offs_t addrend, offs_t addrmirror, const char *tag) { install_bank_generic(addrstart, addrend, addrmirror, tag, ""); }
-	void install_write_bank(offs_t addrstart, offs_t addrend, offs_t addrmirror, const char *tag) { install_bank_generic(addrstart, addrend, addrmirror, "", tag); }
-	void install_readwrite_bank(offs_t addrstart, offs_t addrend, offs_t addrmirror, const char *tag)  { install_bank_generic(addrstart, addrend, addrmirror, tag, tag); }
 	void install_read_bank(offs_t addrstart, offs_t addrend, offs_t addrmirror, memory_bank *bank) { install_bank_generic(addrstart, addrend, addrmirror, bank, nullptr); }
 	void install_write_bank(offs_t addrstart, offs_t addrend, offs_t addrmirror, memory_bank *bank) { install_bank_generic(addrstart, addrend, addrmirror, nullptr, bank); }
 	void install_readwrite_bank(offs_t addrstart, offs_t addrend, offs_t addrmirror, memory_bank *bank)  { install_bank_generic(addrstart, addrend, addrmirror, bank, bank); }
-	void install_rom(offs_t addrstart, offs_t addrend, offs_t addrmirror, void *baseptr = nullptr) { install_ram_generic(addrstart, addrend, addrmirror, read_or_write::READ, baseptr); }
-	void install_writeonly(offs_t addrstart, offs_t addrend, offs_t addrmirror, void *baseptr = nullptr) { install_ram_generic(addrstart, addrend, addrmirror, read_or_write::WRITE, baseptr); }
-	void install_ram(offs_t addrstart, offs_t addrend, offs_t addrmirror, void *baseptr = nullptr) { install_ram_generic(addrstart, addrend, addrmirror, read_or_write::READWRITE, baseptr); }
+	void install_rom(offs_t addrstart, offs_t addrend, offs_t addrmirror, void *baseptr) { install_ram_generic(addrstart, addrend, addrmirror, read_or_write::READ, baseptr); }
+	void install_writeonly(offs_t addrstart, offs_t addrend, offs_t addrmirror, void *baseptr) { install_ram_generic(addrstart, addrend, addrmirror, read_or_write::WRITE, baseptr); }
+	void install_ram(offs_t addrstart, offs_t addrend, offs_t addrmirror, void *baseptr) { install_ram_generic(addrstart, addrend, addrmirror, read_or_write::READWRITE, baseptr); }
 
 	// install device memory maps
 	template <typename T> void install_device(offs_t addrstart, offs_t addrend, T &device, void (T::*map)(address_map &map), u64 unitmask = 0, int cswidth = 0) {
@@ -1434,6 +1338,9 @@ public:
 	virtual memory_passthrough_handler *install_readwrite_tap(offs_t addrstart, offs_t addrend, offs_t addrmirror, std::string name, std::function<void (offs_t offset, u32 &data, u32 mem_mask)> tapr, std::function<void (offs_t offset, u32 &data, u32 mem_mask)> tapw, memory_passthrough_handler *mph = nullptr);
 	virtual memory_passthrough_handler *install_readwrite_tap(offs_t addrstart, offs_t addrend, offs_t addrmirror, std::string name, std::function<void (offs_t offset, u64 &data, u64 mem_mask)> tapr, std::function<void (offs_t offset, u64 &data, u64 mem_mask)> tapw, memory_passthrough_handler *mph = nullptr);
 
+	// install views
+	void install_view(offs_t addrstart, offs_t addrend, memory_view &view) { install_view(addrstart, addrend, 0, view); }
+	virtual void install_view(offs_t addrstart, offs_t addrend, offs_t addrmirror, memory_view &view) = 0;
 
 	// install new-style delegate handlers (short form)
 	void install_read_handler(offs_t addrstart, offs_t addrend, read8_delegate rhandler, u64 unitmask = 0, int cswidth = 0) { install_read_handler(addrstart, addrend, 0, 0, 0, rhandler, unitmask, cswidth); }
@@ -1593,46 +1500,181 @@ public:
 	virtual void install_write_handler(offs_t addrstart, offs_t addrend, offs_t addrmask, offs_t addrmirror, offs_t addrselect, write64smo_delegate whandler, u64 unitmask = 0, int cswidth = 0) = 0;
 	virtual void install_readwrite_handler(offs_t addrstart, offs_t addrend, offs_t addrmask, offs_t addrmirror, offs_t addrselect, read64smo_delegate rhandler, write64smo_delegate whandler, u64 unitmask = 0, int cswidth = 0) = 0;
 
+protected:
+	virtual void unmap_generic(offs_t addrstart, offs_t addrend, offs_t addrmirror, read_or_write readorwrite, bool quiet) = 0;
+	virtual void install_ram_generic(offs_t addrstart, offs_t addrend, offs_t addrmirror, read_or_write readorwrite, void *baseptr) = 0;
+	virtual void install_bank_generic(offs_t addrstart, offs_t addrend, offs_t addrmirror, memory_bank *rbank, memory_bank *wbank) = 0;
+
+	void populate_map_entry(const address_map_entry &entry, read_or_write readorwrite);
+	void adjust_addresses(offs_t &start, offs_t &end, offs_t &mask, offs_t &mirror) {
+		// adjust start/end/mask values
+		mask &= m_addrmask;
+		start &= ~mirror & m_addrmask;
+		end &= ~mirror & m_addrmask;
+	}
+
+	void check_optimize_all(const char *function, int width, offs_t addrstart, offs_t addrend, offs_t addrmask, offs_t addrmirror, offs_t addrselect, u64 unitmask, int cswidth, offs_t &nstart, offs_t &nend, offs_t &nmask, offs_t &nmirror, u64 &nunitmask, int &ncswidth);
+	void check_optimize_mirror(const char *function, offs_t addrstart, offs_t addrend, offs_t addrmirror, offs_t &nstart, offs_t &nend, offs_t &nmask, offs_t &nmirror);
+	void check_address(const char *function, offs_t addrstart, offs_t addrend);
+
+	address_space_installer(const address_space_config &config, memory_manager &manager)
+		: m_config(config),
+		  m_manager(manager),
+		  m_addrmask(make_bitmask<offs_t>(m_config.addr_width())),
+		  m_logaddrmask(make_bitmask<offs_t>(m_config.logaddr_width())),
+		  m_addrchars((m_config.addr_width() + 3) / 4),
+		  m_logaddrchars((m_config.logaddr_width() + 3) / 4)
+	{}
+
+	const address_space_config &m_config;       // configuration of this space
+	memory_manager &            m_manager;          // reference to the owning manager
+	offs_t                      m_addrmask;         // physical address mask
+	offs_t                      m_logaddrmask;      // logical address mask
+	u8                          m_addrchars;        // number of characters to use for physical addresses
+	u8                          m_logaddrchars;     // number of characters to use for logical addresses
+};
+
+// address_space holds live information about an address space
+class address_space : public address_space_installer
+{
+	friend class memory_bank;
+	friend class memory_block;
+	template<int Width, int AddrShift> friend class handler_entry_read_unmapped;
+	template<int Width, int AddrShift> friend class handler_entry_write_unmapped;
+
+	struct notifier_t {
+		std::function<void (read_or_write)> m_notifier;
+		int m_id;
+	};
+
+protected:
+	// construction/destruction
+	address_space(memory_manager &manager, device_memory_interface &memory, int spacenum);
+
+public:
+	virtual ~address_space();
+
+	// getters
+	device_t &device() const { return m_device; }
+	const char *name() const { return m_name; }
+	int spacenum() const { return m_spacenum; }
+	address_map *map() const { return m_map.get(); }
+
+	template<int Width, int AddrShift, endianness_t Endian> void cache(emu::detail::memory_access_cache<Width, AddrShift, Endian> &v) {
+		if(AddrShift != m_config.addr_shift())
+			fatalerror("Requesting cache() with address shift %d while the config says %d\n", AddrShift, m_config.addr_shift());
+		if(8 << Width != m_config.data_width())
+			fatalerror("Requesting cache() with data width %d while the config says %d\n", 8 << Width, m_config.data_width());
+		if(Endian != m_config.endianness())
+			fatalerror("Requesting cache() with endianness %s while the config says %s\n",
+					   endianness_names[Endian], endianness_names[m_config.endianness()]);
+
+		v.set(this, get_cache_info());
+	}
+
+	template<int Level, int Width, int AddrShift, endianness_t Endian> void specific(emu::detail::memory_access_specific<Level, Width, AddrShift, Endian> &v) {
+		if(Level != emu::detail::handler_entry_dispatch_level(m_config.addr_width()))
+			fatalerror("Requesting specific() with wrong level, bad address width (the config says %d)\n", m_config.addr_width());
+		if(AddrShift != m_config.addr_shift())
+			fatalerror("Requesting specific() with address shift %d while the config says %d\n", AddrShift, m_config.addr_shift());
+		if(8 << Width != m_config.data_width())
+			fatalerror("Requesting specific() with data width %d while the config says %d\n", 8 << Width, m_config.data_width());
+		if(Endian != m_config.endianness())
+			fatalerror("Requesting spefific() with endianness %s while the config says %s\n",
+					   endianness_names[Endian], endianness_names[m_config.endianness()]);
+
+		v.set(this, get_specific_info());
+	}
+
+	int add_change_notifier(std::function<void (read_or_write)> n);
+	void remove_change_notifier(int id);
+
+	void invalidate_caches(read_or_write mode) {
+		if(u32(mode) & ~m_in_notification) {
+			u32 old = m_in_notification;
+			m_in_notification |= u32(mode);
+			for(const auto &n : m_notifiers)
+				n.m_notifier(mode);
+			m_in_notification = old;
+		}
+	}
+
+	virtual void validate_reference_counts() const = 0;
+
+	virtual void remove_passthrough(std::unordered_set<handler_entry *> &handlers) = 0;
+
+	u64 unmap() const { return m_unmap; }
+
+	memory_passthrough_handler *make_mph();
+
+	// debug helpers
+	virtual std::string get_handler_string(read_or_write readorwrite, offs_t byteaddress) const = 0;
+	virtual void dump_maps(std::vector<memory_entry> &read_map, std::vector<memory_entry> &write_map) const = 0;
+	bool log_unmap() const { return m_log_unmap; }
+	void set_log_unmap(bool log) { m_log_unmap = log; }
+
+	// general accessors
+	virtual void accessors(data_accessors &accessors) const = 0;
+	virtual void *get_read_ptr(offs_t address) const = 0;
+	virtual void *get_write_ptr(offs_t address) const = 0;
+
+	// read accessors
+	virtual u8 read_byte(offs_t address) = 0;
+	virtual u16 read_word(offs_t address) = 0;
+	virtual u16 read_word(offs_t address, u16 mask) = 0;
+	virtual u16 read_word_unaligned(offs_t address) = 0;
+	virtual u16 read_word_unaligned(offs_t address, u16 mask) = 0;
+	virtual u32 read_dword(offs_t address) = 0;
+	virtual u32 read_dword(offs_t address, u32 mask) = 0;
+	virtual u32 read_dword_unaligned(offs_t address) = 0;
+	virtual u32 read_dword_unaligned(offs_t address, u32 mask) = 0;
+	virtual u64 read_qword(offs_t address) = 0;
+	virtual u64 read_qword(offs_t address, u64 mask) = 0;
+	virtual u64 read_qword_unaligned(offs_t address) = 0;
+	virtual u64 read_qword_unaligned(offs_t address, u64 mask) = 0;
+
+	// write accessors
+	virtual void write_byte(offs_t address, u8 data) = 0;
+	virtual void write_word(offs_t address, u16 data) = 0;
+	virtual void write_word(offs_t address, u16 data, u16 mask) = 0;
+	virtual void write_word_unaligned(offs_t address, u16 data) = 0;
+	virtual void write_word_unaligned(offs_t address, u16 data, u16 mask) = 0;
+	virtual void write_dword(offs_t address, u32 data) = 0;
+	virtual void write_dword(offs_t address, u32 data, u32 mask) = 0;
+	virtual void write_dword_unaligned(offs_t address, u32 data) = 0;
+	virtual void write_dword_unaligned(offs_t address, u32 data, u32 mask) = 0;
+	virtual void write_qword(offs_t address, u64 data) = 0;
+	virtual void write_qword(offs_t address, u64 data, u64 mask) = 0;
+	virtual void write_qword_unaligned(offs_t address, u64 data) = 0;
+	virtual void write_qword_unaligned(offs_t address, u64 data, u64 mask) = 0;
+
 	// setup
 	void prepare_map();
+	void prepare_device_map(address_map &map);
 	void populate_from_map(address_map *map = nullptr);
-	void allocate_memory();
-	void locate_memory();
 
-	template<int Width, int AddrShift, endianness_t Endian> handler_entry_read_unmapped <Width, AddrShift, Endian> *get_unmap_r() const { return static_cast<handler_entry_read_unmapped <Width, AddrShift, Endian> *>(m_unmap_r); }
-	template<int Width, int AddrShift, endianness_t Endian> handler_entry_write_unmapped<Width, AddrShift, Endian> *get_unmap_w() const { return static_cast<handler_entry_write_unmapped<Width, AddrShift, Endian> *>(m_unmap_w); }
+	template<int Width, int AddrShift> handler_entry_read_unmapped <Width, AddrShift> *get_unmap_r() const { return static_cast<handler_entry_read_unmapped <Width, AddrShift> *>(m_unmap_r); }
+	template<int Width, int AddrShift> handler_entry_write_unmapped<Width, AddrShift> *get_unmap_w() const { return static_cast<handler_entry_write_unmapped<Width, AddrShift> *>(m_unmap_w); }
+
+	handler_entry *unmap_r() const { return m_unmap_r; }
+	handler_entry *unmap_w() const { return m_unmap_w; }
+	handler_entry *nop_r() const { return m_nop_r; }
+	handler_entry *nop_w() const { return m_nop_w; }
 
 protected:
 	// internal helpers
 	virtual std::pair<void *, void *> get_cache_info() = 0;
 	virtual std::pair<const void *, const void *> get_specific_info() = 0;
 
-	void populate_map_entry(const address_map_entry &entry, read_or_write readorwrite);
-	virtual void unmap_generic(offs_t addrstart, offs_t addrend, offs_t addrmirror, read_or_write readorwrite, bool quiet) = 0;
-	virtual void install_ram_generic(offs_t addrstart, offs_t addrend, offs_t addrmirror, read_or_write readorwrite, void *baseptr) = 0;
-	virtual void install_bank_generic(offs_t addrstart, offs_t addrend, offs_t addrmirror, std::string rtag, std::string wtag) = 0;
-	virtual void install_bank_generic(offs_t addrstart, offs_t addrend, offs_t addrmirror, memory_bank *rbank, memory_bank *wbank) = 0;
-	void adjust_addresses(offs_t &start, offs_t &end, offs_t &mask, offs_t &mirror);
-	void *find_backing_memory(offs_t addrstart, offs_t addrend);
-	bool needs_backing_store(const address_map_entry &entry);
-	memory_bank &bank_find_or_allocate(const char *tag, offs_t addrstart, offs_t addrend, offs_t addrmirror, read_or_write readorwrite);
-	address_map_entry *block_assign_intersecting(offs_t bytestart, offs_t byteend, u8 *base);
-	void check_optimize_all(const char *function, int width, offs_t addrstart, offs_t addrend, offs_t addrmask, offs_t addrmirror, offs_t addrselect, u64 unitmask, int cswidth, offs_t &nstart, offs_t &nend, offs_t &nmask, offs_t &nmirror, u64 &nunitmask, int &ncswidth);
-	void check_optimize_mirror(const char *function, offs_t addrstart, offs_t addrend, offs_t addrmirror, offs_t &nstart, offs_t &nend, offs_t &nmask, offs_t &nmirror);
-	void check_address(const char *function, offs_t addrstart, offs_t addrend);
+	void prepare_map_generic(address_map &map, bool allow_alloc);
 
 	// private state
-	const address_space_config &m_config;       // configuration of this space
 	device_t &              m_device;           // reference to the owning device
 	std::unique_ptr<address_map> m_map;         // original memory map
-	offs_t                  m_addrmask;         // physical address mask
-	offs_t                  m_logaddrmask;      // logical address mask
 	u64                     m_unmap;            // unmapped value
 	int                     m_spacenum;         // address space index
 	bool                    m_log_unmap;        // log unmapped accesses in this space?
 	const char *            m_name;             // friendly name of the address space
-	u8                      m_addrchars;        // number of characters to use for physical addresses
-	u8                      m_logaddrchars;     // number of characters to use for logical addresses
 
 	handler_entry           *m_unmap_r;
 	handler_entry           *m_unmap_w;
@@ -1645,41 +1687,6 @@ protected:
 	std::vector<notifier_t> m_notifiers;        // notifier list for address map change
 	int                     m_notifier_id;      // next notifier id
 	u32                     m_in_notification;  // notification(s) currently being done
-	memory_manager &        m_manager;          // reference to the owning manager
-};
-
-
-// ======================> memory_block
-
-// a memory block is a chunk of RAM associated with a range of memory in a device's address space
-class memory_block
-{
-	DISABLE_COPYING(memory_block);
-
-public:
-	// construction/destruction
-	memory_block(address_space &space, offs_t start, offs_t end, void *memory = nullptr);
-	~memory_block();
-
-	// getters
-	running_machine &machine() const { return m_machine; }
-	offs_t addrstart() const { return m_addrstart; }
-	offs_t addrend() const { return m_addrend; }
-	u8 *data() const { return m_data; }
-
-	// is the given range contained by this memory block?
-	bool contains(address_space &space, offs_t addrstart, offs_t addrend) const
-	{
-		return (&space == &m_space && m_addrstart <= addrstart && m_addrend >= addrend);
-	}
-
-private:
-	// internal state
-	running_machine &       m_machine;              // need the machine to free our memory
-	address_space &         m_space;                // which address space are we associated with?
-	offs_t                  m_addrstart, m_addrend; // start/end for verifying a match
-	u8 *                    m_data;                 // pointer to the data for this block
-	std::vector<u8>         m_allocated;            // pointer to the actually allocated block
 };
 
 
@@ -1688,54 +1695,17 @@ private:
 // a memory bank is a global pointer to memory that can be shared across devices and changed dynamically
 class memory_bank
 {
-	// a bank reference is an entry in a list of address spaces that reference a given bank
-	class bank_reference
-	{
-	public:
-		// construction/destruction
-		bank_reference(address_space &space, read_or_write readorwrite)
-			: m_space(space),
-				m_readorwrite(readorwrite) { }
-
-		// getters
-		address_space &space() const { return m_space; }
-
-		// does this reference match the space+read/write combination?
-		bool matches(const address_space &space, read_or_write readorwrite) const
-		{
-			return (&space == &m_space && (readorwrite == read_or_write::READWRITE || readorwrite == m_readorwrite));
-		}
-
-	private:
-		// internal state
-		address_space &         m_space;            // address space that references us
-		read_or_write           m_readorwrite;      // used for read or write?
-
-	};
-
 public:
 	// construction/destruction
-	memory_bank(address_space &space, int index, offs_t start, offs_t end, const char *tag = nullptr);
+	memory_bank(device_t &device, std::string tag);
 	~memory_bank();
 
 	// getters
 	running_machine &machine() const { return m_machine; }
 	int entry() const { return m_curentry; }
-	bool anonymous() const { return m_anonymous; }
-	offs_t addrstart() const { return m_addrstart; }
 	void *base() const { return m_entries.empty() ? nullptr : m_entries[m_curentry]; }
-	const char *tag() const { return m_tag.c_str(); }
-	const char *name() const { return m_name.c_str(); }
-
-	// compare a range against our range
-	bool matches_exactly(offs_t addrstart, offs_t addrend) const { return (m_addrstart == addrstart && m_addrend == addrend); }
-	bool fully_covers(offs_t addrstart, offs_t addrend) const { return (m_addrstart <= addrstart && m_addrend >= addrend); }
-	bool is_covered_by(offs_t addrstart, offs_t addrend) const { return (m_addrstart >= addrstart && m_addrend <= addrend); }
-	bool straddles(offs_t addrstart, offs_t addrend) const { return (m_addrstart < addrend && m_addrend > addrstart); }
-
-	// track and verify address space references to this bank
-	bool references_space(const address_space &space, read_or_write readorwrite) const;
-	void add_reference(address_space &space, read_or_write readorwrite);
+	const std::string &tag() const { return m_tag; }
+	const std::string &name() const { return m_name; }
 
 	// set the base explicitly
 	void set_base(void *base);
@@ -1744,20 +1714,14 @@ public:
 	void configure_entry(int entrynum, void *base);
 	void configure_entries(int startentry, int numentries, void *base, offs_t stride);
 	void set_entry(int entrynum);
-	void add_notifier(std::function<void (void *)> cb);
 
 private:
 	// internal state
 	running_machine &       m_machine;              // need the machine to free our memory
 	std::vector<u8 *>       m_entries;              // the entries
-	bool                    m_anonymous;            // are we anonymous or explicit?
-	offs_t                  m_addrstart;            // start offset
-	offs_t                  m_addrend;              // end offset
 	int                     m_curentry;             // current entry
 	std::string             m_name;                 // friendly name for this bank
 	std::string             m_tag;                  // tag for this bank
-	std::vector<std::unique_ptr<bank_reference>> m_reflist;     // list of address spaces referencing this bank
-	std::vector<std::function<void (void *)>> m_alloc_notifier; // list of notifier targets when allocating
 };
 
 
@@ -1768,26 +1732,28 @@ class memory_share
 {
 public:
 	// construction/destruction
-	memory_share(u8 width, size_t bytes, endianness_t endianness, void *ptr = nullptr)
-		: m_ptr(ptr),
-			m_bytes(bytes),
-			m_endianness(endianness),
-			m_bitwidth(width),
-			m_bytewidth(width <= 8 ? 1 : width <= 16 ? 2 : width <= 32 ? 4 : 8)
+	memory_share(std::string name, u8 width, size_t bytes, endianness_t endianness, void *ptr)
+		: m_name(name),
+		  m_ptr(ptr),
+		  m_bytes(bytes),
+		  m_endianness(endianness),
+		  m_bitwidth(width),
+		  m_bytewidth(width <= 8 ? 1 : width <= 16 ? 2 : width <= 32 ? 4 : 8)
 	{ }
 
 	// getters
+	const std::string &name() const { return m_name; }
 	void *ptr() const { return m_ptr; }
 	size_t bytes() const { return m_bytes; }
 	endianness_t endianness() const { return m_endianness; }
 	u8 bitwidth() const { return m_bitwidth; }
 	u8 bytewidth() const { return m_bytewidth; }
 
-	// setters
-	void set_ptr(void *ptr) { m_ptr = ptr; }
+	std::string compare(u8 width, size_t bytes, endianness_t endianness) const;
 
 private:
 	// internal state
+	std::string             m_name;                 // share name
 	void *                  m_ptr;                  // pointer to the memory backing the region
 	size_t                  m_bytes;                // size of the shared region in bytes
 	endianness_t            m_endianness;           // endianness of the memory
@@ -1803,18 +1769,16 @@ private:
 class memory_region
 {
 	DISABLE_COPYING(memory_region);
-
-	friend class memory_manager;
 public:
 	// construction/destruction
-	memory_region(running_machine &machine, const char *name, u32 length, u8 width, endianness_t endian);
+	memory_region(running_machine &machine, std::string name, u32 length, u8 width, endianness_t endian);
 
 	// getters
 	running_machine &machine() const { return m_machine; }
 	u8 *base() { return (m_buffer.size() > 0) ? &m_buffer[0] : nullptr; }
 	u8 *end() { return base() + m_buffer.size(); }
 	u32 bytes() const { return m_buffer.size(); }
-	const char *name() const { return m_name.c_str(); }
+	const std::string &name() const { return m_name; }
 
 	// flag expansion
 	endianness_t endianness() const { return m_endianness; }
@@ -1839,6 +1803,84 @@ private:
 
 
 
+// ======================> memory_view
+
+// a memory view allows switching between submaps in the map
+class memory_view
+{
+	template<int Level, int Width, int AddrShift, endianness_t Endian> friend class address_space_specific;
+	template<int Level, int Width, int AddrShift> friend class memory_view_entry_specific;
+	template<int HighBits, int Width, int AddrShift> friend class handler_entry_write_dispatch;
+	template<int HighBits, int Width, int AddrShift> friend class handler_entry_read_dispatch;
+	friend class memory_view_entry;
+	friend class address_map_entry;
+	friend class address_map;
+	friend class device_t;
+
+	DISABLE_COPYING(memory_view);
+
+public:
+	class memory_view_entry : public address_space_installer {
+	public:
+		virtual ~memory_view_entry() = default;
+
+		address_map_entry &operator()(offs_t start, offs_t end);
+
+		virtual void populate_from_map(address_map *map = nullptr) = 0;
+
+		std::string key() const;
+
+	protected:
+		memory_view &m_view;
+		std::unique_ptr<address_map> m_map;
+		int m_id;
+
+		memory_view_entry(const address_space_config &config, memory_manager &manager, memory_view &view, int id);
+		void prepare_map_generic(address_map &map, bool allow_alloc);
+		void prepare_device_map(address_map &map);
+
+		void check_range_optimize_all(const char *function, int width, offs_t addrstart, offs_t addrend, offs_t addrmask, offs_t addrmirror, offs_t addrselect, u64 unitmask, int cswidth, offs_t &nstart, offs_t &nend, offs_t &nmask, offs_t &nmirror, u64 &nunitmask, int &ncswidth);
+		void check_range_optimize_mirror(const char *function, offs_t addrstart, offs_t addrend, offs_t addrmirror, offs_t &nstart, offs_t &nend, offs_t &nmask, offs_t &nmirror);
+		void check_range_address(const char *function, offs_t addrstart, offs_t addrend);
+	};
+
+	memory_view(device_t &device, std::string name);
+	~memory_view();
+
+	memory_view_entry &operator[](int slot);
+
+	void select(int entry);
+	void disable();
+
+	std::optional<int> entry() const { return m_cur_id == -1 ? std::optional<int>() : m_cur_slot; }
+
+	const std::string &name() const { return m_name; }
+
+private:
+
+	device_t &                                      m_device;
+	std::string                                     m_name;
+	std::map<int, int>                              m_entry_mapping;
+	std::vector<std::unique_ptr<memory_view_entry>> m_entries;
+	const address_space_config *                    m_config;
+	offs_t                                          m_addrstart;
+	offs_t                                          m_addrend;
+	address_space *                                 m_space;
+	handler_entry *                                 m_handler_read;
+	handler_entry *                                 m_handler_write;
+	int                                             m_cur_id;
+	int                                             m_cur_slot;
+	std::string                                     m_context;
+
+	void initialize_from_address_map(offs_t addrstart, offs_t addrend, const address_space_config &config);
+	std::pair<handler_entry *, handler_entry *> make_handlers(address_space &space, offs_t addrstart, offs_t addrend);
+	void make_subdispatch(std::string context);
+	int id_to_slot(int id) const;
+	void register_state();
+};
+
+
+
 // ======================> memory_manager
 
 // holds internal state for the memory system
@@ -1846,39 +1888,54 @@ class memory_manager
 {
 	friend class address_space;
 	template<int Level, int Width, int AddrShift, endianness_t Endian> friend class address_space_specific;
-	friend memory_region::memory_region(running_machine &machine, const char *name, u32 length, u8 width, endianness_t endian);
 public:
 	// construction/destruction
 	memory_manager(running_machine &machine);
+	~memory_manager();
+
+	// initialize the memory spaces from the memory maps of the devices
 	void initialize();
 
 	// getters
 	running_machine &machine() const { return m_machine; }
+
+	// used for the debugger interface memory views
 	const std::unordered_map<std::string, std::unique_ptr<memory_bank>> &banks() const { return m_banklist; }
 	const std::unordered_map<std::string, std::unique_ptr<memory_region>> &regions() const { return m_regionlist; }
 	const std::unordered_map<std::string, std::unique_ptr<memory_share>> &shares() const { return m_sharelist; }
 
-	// regions
-	memory_region *region_alloc(const char *name, u32 length, u8 width, endianness_t endian);
-	void region_free(const char *name);
-	memory_region *region_containing(const void *memory, offs_t bytes) const;
+	// anonymous memory zones
+	void *anonymous_alloc(address_space &space, size_t bytes, u8 width, offs_t start, offs_t end, const std::string &key = "");
 
-	memory_bank *find(const char *tag) const;
-	memory_bank *find(address_space &space, offs_t addrstart, offs_t addrend) const;
-	memory_bank *allocate(address_space &space, offs_t addrstart, offs_t addrend, const char *tag = nullptr);
+	// shares
+	memory_share *share_alloc(device_t &dev, std::string name, u8 width, size_t bytes, endianness_t endianness);
+	memory_share *share_find(std::string name);
+
+	// banks
+	memory_bank *bank_alloc(device_t &device, std::string tag);
+	memory_bank *bank_find(std::string tag);
+
+	// regions
+	memory_region *region_alloc(std::string name, u32 length, u8 width, endianness_t endian);
+	memory_region *region_find(std::string name);
+	void region_free(std::string name);
 
 private:
-	void allocate(device_memory_interface &memory);
+	struct stdlib_deleter { void operator()(void *p) const { free(p); } };
 
 	// internal state
 	running_machine &           m_machine;              // reference to the machine
-	bool                        m_initialized;          // have we completed initialization?
 
-	std::vector<std::unique_ptr<memory_block>>   m_blocklist;            // head of the list of memory blocks
+	std::vector<std::unique_ptr<void, stdlib_deleter>>               m_datablocks;           // list of memory blocks to free on exit
+	std::unordered_map<std::string, std::unique_ptr<memory_bank>>    m_banklist;             // map of banks
+	std::unordered_map<std::string, std::unique_ptr<memory_share>>   m_sharelist;            // map of shares
+	std::unordered_map<std::string, std::unique_ptr<memory_region>>  m_regionlist;           // map of memory regions
 
-	std::unordered_map<std::string, std::unique_ptr<memory_bank>>    m_banklist;             // data gathered for each bank
-	std::unordered_map<std::string, std::unique_ptr<memory_share>>   m_sharelist;            // map for share lookups
-	std::unordered_map<std::string, std::unique_ptr<memory_region>>  m_regionlist;           // list of memory regions
+	// Allocate the address spaces
+	void allocate(device_memory_interface &memory);
+
+	// Allocate some ram and register it for saving
+	void *allocate_memory(device_t &dev, int spacenum, std::string name, u8 width, size_t bytes);
 };
 
 
@@ -1886,25 +1943,6 @@ private:
 //**************************************************************************
 //  MACROS
 //**************************************************************************
-
-// space read/write handler function macros
-#define READ8_MEMBER(name)              u8     name(ATTR_UNUSED address_space &space, ATTR_UNUSED offs_t offset, ATTR_UNUSED u8 mem_mask)
-#define WRITE8_MEMBER(name)             void   name(ATTR_UNUSED address_space &space, ATTR_UNUSED offs_t offset, ATTR_UNUSED u8 data, ATTR_UNUSED u8 mem_mask)
-#define READ16_MEMBER(name)             u16    name(ATTR_UNUSED address_space &space, ATTR_UNUSED offs_t offset, ATTR_UNUSED u16 mem_mask)
-#define WRITE16_MEMBER(name)            void   name(ATTR_UNUSED address_space &space, ATTR_UNUSED offs_t offset, ATTR_UNUSED u16 data, ATTR_UNUSED u16 mem_mask)
-#define READ32_MEMBER(name)             u32    name(ATTR_UNUSED address_space &space, ATTR_UNUSED offs_t offset, ATTR_UNUSED u32 mem_mask)
-#define WRITE32_MEMBER(name)            void   name(ATTR_UNUSED address_space &space, ATTR_UNUSED offs_t offset, ATTR_UNUSED u32 data, ATTR_UNUSED u32 mem_mask)
-#define READ64_MEMBER(name)             u64    name(ATTR_UNUSED address_space &space, ATTR_UNUSED offs_t offset, ATTR_UNUSED u64 mem_mask)
-#define WRITE64_MEMBER(name)            void   name(ATTR_UNUSED address_space &space, ATTR_UNUSED offs_t offset, ATTR_UNUSED u64 data, ATTR_UNUSED u64 mem_mask)
-
-#define DECLARE_READ8_MEMBER(name)      u8     name(ATTR_UNUSED address_space &space, ATTR_UNUSED offs_t offset, ATTR_UNUSED u8 mem_mask = 0xff)
-#define DECLARE_WRITE8_MEMBER(name)     void   name(ATTR_UNUSED address_space &space, ATTR_UNUSED offs_t offset, ATTR_UNUSED u8 data, ATTR_UNUSED u8 mem_mask = 0xff)
-#define DECLARE_READ16_MEMBER(name)     u16    name(ATTR_UNUSED address_space &space, ATTR_UNUSED offs_t offset, ATTR_UNUSED u16 mem_mask = 0xffff)
-#define DECLARE_WRITE16_MEMBER(name)    void   name(ATTR_UNUSED address_space &space, ATTR_UNUSED offs_t offset, ATTR_UNUSED u16 data, ATTR_UNUSED u16 mem_mask = 0xffff)
-#define DECLARE_READ32_MEMBER(name)     u32    name(ATTR_UNUSED address_space &space, ATTR_UNUSED offs_t offset, ATTR_UNUSED u32 mem_mask = 0xffffffff)
-#define DECLARE_WRITE32_MEMBER(name)    void   name(ATTR_UNUSED address_space &space, ATTR_UNUSED offs_t offset, ATTR_UNUSED u32 data, ATTR_UNUSED u32 mem_mask = 0xffffffff)
-#define DECLARE_READ64_MEMBER(name)     u64    name(ATTR_UNUSED address_space &space, ATTR_UNUSED offs_t offset, ATTR_UNUSED u64 mem_mask = 0xffffffffffffffffU)
-#define DECLARE_WRITE64_MEMBER(name)    void   name(ATTR_UNUSED address_space &space, ATTR_UNUSED offs_t offset, ATTR_UNUSED u64 data, ATTR_UNUSED u64 mem_mask = 0xffffffffffffffffU)
 
 
 // helper macro for merging data with the memory mask
@@ -1962,7 +2000,7 @@ private:
 
 
 template<int Width, int AddrShift, endianness_t Endian>
-typename emu::detail::handler_entry_size<Width>::uX 
+typename emu::detail::handler_entry_size<Width>::uX
 emu::detail::memory_access_cache<Width, AddrShift, Endian>::
 read_native(offs_t address, typename emu::detail::handler_entry_size<Width>::uX mask)
 {
@@ -1992,8 +2030,8 @@ set(address_space *space, std::pair<const void *, const void *> rw)
 {
 	m_space = space;
 	m_addrmask = space->addrmask();
-	m_dispatch_read  = (const handler_entry_read <Width, AddrShift, Endian> *const *)(rw.first);
-	m_dispatch_write = (const handler_entry_write<Width, AddrShift, Endian> *const *)(rw.second);
+	m_dispatch_read  = (const handler_entry_read <Width, AddrShift> *const *)(rw.first);
+	m_dispatch_write = (const handler_entry_write<Width, AddrShift> *const *)(rw.second);
 }
 
 
@@ -2004,20 +2042,20 @@ set(address_space *space, std::pair<void *, void *> rw)
 	m_space = space;
 	m_addrmask = space->addrmask();
 
-	m_notifier_id = space->add_change_notifier([this](read_or_write mode) {
-												  if(u32(mode) & u32(read_or_write::READ)) {
-													  m_addrend_r = 0;
-													  m_addrstart_r = 1;
-													  m_cache_r = nullptr;
-												  }
-												  if(u32(mode) & u32(read_or_write::WRITE)) {
-													  m_addrend_w = 0;
-													  m_addrstart_w = 1;
-													  m_cache_w = nullptr;
-												  }
-											  });
-	m_root_read  = (handler_entry_read <Width, AddrShift, Endian> *)(rw.first);
-	m_root_write = (handler_entry_write<Width, AddrShift, Endian> *)(rw.second);
+	space->add_change_notifier([this](read_or_write mode) {
+								   if(u32(mode) & u32(read_or_write::READ)) {
+									   m_addrend_r = 0;
+									   m_addrstart_r = 1;
+									   m_cache_r = nullptr;
+								   }
+								   if(u32(mode) & u32(read_or_write::WRITE)) {
+									   m_addrend_w = 0;
+									   m_addrstart_w = 1;
+									   m_cache_w = nullptr;
+								   }
+							   });
+	m_root_read  = (handler_entry_read <Width, AddrShift> *)(rw.first);
+	m_root_write = (handler_entry_write<Width, AddrShift> *)(rw.second);
 
 	// Protect against a wandering memset
 	m_addrstart_r = 1;
@@ -2032,8 +2070,6 @@ template<int Width, int AddrShift, endianness_t Endian>
 emu::detail::memory_access_cache<Width, AddrShift, Endian>::
 ~memory_access_cache()
 {
-	if(m_space)
-		m_space->remove_change_notifier(m_notifier_id);
 }
 
 #endif  /* MAME_EMU_EMUMEM_H */

@@ -63,11 +63,11 @@ TODO:
 // TODO: NTSC system clock is 30.2098 MHz; additional 4.9152 MHz XTAL provided for UART
 #define CLOCK_A 30_MHz_XTAL
 
-#define LOG_DVC				(1 << 1)
-#define LOG_QUIZARD_READS	(1 << 2)
-#define LOG_QUIZARD_WRITES	(1 << 3)
-#define LOG_QUIZARD_OTHER	(1 << 4)
-#define LOG_UART			(1 << 5)
+#define LOG_DVC             (1 << 1)
+#define LOG_QUIZARD_READS   (1 << 2)
+#define LOG_QUIZARD_WRITES  (1 << 3)
+#define LOG_QUIZARD_OTHER   (1 << 4)
+#define LOG_UART            (1 << 5)
 
 #define VERBOSE         (0)
 #include "logmacro.h"
@@ -402,7 +402,7 @@ void cdi_state::draw_lcd(int y)
 	if (y >= 22 || !m_slave_hle.found())
 		return;
 
-	uint32_t *scanline = &m_lcdbitmap.pix32(y);
+	uint32_t *scanline = &m_lcdbitmap.pix(y);
 
 	for (int lcd = 0; lcd < 8; lcd++)
 	{
@@ -451,14 +451,14 @@ void cdi_state::cdimono1_base(machine_config &config)
 	m_mcd212->set_scanline_callback(FUNC(cdi_state::draw_lcd));
 
 	screen_device &screen(SCREEN(config, "screen", SCREEN_TYPE_RASTER));
-	screen.set_refresh_hz(60);
+	screen.set_refresh_hz(50);
 	screen.set_vblank_time(ATTOSECONDS_IN_USEC(0));
 	screen.set_size(384, 302);
 	screen.set_visarea(0, 384-1, 22, 302-1); // TODO: dynamic resolution
 	screen.set_screen_update("mcd212", FUNC(mcd212_device::screen_update));
 
 	SCREEN(config, m_lcd, SCREEN_TYPE_RASTER);
-	m_lcd->set_refresh_hz(60);
+	m_lcd->set_refresh_hz(50);
 	m_lcd->set_vblank_time(ATTOSECONDS_IN_USEC(0));
 	m_lcd->set_size(192, 22);
 	m_lcd->set_visarea(0, 192-1, 0, 22-1);
@@ -557,10 +557,10 @@ void cdi_state::cdi910(machine_config &config)
 	m_mcd212->set_scanline_callback(FUNC(cdi_state::draw_lcd));
 
 	screen_device &screen(SCREEN(config, "screen", SCREEN_TYPE_RASTER));
-	screen.set_refresh_hz(60);
+	screen.set_refresh_hz(50);
 	screen.set_vblank_time(ATTOSECONDS_IN_USEC(0));
-	screen.set_size(384, 302);
-	screen.set_visarea(0, 384-1, 22, 302-1); // TODO: dynamic resolution
+	screen.set_size(384, 312);
+	screen.set_visarea(0, 384-1, 32, 312-1); // TODO: dynamic resolution
 	screen.set_screen_update("mcd212", FUNC(mcd212_device::screen_update));
 
 	SCREEN(config, m_lcd, SCREEN_TYPE_RASTER);
@@ -885,14 +885,14 @@ ROM_END
 
 /*    YEAR  NAME      PARENT  COMPAT  MACHINE   INPUT     CLASS      INIT        COMPANY       FULLNAME */
 // BIOS / System
-CONS( 1991, cdimono1, 0,      0,      cdimono1, cdi,      cdi_state, empty_init, "Philips",    "CD-i (Mono-I) (PAL)",   MACHINE_IMPERFECT_GRAPHICS | MACHINE_IMPERFECT_SOUND | MACHINE_SUPPORTS_SAVE )
+CONS( 1991, cdimono1, 0,      0,      cdimono1, cdi,      cdi_state, empty_init, "Philips",    "CD-i (Mono-I) (PAL)",   MACHINE_NOT_WORKING | MACHINE_IMPERFECT_GRAPHICS | MACHINE_IMPERFECT_SOUND | MACHINE_SUPPORTS_SAVE )
 CONS( 1991, cdimono2, 0,      0,      cdimono2, cdimono2, cdi_state, empty_init, "Philips",    "CD-i (Mono-II) (NTSC)",   MACHINE_NOT_WORKING )
 CONS( 1991, cdi910,   0,      0,      cdi910,   cdimono2, cdi_state, empty_init, "Philips",    "CD-i 910-17P Mini-MMC (PAL)",   MACHINE_NOT_WORKING )
 CONS( 1991, cdi490a,  0,      0,      cdimono1, cdi,      cdi_state, empty_init, "Philips",    "CD-i 490",   MACHINE_NOT_WORKING )
 
 // The Quizard games are retail CD-i units in a cabinet, with an additional JAMMA adapter and dongle for protection, hence being clones of the system.
 /*    YEAR  NAME         PARENT    MACHINE        INPUT     DEVICE          INIT         MONITOR     COMPANY         FULLNAME */
-GAME( 1995, cdibios,     0,        cdimono1,      quizard,  cdi_state,     empty_init,  ROT0,     "Philips",  "CD-i (Mono-I) (PAL) BIOS", MACHINE_IMPERFECT_SOUND | MACHINE_IMPERFECT_GRAPHICS | MACHINE_IS_BIOS_ROOT )
+GAME( 1995, cdibios,     0,        cdimono1,      quizard,  cdi_state,     empty_init,  ROT0,     "Philips",  "CD-i (Mono-I) (PAL) BIOS", MACHINE_NOT_WORKING | MACHINE_IMPERFECT_SOUND | MACHINE_IMPERFECT_GRAPHICS | MACHINE_IS_BIOS_ROOT )
 
 GAME( 1995, quizard,     cdibios,  quizard,       quizard,  quizard_state, empty_init,  ROT0, "TAB Austria",  "Quizard (v1.8, German, i8751 DE 11 D3)", MACHINE_IMPERFECT_SOUND )
 GAME( 1995, quizard_17,  quizard,  quizard,       quizard,  quizard_state, empty_init,  ROT0, "TAB Austria",  "Quizard (v1.7, German, i8751 DE 11 D3)", MACHINE_IMPERFECT_SOUND )

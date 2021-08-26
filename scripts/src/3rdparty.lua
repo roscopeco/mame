@@ -19,18 +19,21 @@ project "expat"
 	kind "StaticLib"
 
 	-- fake out the enough of expat_config.h to get by
+	-- could possibly add more defines here for specific targets
 	defines {
 		"HAVE_MEMMOVE",
 		"HAVE_STDINT_H",
 		"HAVE_STDLIB_H",
 		"HAVE_STRING_H",
+		"PACKAGE=\"expat\"",
 		"PACKAGE_BUGREPORT=\"expat-bugs@libexpat.org\"",
 		"PACKAGE_NAME=\"expat\"",
-		"PACKAGE_STRING=\"expat 2.1.1\"",
+		"PACKAGE_STRING=\"expat 2.2.10\"",
 		"PACKAGE_TARNAME=\"expat\"",
 		"PACKAGE_URL=\"\"",
-		"PACKAGE_VERSION=\"2.1.1\"",
+		"PACKAGE_VERSION=\"2.2.10\"",
 		"STDC_HEADERS",
+		"VERSION=\"2.2.10\"",
 		"XML_CONTEXT_BYTES=1024",
 		"XML_DTD",
 		"XML_NS",
@@ -43,6 +46,22 @@ if _OPTIONS["BIGENDIAN"]=="1" then
 else
 	defines {
 		"BYTEORDER=1234",
+	}
+end
+if _OPTIONS["targetos"]=="macosx" or _OPTIONS["targetos"]=="freebsd" then
+	defines {
+		"HAVE_ARC4RANDOM",
+	}
+end
+if BASE_TARGETOS=="unix" then
+	defines {
+		"HAVE_DLFCN_H",
+		"HAVE_FCNTL_H",
+		"HAVE_MMAP",
+		"HAVE_SYS_STAT_H",
+		"HAVE_SYS_TYPES_H",
+		"HAVE_UNISTD_H",
+		"XML_DEV_URANDOM",
 	}
 end
 
@@ -178,6 +197,7 @@ end
 	files {
 		MAME_DIR .. "3rdparty/softfloat/softfloat.c",
 		MAME_DIR .. "3rdparty/softfloat/fsincos.c",
+		MAME_DIR .. "3rdparty/softfloat/fpatan.c",
 		MAME_DIR .. "3rdparty/softfloat/fyl2x.c",
 	}
 
@@ -206,6 +226,11 @@ configuration { "gmake or ninja" }
 buildoptions_cpp {
 	"-x c++",
 }
+if _OPTIONS["gcc"]~=nil and not string.find(_OPTIONS["gcc"], "clang") then
+	buildoptions_cpp {
+		"-Wno-error=implicit-fallthrough",
+	}
+end
 
 configuration { "vs*" }
 buildoptions {
@@ -644,8 +669,8 @@ end
 
 	configuration { "vsllvm" }
 		buildoptions {
-			"-Wno-unused-function",
 			"-Wno-enum-conversion",
+			"-Wno-unused-function",
 		}
 
 	configuration { }
@@ -714,14 +739,19 @@ project "7z"
 
 	configuration { "gmake or ninja" }
 		buildoptions_c {
-			"-Wno-undef",
 			"-Wno-strict-prototypes",
+			"-Wno-undef",
 		}
 if _OPTIONS["gcc"]~=nil and string.find(_OPTIONS["gcc"], "clang") and str_to_version(_OPTIONS["gcc_version"]) >= 100000 then
 		buildoptions_c {
 			"-Wno-misleading-indentation",
 		}
 end
+
+	configuration { "asmjs" }
+		buildoptions {
+			"-Wno-misleading-indentation",
+		}
 
 	configuration { "mingw*" }
 		buildoptions_c {
@@ -980,10 +1010,10 @@ project "sqlite3"
 
 	configuration { "gmake" }
 		buildoptions_c {
-			"-Wno-discarded-qualifiers",
-			"-Wno-unused-but-set-variable",
 			"-Wno-bad-function-cast",
+			"-Wno-discarded-qualifiers",
 			"-Wno-undef",
+			"-Wno-unused-but-set-variable",
 		}
 if _OPTIONS["gcc"]~=nil and ((string.find(_OPTIONS["gcc"], "clang") or string.find(_OPTIONS["gcc"], "asmjs") or string.find(_OPTIONS["gcc"], "android"))) then
 		buildoptions_c {
@@ -1146,15 +1176,6 @@ project "bx"
 		}
 
 	configuration { }
-
-	local version = str_to_version(_OPTIONS["gcc_version"])
-	if _OPTIONS["gcc"]~=nil and string.find(_OPTIONS["gcc"], "gcc") then
-		if version < 60000 then
-			buildoptions {
-				"-Wno-strict-overflow",
-			}
-		end
-	end
 
 	includedirs {
 		MAME_DIR .. "3rdparty/bx/include",
@@ -1339,10 +1360,9 @@ end
 	configuration { "gmake or ninja" }
 		buildoptions {
 			"-Wno-uninitialized",
+			"-Wno-unused-but-set-variable",
 			"-Wno-unused-function",
 			"-Wno-unused-variable",
-			"-Wno-unused-but-set-variable",
-			"-Wno-format-extra-args", -- temp for mingw 6.1 till update bgfx code
 		}
 	configuration { "rpi" }
 		buildoptions {
@@ -1385,12 +1405,10 @@ end
 		end
 	end
 
-	if _OPTIONS["targetos"]=="macosx" and _OPTIONS["gcc"]~=nil then
-		if string.find(_OPTIONS["gcc"], "clang") and (version < 80000) then
-			defines {
-				"TARGET_OS_OSX=1",
-			}
-		end
+	if _OPTIONS["targetos"]=="freebsd" then
+		buildoptions {
+			backtick(pkgconfigcmd() .. " --cflags gl")
+		}
 	end
 
 	defines {
@@ -1405,6 +1423,14 @@ end
 			defines {
 				"BGFX_CONFIG_RENDERER_OPENGLES=1",
 				"BGFX_CONFIG_RENDERER_OPENGL=0",
+			}
+		end
+	end
+
+	if _OPTIONS["targetos"]=="macosx" and _OPTIONS["gcc"]~=nil then
+		if string.find(_OPTIONS["gcc"], "clang") and (version < 80000) then
+			defines {
+				"TARGET_OS_OSX=1",
 			}
 		end
 	end
@@ -1426,17 +1452,19 @@ end
 		MAME_DIR .. "3rdparty/bgfx/src/renderer_noop.cpp",
 		MAME_DIR .. "3rdparty/bgfx/src/renderer_nvn.cpp",
 		MAME_DIR .. "3rdparty/bgfx/src/renderer_vk.cpp",
+		MAME_DIR .. "3rdparty/bgfx/src/renderer_webgpu.cpp",
 		MAME_DIR .. "3rdparty/bgfx/src/shader.cpp",
 		MAME_DIR .. "3rdparty/bgfx/src/shader_dx9bc.cpp",
 		MAME_DIR .. "3rdparty/bgfx/src/shader_dxbc.cpp",
 		MAME_DIR .. "3rdparty/bgfx/src/shader_spirv.cpp",
 		MAME_DIR .. "3rdparty/bgfx/src/topology.cpp",
-		MAME_DIR .. "3rdparty/bgfx/src/vertexdecl.cpp",
+		MAME_DIR .. "3rdparty/bgfx/src/vertexlayout.cpp",
 		MAME_DIR .. "3rdparty/bgfx/examples/common/imgui/imgui.cpp",
 		MAME_DIR .. "3rdparty/bgfx/examples/common/nanovg/nanovg.cpp",
 		MAME_DIR .. "3rdparty/bgfx/examples/common/nanovg/nanovg_bgfx.cpp",
 		MAME_DIR .. "3rdparty/bgfx/3rdparty/dear-imgui/imgui.cpp",
 		MAME_DIR .. "3rdparty/bgfx/3rdparty/dear-imgui/imgui_draw.cpp",
+		MAME_DIR .. "3rdparty/bgfx/3rdparty/dear-imgui/imgui_tables.cpp",
 		MAME_DIR .. "3rdparty/bgfx/3rdparty/dear-imgui/imgui_widgets.cpp",
 	}
 	if _OPTIONS["targetos"]=="macosx" then
@@ -1447,6 +1475,7 @@ end
 		}
 		buildoptions {
 			"-x objective-c++",
+			"-D BGFX_CONFIG_MULTITHREADED=0",
 		}
 	end
 
@@ -1485,21 +1514,21 @@ project "portaudio"
 		buildoptions {
 			"-Wno-deprecated-declarations",
 			"-Wno-missing-braces",
-			"-Wno-unused-variable",
 			"-Wno-switch",
 			"-Wno-unused-function",
+			"-Wno-unused-variable",
 		}
 
 	configuration { "gmake or ninja" }
 		buildoptions_c {
-			"-Wno-strict-prototypes",
 			"-Wno-bad-function-cast",
-			"-Wno-undef",
 			"-Wno-missing-braces",
-			"-Wno-unused-variable",
-			"-Wno-unused-value",
-			"-Wno-unused-function",
+			"-Wno-strict-prototypes",
+			"-Wno-undef",
 			"-Wno-unknown-pragmas",
+			"-Wno-unused-function",
+			"-Wno-unused-value",
+			"-Wno-unused-variable",
 		}
 
 	local version = str_to_version(_OPTIONS["gcc_version"])
@@ -1513,15 +1542,13 @@ project "portaudio"
 				"-Wno-sometimes-uninitialized",
 			}
 		else
-			if (version >= 40600) then
-				buildoptions_c {
-					"-Wno-unused-but-set-variable",
-					"-Wno-maybe-uninitialized",
-					"-Wno-sometimes-uninitialized",
-					"-w",
-					"-Wno-incompatible-pointer-types-discards-qualifiers",
-				}
-			end
+			buildoptions_c {
+				"-Wno-maybe-uninitialized",
+				"-Wno-sometimes-uninitialized",
+				"-Wno-unused-but-set-variable",
+				"-Wno-incompatible-pointer-types-discards-qualifiers",
+				"-w",
+			}
 		end
 		if string.find(_OPTIONS["gcc"], "clang") and version >= 100000 then
 			buildoptions_c {
@@ -2093,13 +2120,13 @@ end
 			MAME_DIR .. "3rdparty/bgfx/3rdparty/khronos",
 		}
 		buildoptions_c {
-			"-Wno-undef",
+			"-Wno-bad-function-cast",
+			"-Wno-discarded-qualifiers",
 			"-Wno-format",
 			"-Wno-format-security",
-			"-Wno-strict-prototypes",
-			"-Wno-bad-function-cast",
 			"-Wno-pointer-to-int-cast",
-			"-Wno-discarded-qualifiers",
+			"-Wno-strict-prototypes",
+			"-Wno-undef",
 			"-Wno-unused-but-set-variable",
 		}
 
@@ -2119,6 +2146,7 @@ end
 
 		buildoptions_c {
 			"-Wno-bad-function-cast",
+			"-Wno-strict-prototypes",
 		}
 
 	configuration { "android-*"}
@@ -2396,14 +2424,61 @@ custombuildtask {
 }	
 
 --------------------------------------------------
+-- ymfm library objects
+--------------------------------------------------
+
+project "ymfm"
+	uuid "2403a536-cb0a-4b50-b41f-10c17917689b"
+	kind "StaticLib"
+
+	configuration { }
+		defines {
+			"YMFM_MAME",
+		}
+
+	files {
+		MAME_DIR .. "3rdparty/ymfm/src/ymfm.h",
+		MAME_DIR .. "3rdparty/ymfm/src/ymfm_adpcm.cpp",
+		MAME_DIR .. "3rdparty/ymfm/src/ymfm_adpcm.h",
+		MAME_DIR .. "3rdparty/ymfm/src/ymfm_fm.h",
+		MAME_DIR .. "3rdparty/ymfm/src/ymfm_fm.ipp",
+		MAME_DIR .. "3rdparty/ymfm/src/ymfm_misc.cpp",
+		MAME_DIR .. "3rdparty/ymfm/src/ymfm_misc.h",
+		MAME_DIR .. "3rdparty/ymfm/src/ymfm_opl.cpp",
+		MAME_DIR .. "3rdparty/ymfm/src/ymfm_opl.h",
+		MAME_DIR .. "3rdparty/ymfm/src/ymfm_opm.cpp",
+		MAME_DIR .. "3rdparty/ymfm/src/ymfm_opm.h",
+		MAME_DIR .. "3rdparty/ymfm/src/ymfm_opn.cpp",
+		MAME_DIR .. "3rdparty/ymfm/src/ymfm_opn.h",
+		MAME_DIR .. "3rdparty/ymfm/src/ymfm_opq.cpp",
+		MAME_DIR .. "3rdparty/ymfm/src/ymfm_opq.h",
+		MAME_DIR .. "3rdparty/ymfm/src/ymfm_opz.cpp",
+		MAME_DIR .. "3rdparty/ymfm/src/ymfm_opz.h",
+		MAME_DIR .. "3rdparty/ymfm/src/ymfm_pcm.cpp",
+		MAME_DIR .. "3rdparty/ymfm/src/ymfm_pcm.h",
+		MAME_DIR .. "3rdparty/ymfm/src/ymfm_ssg.cpp",
+		MAME_DIR .. "3rdparty/ymfm/src/ymfm_ssg.h",
+	}
+
+
+--------------------------------------------------
 -- asmjit library
 --------------------------------------------------
 
+if not _OPTIONS["FORCE_DRC_C_BACKEND"] then
 project "asmjit"
 	uuid "4539757c-6e99-4bae-b3d0-b342a7c49539"
 	kind "StaticLib"
 
 	configuration { }
+
+	if _OPTIONS["targetos"]=="macosx" and _OPTIONS["gcc"]~=nil then
+		if string.find(_OPTIONS["gcc"], "clang") and (version < 80000) then
+			defines {
+				"TARGET_OS_OSX=1",
+			}
+		end
+	end
 
 	files {
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/asmjit.h",
@@ -2419,6 +2494,7 @@ project "asmjit"
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/builder.h",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/callconv.cpp",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/callconv.h",
+		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/codebuffer.h",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/codebufferwriter_p.h",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/codeholder.cpp",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/codeholder.h",
@@ -2431,7 +2507,15 @@ project "asmjit"
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/datatypes.h",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/emitter.cpp",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/emitter.h",
+		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/emitterutils.cpp",
+		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/emitterutils_p.h",
+		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/environment.cpp",
+		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/environment.h",
+		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/errorhandler.cpp",
+		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/errorhandler.h",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/features.h",
+		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/formatter.cpp",
+		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/formatter.h",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/func.cpp",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/func.h",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/globals.cpp",
@@ -2442,13 +2526,14 @@ project "asmjit"
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/jitallocator.h",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/jitruntime.cpp",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/jitruntime.h",
-		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/logging.cpp",
-		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/logging.h",
+		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/logger.cpp",
+		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/logger.h",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/misc_p.h",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/operand.cpp",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/operand.h",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/osutils.cpp",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/osutils.h",
+		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/osutils_p.h",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/raassignment_p.h",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/rabuilders_p.h",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/radefs_p.h",
@@ -2481,6 +2566,8 @@ project "asmjit"
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/zonetree.h",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/zonevector.cpp",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/core/zonevector.h",
+		MAME_DIR .. "3rdparty/asmjit/src/asmjit/x86/x86archdata.cpp",
+		MAME_DIR .. "3rdparty/asmjit/src/asmjit/x86/x86archdata_p.h",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/x86/x86assembler.cpp",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/x86/x86assembler.h",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/x86/x86builder.cpp",
@@ -2492,6 +2579,8 @@ project "asmjit"
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/x86/x86emitter.h",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/x86/x86features.cpp",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/x86/x86features.h",
+		MAME_DIR .. "3rdparty/asmjit/src/asmjit/x86/x86formatter.cpp",
+		MAME_DIR .. "3rdparty/asmjit/src/asmjit/x86/x86formatter_p.h",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/x86/x86globals.h",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/x86/x86instapi.cpp",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/x86/x86instapi_p.h",
@@ -2500,11 +2589,10 @@ project "asmjit"
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/x86/x86instdb_p.h",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/x86/x86internal.cpp",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/x86/x86internal_p.h",
-		MAME_DIR .. "3rdparty/asmjit/src/asmjit/x86/x86logging.cpp",
-		MAME_DIR .. "3rdparty/asmjit/src/asmjit/x86/x86logging_p.h",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/x86/x86opcode_p.h",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/x86/x86operand.cpp",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/x86/x86operand.h",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/x86/x86rapass.cpp",
 		MAME_DIR .. "3rdparty/asmjit/src/asmjit/x86/x86rapass_p.h",
 	}
+end

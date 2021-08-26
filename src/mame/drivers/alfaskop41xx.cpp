@@ -285,14 +285,14 @@ template <unsigned N> void alfaskop4110_state::irq_w(int state)
 /* Simplified chargen, no attributes or special formats/features yet  */
 MC6845_UPDATE_ROW( alfaskop4110_state::crtc_update_row )
 {
-	offs_t base = ma + 0x4000;
-	u32 *px = &bitmap.pix32(y);
+	offs_t const base = ma + 0x4000;
+	u32 *px = &bitmap.pix(y);
 
 	for (int i = 0; i < x_count; i++)
 	{
 		u8 chr = m_vram[(base + i) & 0x07ff] & 0x7f;
-		rgb_t bg = rgb_t::white();
-		rgb_t fg = rgb_t::black();
+		rgb_t const bg = rgb_t::white();
+		rgb_t const fg = rgb_t::black();
 
 		u8 dots = m_chargen[chr * 16 + ra];
 
@@ -551,8 +551,8 @@ ROM_START( alfaskop4110 ) // Display Unit
 	ROM_REGION( 0x800, "chargen", ROMREGION_ERASEFF )
 	ROM_LOAD( "e3405972067500.bin", 0x0000, 0x0400, CRC(fb12b549) SHA1(53783f62c5e51320a53e053fbcf8b3701d8a805f))
 	ROM_LOAD( "e3405972067600.bin", 0x0400, 0x0400, CRC(c7069d65) SHA1(587efcbee036d4c0c5b936cc5d7b1f97b6fe6dba))
-		ROM_REGION( 0xff, PLA1_TAG, 0 )
-	//ROM_LOAD( "dtc_a_e34062_0100_ic50_e3405970303601_ml.bin", 0x00, 0xf5, CRC(b37395f2) SHA1(a00dc77d4bef084c0ddceef618986d83c69b1d65) ) // Signetics_N82S100N.bin MAXLOADER format
+
+	ROM_REGION( 0xff, PLA1_TAG, 0 )
 	ROM_LOAD( "dtc_a_e34062_0100_ic50_e3405970303601.bin", 0x00, 0xfa, CRC(16339b7a) SHA1(9b313a7526460dc9bcedfda25bece91c924f0ddc) ) // Signetics_N82S100N.bin DATAIO format
 ROM_END
 

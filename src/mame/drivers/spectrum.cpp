@@ -291,7 +291,7 @@ SamRam
 /****************************************************************************************************/
 /* Spectrum 48k functions */
 
-READ8_MEMBER(spectrum_state::pre_opcode_fetch_r)
+uint8_t spectrum_state::pre_opcode_fetch_r(offs_t offset)
 {
 	/* this allows expansion devices to act upon opcode fetches from MEM addresses
 	   for example, interface1 detection fetches requires fetches at 0008 / 0708 to
@@ -303,7 +303,7 @@ READ8_MEMBER(spectrum_state::pre_opcode_fetch_r)
 	return retval;
 }
 
-READ8_MEMBER(spectrum_state::spectrum_data_r)
+uint8_t spectrum_state::spectrum_data_r(offs_t offset)
 {
 	m_exp->pre_data_fetch(offset);
 	uint8_t retval = m_specmem->space(AS_PROGRAM).read_byte(offset);
@@ -311,18 +311,17 @@ READ8_MEMBER(spectrum_state::spectrum_data_r)
 	return retval;
 }
 
-WRITE8_MEMBER(spectrum_state::spectrum_data_w)
+void spectrum_state::spectrum_data_w(offs_t offset, uint8_t data)
 {
 	m_specmem->space(AS_PROGRAM).write_byte(offset,data);
 }
 
-WRITE8_MEMBER(spectrum_state::spectrum_rom_w)
+void spectrum_state::spectrum_rom_w(offs_t offset, uint8_t data)
 {
-	if (m_exp->romcs())
-		m_exp->mreq_w(offset, data);
+	m_exp->mreq_w(offset, data);
 }
 
-READ8_MEMBER(spectrum_state::spectrum_rom_r)
+uint8_t spectrum_state::spectrum_rom_r(offs_t offset)
 {
 	uint8_t data;
 
@@ -374,7 +373,7 @@ void spectrum_state::spectrum_port_fe_w(offs_t offset, uint8_t data)
 
 /* KT: more accurate keyboard reading */
 /* DJR: Spectrum+ keys added */
-READ8_MEMBER(spectrum_state::spectrum_port_fe_r)
+uint8_t spectrum_state::spectrum_port_fe_r(offs_t offset)
 {
 	int lines = offset >> 8;
 	int data = 0xff;
@@ -449,7 +448,7 @@ READ8_MEMBER(spectrum_state::spectrum_port_fe_r)
 	return data;
 }
 
-READ8_MEMBER(spectrum_state::spectrum_port_ula_r)
+uint8_t spectrum_state::spectrum_port_ula_r(offs_t offset)
 {
 	// known ports used for reading floating bus are:
 	//   0x28ff   Arkanoid, Cobra, Renegade, Short Circuit, Terra Cresta
@@ -477,7 +476,7 @@ READ8_MEMBER(spectrum_state::spectrum_port_ula_r)
 	return floating_bus_r();
 }
 
-READ8_MEMBER(spectrum_state::spectrum_clone_port_ula_r)
+uint8_t spectrum_state::spectrum_clone_port_ula_r()
 {
 	int vpos = m_screen->vpos();
 
@@ -719,16 +718,10 @@ INPUT_PORTS_END
 
 void spectrum_state::init_spectrum()
 {
-	switch (m_ram->size())
-	{
-		case 48*1024:
-			m_specmem->space(AS_PROGRAM).install_ram(0x8000, 0xffff, nullptr); // Fall through
-		case 16*1024:
-			m_specmem->space(AS_PROGRAM).install_ram(0x5b00, 0x7fff, nullptr);
-	}
+	m_specmem->space(AS_PROGRAM).install_ram(0x5b00, m_ram->size() + 0x3fff, m_ram->pointer() + 0x1b00);
 }
 
-MACHINE_RESET_MEMBER(spectrum_state,spectrum)
+void spectrum_state::machine_reset()
 {
 	m_port_7ffd_data = -1;
 	m_port_1ffd_data = -1;
@@ -785,9 +778,11 @@ void spectrum_state::spectrum_common(machine_config &config)
 
 	ADDRESS_MAP_BANK(config, m_specmem).set_map(&spectrum_state::spectrum_map).set_options(ENDIANNESS_LITTLE, 8, 16, 0x10000);
 
+#if 1 // change to 0 in order to get working "Proceed 1" VC1541 FDC
 	config.set_maximum_quantum(attotime::from_hz(60));
-
-	MCFG_MACHINE_RESET_OVERRIDE(spectrum_state, spectrum )
+#else
+	config.set_perfect_quantum(m_maincpu);
+#endif
 
 	/* video hardware */
 	SCREEN(config, m_screen, SCREEN_TYPE_RASTER);
@@ -798,8 +793,6 @@ void spectrum_state::spectrum_common(machine_config &config)
 
 	PALETTE(config, "palette", FUNC(spectrum_state::spectrum_palette), 16);
 	GFXDECODE(config, "gfxdecode", "palette", gfx_spectrum);
-
-	MCFG_VIDEO_START_OVERRIDE(spectrum_state, spectrum)
 
 	/* sound hardware */
 	SPEAKER(config, "mono").front_center();
@@ -890,6 +883,24 @@ ROM_START(spectrum)
 	ROMX_LOAD("isomoje.rom",0x0000,0x4000, CRC(62ab3640) SHA1(04adbdb1380d6ccd4ab26ddd61b9ccbba462a60f), ROM_BIOS(18))
 	ROM_SYSTEM_BIOS(19, "iso8", "ISO ROM 8")
 	ROMX_LOAD("iso8bm.rom",0x0000,0x4000, CRC(43e9c2fd) SHA1(5752e6f789769475711b91e0a75911fa5232c767), ROM_BIOS(19))
+	ROM_SYSTEM_BIOS(20, "diagv28", "DiagROM v1.28")
+	ROMX_LOAD("diagrom.v28",0x0000,0x4000, CRC(aadf967e) SHA1(6fbdb11e475499655df36343a22f15d67f578165), ROM_BIOS(20))
+	ROM_SYSTEM_BIOS(21, "diagv31", "DiagROM v1.31")
+	ROMX_LOAD("diagrom.v31",0x0000,0x4000, CRC(cddbb11e) SHA1(3ed203034fe1562ee7216fad06309d3f7033a967), ROM_BIOS(21))
+	ROM_SYSTEM_BIOS(22, "diagv33", "DiagROM v1.33")
+	ROMX_LOAD("diagrom.v33",0x0000,0x4000, CRC(0fb080e1) SHA1(222f535ae277d0b8ce6c27b75319da9c45f8cadc), ROM_BIOS(22))
+	ROM_SYSTEM_BIOS(23, "diagv34", "DiagROM v1.34")
+	ROMX_LOAD("diagrom.v34",0x0000,0x4000, CRC(50478f29) SHA1(1e55af6e7bb24090ce052e7536e91f92492fe168), ROM_BIOS(23))
+	ROM_SYSTEM_BIOS(24, "diagv35", "DiagROM v1.35")
+	ROMX_LOAD("diagrom.v35",0x0000,0x4000, CRC(c869b642) SHA1(61eb786249a207ea57cdea6bb01fcd0b95c218f2), ROM_BIOS(24))
+	ROM_SYSTEM_BIOS(25, "diagv47", "DiagROM v1.47")
+	ROMX_LOAD("diagrom.v47",0x0000,0x4000, CRC(be329fc0) SHA1(24dc875753e729452f1ff941d2e0ae49f9031bc3), ROM_BIOS(25))
+	ROM_SYSTEM_BIOS(26, "diagv50", "DiagROM v1.50")
+	ROMX_LOAD("diagrom.v50",0x0000,0x4000, CRC(054a2d6a) SHA1(2fa6f3b31d7bb610df78be5c4c80537cf6e5911d), ROM_BIOS(26))
+	ROM_SYSTEM_BIOS(27, "diagv51", "DiagROM v1.51")
+	ROMX_LOAD("diagrom.v51",0x0000,0x4000, CRC(83034df6) SHA1(e57b2c8a8e3563ea02a20eecd1d4cb6be9f9c2df), ROM_BIOS(27))
+	ROM_SYSTEM_BIOS(28, "alford37", "Brian Alford's Test ROM v0.37")
+	ROMX_LOAD("testromv037.bin", 0x0000,0x4000, CRC(a7ea3d1c) SHA1(f699b73abfb1ab53c063ac02ac6283705864c734), ROM_BIOS(28))
 ROM_END
 
 ROM_START(specide)

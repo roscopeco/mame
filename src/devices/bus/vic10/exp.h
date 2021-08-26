@@ -41,14 +41,6 @@
 
 
 //**************************************************************************
-//  CONSTANTS
-//**************************************************************************
-
-#define VIC10_EXPANSION_SLOT_TAG        "exp"
-
-
-
-//**************************************************************************
 //  TYPE DEFINITIONS
 //**************************************************************************
 
@@ -141,9 +133,9 @@ public:
 protected:
 	device_vic10_expansion_card_interface(const machine_config &mconfig, device_t &device);
 
-	optional_shared_ptr<uint8_t> m_lorom;
-	optional_shared_ptr<uint8_t> m_exram;
-	optional_shared_ptr<uint8_t> m_uprom;
+	std::unique_ptr<uint8_t[]> m_lorom;
+	std::unique_ptr<uint8_t[]> m_exram;
+	std::unique_ptr<uint8_t[]> m_uprom;
 
 	vic10_expansion_slot_device *m_slot;
 };

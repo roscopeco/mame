@@ -156,6 +156,7 @@ project ("ocore_" .. _OPTIONS["osd"])
 	files {
 		MAME_DIR .. "src/osd/osdcore.cpp",
 		MAME_DIR .. "src/osd/osdcore.h",
+		MAME_DIR .. "src/osd/osdfile.h",
 		MAME_DIR .. "src/osd/strconv.cpp",
 		MAME_DIR .. "src/osd/strconv.h",
 		MAME_DIR .. "src/osd/osdsync.cpp",
@@ -165,7 +166,6 @@ project ("ocore_" .. _OPTIONS["osd"])
 		MAME_DIR .. "src/osd/modules/lib/osdlib_macosx.cpp",
 		MAME_DIR .. "src/osd/modules/lib/osdlib.h",
 		MAME_DIR .. "src/osd/modules/file/posixdir.cpp",
-		MAME_DIR .. "src/osd/modules/file/posixdomain.cpp",
 		MAME_DIR .. "src/osd/modules/file/posixfile.cpp",
 		MAME_DIR .. "src/osd/modules/file/posixfile.h",
 		MAME_DIR .. "src/osd/modules/file/posixptty.cpp",

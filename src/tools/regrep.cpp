@@ -12,8 +12,12 @@
 #include <cctype>
 #include <new>
 #include <cassert>
-#include "osdcore.h"
+#include "corefile.h"
+#include "corestr.h"
+#include "osdcomm.h"
 #include "png.h"
+
+using util::string_format;
 
 
 /***************************************************************************
@@ -235,7 +239,7 @@ int main(int argc, char *argv[])
 
 	/* read the template file into an astring */
 	std::string tempheader;
-	if (util::core_file::load(tempfilename.c_str(), &buffer, bufsize) == osd_file::error::NONE)
+	if (!util::core_file::load(tempfilename.c_str(), &buffer, bufsize))
 	{
 		tempheader.assign((const char *)buffer, bufsize);
 		free(buffer);
@@ -565,7 +569,7 @@ static util::core_file::ptr create_file_and_output_header(std::string &filename,
 	util::core_file::ptr file;
 
 	/* create the indexfile */
-	if (util::core_file::open(filename, OPEN_FLAG_WRITE | OPEN_FLAG_CREATE | OPEN_FLAG_CREATE_PATHS | OPEN_FLAG_NO_BOM, file) != osd_file::error::NONE)
+	if (util::core_file::open(filename, OPEN_FLAG_WRITE | OPEN_FLAG_CREATE | OPEN_FLAG_CREATE_PATHS | OPEN_FLAG_NO_BOM, file))
 		return util::core_file::ptr();
 
 	/* print a header */
@@ -607,7 +611,6 @@ static void output_report(std::string &dirname, std::string &tempheader, std::st
 	summary_file *buckethead[BUCKET_COUNT], **buckettailptr[BUCKET_COUNT];
 	summary_file *curfile;
 	std::string title("MAME Regressions");
-	std::string tempname;
 	int listnum, bucknum;
 	util::core_file::ptr indexfile;
 	int count = 0, total;
@@ -686,7 +689,7 @@ static void output_report(std::string &dirname, std::string &tempheader, std::st
 		*buckettailptr[bucknum] = nullptr;
 
 	/* output header */
-	tempname = string_format("%s" PATH_SEPARATOR "%s", dirname.c_str(), "index.html");
+	std::string tempname = string_format("%s" PATH_SEPARATOR "%s", dirname.c_str(), "index.html");
 	indexfile = create_file_and_output_header(tempname, tempheader, title);
 	if (!indexfile)
 	{
@@ -695,7 +698,7 @@ static void output_report(std::string &dirname, std::string &tempheader, std::st
 	}
 
 	/* iterate over buckets and output them */
-	for (bucknum = 0; bucknum < ARRAY_LENGTH(bucket_output_order); bucknum++)
+	for (bucknum = 0; bucknum < std::size(bucket_output_order); bucknum++)
 	{
 		int curbucket = bucket_output_order[bucknum];
 
@@ -721,14 +724,13 @@ static int compare_screenshots(summary_file *curfile)
 	bitmap_argb32 bitmaps[MAX_COMPARES];
 	int unique[MAX_COMPARES];
 	int numunique = 0;
-	int listnum;
 
 	/* iterate over all files and load their bitmaps */
-	for (listnum = 0; listnum < list_count; listnum++)
+	for (int listnum = 0; listnum < list_count; listnum++)
 		if (curfile->status[listnum] == STATUS_SUCCESS)
 		{
 			std::string fullname;
-			osd_file::error filerr;
+			std::error_condition filerr;
 			util::core_file::ptr file;
 
 			/* get the filename for the image */
@@ -738,7 +740,7 @@ static int compare_screenshots(summary_file *curfile)
 			filerr = util::core_file::open(fullname, OPEN_FLAG_READ, file);
 
 			/* if that failed, look in the old location */
-			if (filerr != osd_file::error::NONE)
+			if (filerr)
 			{
 				/* get the filename for the image */
 				fullname = string_format("%s" PATH_SEPARATOR "snap" PATH_SEPARATOR "_%s.png", lists[listnum].dir, curfile->name);
@@ -748,14 +750,15 @@ static int compare_screenshots(summary_file *curfile)
 			}
 
 			/* if that worked, load the file */
-			if (filerr == osd_file::error::NONE)
+			if (!filerr)
 			{
-				png_read_bitmap(*file, bitmaps[listnum]);
+				util::png_read_bitmap(*file, bitmaps[listnum]);
 				file.reset();
 			}
 		}
 
 	/* now find all the different bitmap types */
+	int listnum;
 	for (listnum = 0; listnum < list_count; listnum++)
 	{
 		curfile->matchbitmap[listnum] = 0xff;
@@ -774,8 +777,8 @@ static int compare_screenshots(summary_file *curfile)
 				/* compare scanline by scanline */
 				for (int y = 0; y < this_bitmap.height() && !bitmaps_differ; y++)
 				{
-					uint32_t *base = &base_bitmap.pix32(y);
-					uint32_t *curr = &this_bitmap.pix32(y);
+					uint32_t const *base = &base_bitmap.pix(y);
+					uint32_t const *curr = &this_bitmap.pix(y);
 
 					/* scan the scanline */
 					int x;
@@ -831,14 +834,12 @@ static int generate_png_diff(const summary_file *curfile, std::string &destdir, 
 	bitmap_argb32 bitmaps[MAX_COMPARES];
 	std::string srcimgname;
 	std::string dstfilename;
-	std::string tempname;
 	bitmap_argb32 finalbitmap;
 	int width, height, maxwidth;
 	int bitmapcount = 0;
-	int listnum, bmnum;
 	util::core_file::ptr file;
-	osd_file::error filerr;
-	png_error pngerr;
+	std::error_condition filerr;
+	util::png_error pngerr;
 	int error = -1;
 	int starty;
 
@@ -847,20 +848,20 @@ static int generate_png_diff(const summary_file *curfile, std::string &destdir, 
 	srcimgname = string_format("snap" PATH_SEPARATOR "%s" PATH_SEPARATOR "final.png", curfile->name);
 
 	/* open and load all unique bitmaps */
-	for (listnum = 0; listnum < list_count; listnum++)
+	for (int listnum = 0; listnum < list_count; listnum++)
 		if (curfile->matchbitmap[listnum] == listnum)
 		{
-			tempname = string_format("%s" PATH_SEPARATOR "%s", lists[listnum].dir, srcimgname.c_str());
+			std::string tempname = string_format("%s" PATH_SEPARATOR "%s", lists[listnum].dir, srcimgname.c_str());
 
 			/* open the source image */
 			filerr = util::core_file::open(tempname, OPEN_FLAG_READ, file);
-			if (filerr != osd_file::error::NONE)
+			if (filerr)
 				goto error;
 
 			/* load the source image */
-			pngerr = png_read_bitmap(*file, bitmaps[bitmapcount++]);
+			pngerr = util::png_read_bitmap(*file, bitmaps[bitmapcount++]);
 			file.reset();
-			if (pngerr != PNGERR_NONE)
+			if (pngerr != util::png_error::NONE)
 				goto error;
 		}
 
@@ -871,7 +872,7 @@ static int generate_png_diff(const summary_file *curfile, std::string &destdir, 
 	/* determine the size of the final bitmap */
 	height = width = 0;
 	maxwidth = bitmaps[0].width();
-	for (bmnum = 1; bmnum < bitmapcount; bmnum++)
+	for (int bmnum = 1; bmnum < bitmapcount; bmnum++)
 	{
 		int curwidth;
 
@@ -891,24 +892,23 @@ static int generate_png_diff(const summary_file *curfile, std::string &destdir, 
 
 	/* now copy and compare each set of bitmaps */
 	starty = 0;
-	for (bmnum = 1; bmnum < bitmapcount; bmnum++)
+	for (int bmnum = 1; bmnum < bitmapcount; bmnum++)
 	{
-		bitmap_argb32 &bitmap1 = bitmaps[0];
-		bitmap_argb32 &bitmap2 = bitmaps[bmnum];
+		bitmap_argb32 const &bitmap1 = bitmaps[0];
+		bitmap_argb32 const &bitmap2 = bitmaps[bmnum];
 		int curheight = std::max(bitmap1.height(), bitmap2.height());
-		int x, y;
 
 		/* iterate over rows in these bitmaps */
-		for (y = 0; y < curheight; y++)
+		for (int y = 0; y < curheight; y++)
 		{
-			uint32_t *src1 = (y < bitmap1.height()) ? &bitmap1.pix32(y) : nullptr;
-			uint32_t *src2 = (y < bitmap2.height()) ? &bitmap2.pix32(y) : nullptr;
-			uint32_t *dst1 = &finalbitmap.pix32(starty + y, 0);
-			uint32_t *dst2 = &finalbitmap.pix32(starty + y, bitmap1.width() + BITMAP_SPACE);
-			uint32_t *dstdiff = &finalbitmap.pix32(starty + y, bitmap1.width() + BITMAP_SPACE + maxwidth + BITMAP_SPACE);
+			uint32_t const *src1 = (y < bitmap1.height()) ? &bitmap1.pix(y) : nullptr;
+			uint32_t const *src2 = (y < bitmap2.height()) ? &bitmap2.pix(y) : nullptr;
+			uint32_t *dst1 = &finalbitmap.pix(starty + y, 0);
+			uint32_t *dst2 = &finalbitmap.pix(starty + y, bitmap1.width() + BITMAP_SPACE);
+			uint32_t *dstdiff = &finalbitmap.pix(starty + y, bitmap1.width() + BITMAP_SPACE + maxwidth + BITMAP_SPACE);
 
 			/* now iterate over columns */
-			for (x = 0; x < maxwidth; x++)
+			for (int x = 0; x < maxwidth; x++)
 			{
 				int pix1 = -1, pix2 = -2;
 
@@ -926,11 +926,11 @@ static int generate_png_diff(const summary_file *curfile, std::string &destdir, 
 
 	/* write the final PNG */
 	filerr = util::core_file::open(dstfilename, OPEN_FLAG_WRITE | OPEN_FLAG_CREATE, file);
-	if (filerr != osd_file::error::NONE)
+	if (filerr)
 		goto error;
-	pngerr = png_write_bitmap(*file, nullptr, finalbitmap, 0, nullptr);
+	pngerr = util::png_write_bitmap(*file, nullptr, finalbitmap, 0, nullptr);
 	file.reset();
-	if (pngerr != PNGERR_NONE)
+	if (pngerr != util::png_error::NONE)
 		goto error;
 
 	/* if we get here, we are error free */

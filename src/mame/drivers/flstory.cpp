@@ -17,22 +17,21 @@
 #include "cpu/m6805/m6805.h"
 #include "cpu/z80/z80.h"
 #include "sound/dac.h"
-#include "sound/volt_reg.h"
 #include "screen.h"
 #include "speaker.h"
 
 
-READ8_MEMBER(flstory_state::snd_flag_r)
+uint8_t flstory_state::snd_flag_r()
 {
 	return (m_soundlatch->pending_r() ? 0 : 1) | (m_soundlatch2->pending_r() ? 2 : 0);
 }
 
-WRITE8_MEMBER(flstory_state::snd_reset_w)
+void flstory_state::snd_reset_w(uint8_t data)
 {
 	m_audiocpu->set_input_line(INPUT_LINE_RESET, (data & 1 ) ? ASSERT_LINE : CLEAR_LINE);
 }
 
-READ8_MEMBER(flstory_state::flstory_mcu_status_r)
+uint8_t flstory_state::flstory_mcu_status_r()
 {
 	// bit 0 = when 1, MCU is ready to receive data from main CPU
 	// bit 1 = when 1, MCU has sent data to the main CPU
@@ -42,9 +41,9 @@ READ8_MEMBER(flstory_state::flstory_mcu_status_r)
 }
 
 
-READ8_MEMBER(flstory_state::victnine_mcu_status_r)
+uint8_t flstory_state::victnine_mcu_status_r()
 {
-	uint8_t ret = flstory_mcu_status_r(space, offset) & 0x03;
+	uint8_t ret = flstory_mcu_status_r() & 0x03;
 	ret |= m_extraio1->read() & 0xfc;
 	return ret;
 }
@@ -797,9 +796,6 @@ void flstory_state::common(machine_config &config)
 	// pin 22 Noise Output  not mapped
 
 	DAC_8BIT_R2R(config, "dac", 0).add_route(ALL_OUTPUTS, "speaker", 0.1); // unknown DAC
-	voltage_regulator_device &vref(VOLTAGE_REGULATOR(config, "vref", 0));
-	vref.add_route(0, "dac", 1.0, DAC_VREF_POS_INPUT);
-	vref.add_route(0, "dac", -1.0, DAC_VREF_NEG_INPUT);
 }
 
 void flstory_state::flstory(machine_config &config)

@@ -4,7 +4,6 @@
  * Epson LX-810L dot matrix printer emulation
  *
  */
-
 #ifndef MAME_BUS_CENTRONICS_EPSON_LX810L_H
 #define MAME_BUS_CENTRONICS_EPSON_LX810L_H
 
@@ -18,16 +17,8 @@
 #include "sound/dac.h"
 #include "screen.h"
 
+#include <cstdlib>
 
-/* The printer starts printing at x offset 44 and stops printing at x
- * offset 1009, giving a total of 965 printable pixels. Supposedly, the
- * border at the far right would be at x offset 1053. I've chosen the
- * width for the paper as 1024, since it's a nicer number than 1053, so
- * an offset must be used to centralize the pixels.
- */
-#define CR_OFFSET    (-14)
-#define PAPER_WIDTH  1024
-#define PAPER_HEIGHT 576
 
 //**************************************************************************
 //  TYPE DEFINITIONS
@@ -51,9 +42,13 @@ public:
 	virtual DECLARE_WRITE_LINE_MEMBER( input_data5 ) override { m_e05a30->centronics_input_data5(state); }
 	virtual DECLARE_WRITE_LINE_MEMBER( input_data6 ) override { m_e05a30->centronics_input_data6(state); }
 	virtual DECLARE_WRITE_LINE_MEMBER( input_data7 ) override { m_e05a30->centronics_input_data7(state); }
+	virtual DECLARE_WRITE_LINE_MEMBER( input_init ) override { m_e05a30->centronics_input_init(state); }
 
 	/* Panel buttons */
 	DECLARE_INPUT_CHANGED_MEMBER(online_sw);
+
+	/* Reset Printer (equivalent to turning power off and back on) */
+	DECLARE_INPUT_CHANGED_MEMBER(reset_printer);
 
 protected:
 	epson_lx810l_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock);
@@ -68,6 +63,8 @@ protected:
 	virtual void device_add_mconfig(machine_config &config) override;
 	virtual ioport_constructor device_input_ports() const override;
 
+	virtual bool supports_pin35_5v() override { return true; }
+
 private:
 	uint8_t porta_r(offs_t offset);
 	void porta_w(offs_t offset, uint8_t data);
@@ -77,8 +74,8 @@ private:
 	void portc_w(offs_t offset, uint8_t data);
 
 	/* fake memory I/O to get past memory reset check */
-	DECLARE_READ8_MEMBER(fakemem_r);
-	DECLARE_WRITE8_MEMBER(fakemem_w);
+	uint8_t fakemem_r();
+	void fakemem_w(uint8_t data);
 
 	/* Extended Timer Output */
 	DECLARE_WRITE_LINE_MEMBER(co0_w);
@@ -106,13 +103,14 @@ private:
 	DECLARE_WRITE_LINE_MEMBER(e05a30_centronics_fault) { output_fault(state); }
 	DECLARE_WRITE_LINE_MEMBER(e05a30_centronics_select) { output_select(state); }
 
+	DECLARE_WRITE_LINE_MEMBER(e05a30_cpu_reset) { if (!state) m_maincpu->pulse_input_line(INPUT_LINE_RESET, attotime::zero); } // reset cpu
+
 	void lx810l_mem(address_map &map);
 
 	/* Video hardware (simulates paper) */
 	uint32_t screen_update_lx810l(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect);
 
-#define uabs(x) ((x) > 0 ? (x) : -(x))
-	unsigned int bitmap_line(int i) { return ((uabs(m_pf_pos_abs) / 6) + i) % m_bitmap.height(); }
+	unsigned int bitmap_line(int i) { return ((std::abs(m_pf_pos_abs) / 6) + i) % m_bitmap.height(); }
 
 	required_device<cpu_device> m_maincpu;
 	required_device<stepper_device> m_pf_stepper;
@@ -147,9 +145,9 @@ class epson_ap2000_device : public epson_lx810l_device
 {
 public:
 	// construction/destruction
-	epson_ap2000_device(const machine_config &mconfig, const char *tag,
-					device_t *owner, uint32_t clock);
+	epson_ap2000_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
 
+protected:
 	// optional information overrides
 	virtual const tiny_rom_entry *device_rom_region() const override;
 };

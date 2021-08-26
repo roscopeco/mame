@@ -15,7 +15,6 @@
 
 #include "sound/dac.h"
 #include "machine/input_merger.h"
-#include "sound/volt_reg.h"
 
 
 namespace {
@@ -128,9 +127,6 @@ void gottlieb_sound_r0_device::device_add_mconfig(machine_config &config)
 
 	// sound devices
 	DAC_8BIT_R2R(config, "dac", 0).add_route(ALL_OUTPUTS, *this, 0.25); // unknown DAC
-	voltage_regulator_device &vref(VOLTAGE_REGULATOR(config, "vref"));
-	vref.add_route(0, "dac", 1.0, DAC_VREF_POS_INPUT);
-	vref.add_route(0, "dac", -1.0, DAC_VREF_NEG_INPUT);
 }
 
 
@@ -261,9 +257,6 @@ void gottlieb_sound_r1_device::device_add_mconfig(machine_config &config)
 
 	// sound devices
 	DAC_8BIT_R2R(config, "dac", 0).add_route(ALL_OUTPUTS, *this, 0.25); // unknown DAC
-	voltage_regulator_device &vref(VOLTAGE_REGULATOR(config, "vref"));
-	vref.add_route(0, "dac", 1.0, DAC_VREF_POS_INPUT);
-	vref.add_route(0, "dac", -1.0, DAC_VREF_NEG_INPUT);
 }
 
 
@@ -347,7 +340,7 @@ void gottlieb_sound_r1_with_votrax_device::device_post_load()
 	gottlieb_sound_r1_device::device_post_load();
 
 	// totally random guesswork; would like to get real measurements on a board
-	m_votrax->set_unscaled_clock(600000 + (m_last_speech_clock - 0xa0) * 10000);
+	m_votrax->set_unscaled_clock(900000 + (m_last_speech_clock - 0xa0) * 9000);
 }
 
 
@@ -371,7 +364,7 @@ void gottlieb_sound_r1_with_votrax_device::votrax_data_w(uint8_t data)
 void gottlieb_sound_r1_with_votrax_device::speech_clock_dac_w(uint8_t data)
 {
 	// prevent negative clock values (and possible crash)
-	if (data < 0x65) data = 0x65;
+	if (data < 0x60) data = 0x60;
 
 	// nominal clock is 0xa0
 	if (data != m_last_speech_clock)
@@ -379,7 +372,7 @@ void gottlieb_sound_r1_with_votrax_device::speech_clock_dac_w(uint8_t data)
 		logerror("clock = %02X\n", data);
 
 		// totally random guesswork; would like to get real measurements on a board
-		m_votrax->set_unscaled_clock(600000 + (data - 0xa0) * 10000);
+		m_votrax->set_unscaled_clock(950000 + (data - 0xa0) * 5500);
 		m_last_speech_clock = data;
 	}
 }
@@ -470,7 +463,8 @@ inline void gottlieb_sound_r2_device::nmi_state_update()
 
 uint8_t gottlieb_sound_r2_device::audio_data_r()
 {
-	m_audiocpu->set_input_line(M6502_IRQ_LINE, CLEAR_LINE);
+	if (!machine().side_effects_disabled())
+		m_audiocpu->set_input_line(M6502_IRQ_LINE, CLEAR_LINE);
 	return m_audiocpu_latch;
 }
 
@@ -482,8 +476,25 @@ uint8_t gottlieb_sound_r2_device::audio_data_r()
 
 uint8_t gottlieb_sound_r2_device::speech_data_r()
 {
-	m_speechcpu->set_input_line(M6502_IRQ_LINE, CLEAR_LINE);
+	if (!machine().side_effects_disabled())
+		m_speechcpu->set_input_line(M6502_IRQ_LINE, CLEAR_LINE);
 	return m_speechcpu_latch;
+}
+
+
+//-------------------------------------------------
+//  signal_audio_nmi_r - signal an NMI from the
+//  speech CPU to the audio CPU
+//-------------------------------------------------
+
+uint8_t gottlieb_sound_r2_device::signal_audio_nmi_r()
+{
+	if (!machine().side_effects_disabled())
+	{
+		m_audiocpu->set_input_line(INPUT_LINE_NMI, ASSERT_LINE);
+		m_audiocpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+	}
+	return 0xff;
 }
 
 
@@ -627,7 +638,7 @@ void gottlieb_sound_r2_device::gottlieb_speech_r2_map(address_map &map)
 	map(0x8000, 0x8000).mirror(0x1fff).w(FUNC(gottlieb_sound_r2_device::psg_latch_w));
 	map(0xa000, 0xa000).mirror(0x07ff).w(FUNC(gottlieb_sound_r2_device::nmi_rate_w));
 	map(0xa800, 0xa800).mirror(0x07ff).r(FUNC(gottlieb_sound_r2_device::speech_data_r));
-	map(0xb000, 0xb000).mirror(0x07ff).w(FUNC(gottlieb_sound_r2_device::signal_audio_nmi_w));
+	map(0xb000, 0xb000).mirror(0x07ff).rw(FUNC(gottlieb_sound_r2_device::signal_audio_nmi_r), FUNC(gottlieb_sound_r2_device::signal_audio_nmi_w));
 	map(0xc000, 0xffff).rom();
 }
 
@@ -666,9 +677,10 @@ void gottlieb_sound_r2_device::device_add_mconfig(machine_config &config)
 
 	// sound hardware
 	DAC_8BIT_R2R(config, "dac", 0).add_route(ALL_OUTPUTS, *this, 0.075); // unknown DAC
-	DAC_8BIT_R2R(config, "dacvol", 0).add_route(0, "dac", 1.0, DAC_VREF_POS_INPUT).add_route(0, "dac", -1.0, DAC_VREF_NEG_INPUT); // unknown DAC
-	voltage_regulator_device &vref(VOLTAGE_REGULATOR(config, "vref"));
-	vref.add_route(0, "dacvol", 1.0, DAC_VREF_POS_INPUT);
+	DAC_8BIT_R2R(config, "dacvol", 0)
+		.set_output_range(0, 1)
+		.add_route(0, "dac", 1.0, DAC_INPUT_RANGE_HI)
+		.add_route(0, "dac", -1.0, DAC_INPUT_RANGE_LO); // unknown DAC
 
 	AY8913(config, m_ay1, SOUND2_CLOCK/2).add_route(ALL_OUTPUTS, *this, 0.15);
 
@@ -709,6 +721,9 @@ void gottlieb_sound_r2_device::device_start()
 	save_item(NAME(m_nmi_state));
 	save_item(NAME(m_speech_control));
 	save_item(NAME(m_last_command));
+	save_item(NAME(m_psg_latch));
+	save_item(NAME(m_psg_data_latch));
+	save_item(NAME(m_sp0250_latch));
 }
 
 

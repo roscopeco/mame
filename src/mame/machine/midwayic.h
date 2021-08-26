@@ -51,7 +51,6 @@ private:
 	uint8_t   m_idx;
 	uint8_t   m_status;
 	uint8_t   m_bits;
-	uint8_t   m_ormask;
 };
 
 
@@ -66,6 +65,11 @@ public:
 	// construction/destruction
 	midway_serial_pic_emu_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
 
+	u8 read();
+	void write(u8 data);
+	u8 status_r();
+	DECLARE_WRITE_LINE_MEMBER(reset_w);
+
 protected:
 	midway_serial_pic_emu_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock);
 
@@ -74,12 +78,15 @@ protected:
 	virtual void device_start() override;
 
 private:
-	uint8_t read_a();
-	uint8_t read_b();
-	uint8_t read_c();
-	void write_a(uint8_t data);
-	void write_b(uint8_t data);
-	void write_c(uint8_t data);
+	required_device<pic16c57_device> m_pic;
+
+	u8 read_c();
+	void write_c(u8 data);
+
+	u8 m_command;
+	u8 m_data_out;
+	u8 m_clk;
+	u8 m_status;
 };
 
 
@@ -165,15 +172,15 @@ public:
 
 	DECLARE_WRITE_LINE_MEMBER(fifo_reset_w);
 	uint16_t fifo_r();
-	DECLARE_READ16_MEMBER(fifo_status_r);
+	uint16_t fifo_status_r(address_space &space);
 
 	DECLARE_WRITE_LINE_MEMBER(ioasic_input_empty);
 	DECLARE_WRITE_LINE_MEMBER(ioasic_output_full);
 
-	DECLARE_READ32_MEMBER( read );
-	DECLARE_WRITE32_MEMBER( write );
-	DECLARE_READ32_MEMBER( packed_r );
-	DECLARE_WRITE32_MEMBER( packed_w );
+	uint32_t read(address_space &space, offs_t offset);
+	void write(offs_t offset, uint32_t data, uint32_t mem_mask = ~0);
+	uint32_t packed_r(address_space &space, offs_t offset, uint32_t mem_mask = ~0);
+	void packed_w(offs_t offset, uint32_t data, uint32_t mem_mask = ~0);
 
 	void cage_irq_handler(uint8_t data);
 
@@ -188,6 +195,7 @@ protected:
 private:
 	void ioasic_register_state();
 	void update_ioasic_irq();
+	uint16_t get_fifo_status();
 
 	required_ioport m_io_dips;
 	required_ioport m_io_system;

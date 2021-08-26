@@ -147,17 +147,17 @@ void vme_hcpu30_card_device::device_add_mconfig(machine_config &config)
 }
 
 /* Boot vector handler, the PCB hardwires the first 8 bytes from 0xff800000 to 0x0 at reset */
-READ32_MEMBER(vme_hcpu30_card_device::bootvect_r)
+uint32_t vme_hcpu30_card_device::bootvect_r(offs_t offset)
 {
 	LOG("%s\n", FUNCNAME);
 	return m_sysrom[offset];
 }
 
-WRITE32_MEMBER(vme_hcpu30_card_device::bootvect_w)
+void vme_hcpu30_card_device::bootvect_w(offs_t offset, uint32_t data, uint32_t mem_mask)
 {
 	LOG("%s\n", FUNCNAME);
-	m_sysram[offset % ARRAY_LENGTH(m_sysram)] &= ~mem_mask;
-	m_sysram[offset % ARRAY_LENGTH(m_sysram)] |= (data & mem_mask);
+	m_sysram[offset % std::size(m_sysram)] &= ~mem_mask;
+	m_sysram[offset % std::size(m_sysram)] |= (data & mem_mask);
 	m_sysrom = &m_sysram[0]; // redirect all upcoming accesses to masking RAM until reset.
 }
 
@@ -179,8 +179,6 @@ vme_hcpu30_card_device::vme_hcpu30_card_device(const machine_config &mconfig, co
 void vme_hcpu30_card_device::device_start()
 {
 	LOG("%s %s\n", tag(), FUNCNAME);
-
-	set_vme_device();
 
 	save_pointer (NAME (m_sysrom), sizeof(m_sysrom));
 	save_pointer (NAME (m_sysram), sizeof(m_sysram));

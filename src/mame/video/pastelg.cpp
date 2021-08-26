@@ -19,17 +19,18 @@ uint16_t pastelg_state::blitter_src_addr_r()
 	return m_blitter_src_addr;
 }
 
-void pastelg_state::romsel_w(address_space &space, uint8_t data)
+void pastelg_state::romsel_w(uint8_t data)
 {
 	m_gfxbank = ((data & 0xc0) >> 6);
 	m_palbank = ((data & 0x10) >> 4);
-	m_nb1413m3->sndrombank1_w(space, 0, data);
+	m_nb1413m3->sndrombank1_w(data);
 
-	if ((m_gfxbank << 16) > m_blitter_rom.mask())
+	if ((m_gfxbank << 16) >= m_blitter_rom.length())
 	{
 #ifdef MAME_DEBUG
 		popmessage("GFXROM BANK OVER!!");
 #endif
+		// FIXME: this isn't a power-of-two size, subtracting 1 doesn't generate a valid mask
 		m_gfxbank &= (m_blitter_rom.length() / 0x20000 - 1);
 	}
 }
@@ -185,7 +186,7 @@ void pastelg_common_state::gfxdraw()
 		{
 			gfxaddr = (m_gfxbank << 16) + ((m_blitter_src_addr + count));
 
-			if (gfxaddr > m_blitter_rom.mask())
+			if (gfxaddr >= m_blitter_rom.length())
 			{
 #ifdef MAME_DEBUG
 				popmessage("GFXROM ADDRESS OVER!!");
@@ -271,6 +272,8 @@ void pastelg_common_state::video_start()
 	save_item(NAME(m_palbank));
 	save_pointer(NAME(m_videoram), width*height);
 	save_item(NAME(m_flipscreen_old));
+
+	m_palbank = 0;
 }
 
 /******************************************************************************
@@ -286,7 +289,7 @@ uint32_t pastelg_common_state::screen_update(screen_device &screen, bitmap_ind16
 
 		for (int y = 0; y < height; y++)
 			for (int x = 0; x < width; x++)
-				bitmap.pix16(y, x) = m_videoram[(y * width) + x];
+				bitmap.pix(y, x) = m_videoram[(y * width) + x];
 	}
 	else
 		bitmap.fill(0, cliprect);

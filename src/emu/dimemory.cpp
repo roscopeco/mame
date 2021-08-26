@@ -2,7 +2,7 @@
 // copyright-holders:Aaron Giles
 /***************************************************************************
 
-    dimemory.c
+    dimemory.cpp
 
     Device memory interfaces.
 
@@ -50,15 +50,16 @@ device_memory_interface::~device_memory_interface()
 
 void device_memory_interface::set_addrmap(int spacenum, address_map_constructor map)
 {
+	assert(0 <= spacenum);
 	if (spacenum >= int(m_address_map.size()))
-		m_address_map.resize(spacenum+1);
-	m_address_map[spacenum] = map;
+		m_address_map.resize(spacenum + 1);
+	m_address_map[spacenum] = std::move(map);
 }
 
 
 //-------------------------------------------------
 //  memory_translate - translate from logical to
-//  phyiscal addresses; designed to be overridden
+//  physical addresses; designed to be overridden
 //  by the actual device implementation if address
 //  translation is supported
 //-------------------------------------------------

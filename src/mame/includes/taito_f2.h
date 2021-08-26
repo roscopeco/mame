@@ -68,6 +68,7 @@ public:
 	void qcrayon2(machine_config &config);
 	void qtorimon(machine_config &config);
 	void driftout(machine_config &config);
+	void driftoutct(machine_config &config);
 	void solfigtr(machine_config &config);
 	void qzquest(machine_config &config);
 	void liquidk(machine_config &config);
@@ -105,11 +106,11 @@ protected:
 
 	struct f2_tempsprite
 	{
-		u32 code, color;
-		bool flipx, flipy;
-		int x, y;
-		int zoomx, zoomy;
-		u64 primask;
+		u32 code = 0, color = 0;
+		bool flipx = false, flipy = false;
+		int x = 0, y = 0;
+		int zoomx = 0, zoomy = 0;
+		u64 primask = 0;
 	};
 	/* memory pointers */
 	optional_shared_ptr<u16> m_sprite_extension;
@@ -118,7 +119,7 @@ protected:
 	std::unique_ptr<u16[]>   m_spriteram_delayed;
 
 	/* video-related */
-	std::unique_ptr<struct f2_tempsprite[]> m_spritelist;
+	std::unique_ptr<f2_tempsprite[]> m_spritelist;
 	int           m_sprite_type;
 
 	u16           m_spritebank[8];
@@ -158,6 +159,7 @@ protected:
 	int           m_nibble;
 	s32           m_driveout_sound_latch;
 	emu_timer     *m_int6_timer;
+	std::unique_ptr<u8[]> m_decoded_gfx;
 
 	/* devices */
 	required_device<cpu_device> m_maincpu;
@@ -258,6 +260,7 @@ protected:
 	void dinorex_map(address_map &map);
 	void dondokod_map(address_map &map);
 	void driftout_map(address_map &map);
+	void driftoutct_map(address_map &map);
 	void driveout_map(address_map &map);
 	void driveout_oki_map(address_map &map);
 	void driveout_sound_map(address_map &map);

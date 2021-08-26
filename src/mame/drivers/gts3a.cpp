@@ -321,14 +321,13 @@ void gts3a_state::palette_init(palette_device &palette)
 
 MC6845_UPDATE_ROW( gts3a_state::crtc_update_row )
 {
-	const rgb_t *palette = m_palette->palette()->entry_list_raw();
+	rgb_t const *const palette = m_palette->palette()->entry_list_raw();
 	uint8_t gfx=0;
-	uint16_t mem,x;
-	uint32_t *p = &bitmap.pix32(y);
+	uint32_t *p = &bitmap.pix(y);
 
-	for (x = 0; x < x_count; x++)
+	for (uint16_t x = 0; x < x_count; x++)
 	{
-		mem = (ma + x) & 0xfff;mem++;
+		uint16_t mem = (ma + x) & 0xfff;mem++;
 		gfx = 4;//m_p_chargen[(chr<<4) | ra] ^ inv;
 
 		/* Display a scanline of a character */
@@ -372,7 +371,7 @@ void gts3a_state::gts3a(machine_config &config)
 	/* Sound */
 	genpin_audio(config);
 
-	VIA6522(config, m_u4, XTAL(4'000'000) / 2);
+	R65C22(config, m_u4, XTAL(4'000'000) / 2);
 	m_u4->irq_handler().set_inputline(m_maincpu, M65C02_IRQ_LINE);
 	m_u4->readpa_handler().set(FUNC(gts3a_state::u4a_r));
 	m_u4->readpb_handler().set(FUNC(gts3a_state::u4b_r));
@@ -380,7 +379,7 @@ void gts3a_state::gts3a(machine_config &config)
 	//m_u4->ca2_handler().set(FUNC(gts3a_state::u4ca2_w));
 	m_u4->cb2_handler().set(FUNC(gts3a_state::nmi_w));
 
-	VIA6522(config, m_u5, XTAL(4'000'000) / 2);
+	R65C22(config, m_u5, XTAL(4'000'000) / 2);
 	m_u5->irq_handler().set_inputline(m_maincpu, M65C02_IRQ_LINE);
 	//m_u5->readpa_handler().set(FUNC(gts3a_state::u5a_r));
 	//m_u5->readpb_handler().set(FUNC(gts3a_state::u5b_r));

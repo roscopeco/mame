@@ -161,6 +161,9 @@ B0000x-xxxxxx: see V7, -800000
 ******************************************************************************/
 
 #include "emu.h"
+
+#include "bus/generic/slot.h"
+#include "bus/generic/carts.h"
 #include "cpu/m68000/m68000.h"
 #include "machine/gen_latch.h"
 #include "machine/ram.h"
@@ -168,10 +171,7 @@ B0000x-xxxxxx: see V7, -800000
 #include "machine/timer.h"
 #include "machine/sensorboard.h"
 #include "sound/dac.h"
-#include "sound/volt_reg.h"
 #include "video/pwm.h"
-#include "bus/generic/slot.h"
-#include "bus/generic/carts.h"
 
 #include "softlist.h"
 #include "speaker.h"
@@ -560,7 +560,7 @@ void excel68k_state::fex68k(machine_config &config)
 
 	const attotime irq_period = attotime::from_hz(600); // 556 timer (22nF, 91K + 20K POT @ 14.8K, 0.1K), ideal is 600Hz (measured 580Hz, 604Hz, 632Hz)
 	TIMER(config, m_irq_on).configure_periodic(FUNC(excel68k_state::irq_on<M68K_IRQ_2>), irq_period);
-	m_irq_on->set_start_delay(irq_period - attotime::from_nsec(1528)); // active for 1.525us
+	m_irq_on->set_start_delay(irq_period - attotime::from_nsec(1525)); // active for 1.525us
 	TIMER(config, "irq_off").configure_periodic(FUNC(excel68k_state::irq_off<M68K_IRQ_2>), irq_period);
 
 	SENSORBOARD(config, m_board).set_type(sensorboard_device::BUTTONS);
@@ -575,7 +575,6 @@ void excel68k_state::fex68k(machine_config &config)
 	/* sound hardware */
 	SPEAKER(config, "speaker").front_center();
 	DAC_1BIT(config, m_dac).add_route(ALL_OUTPUTS, "speaker", 0.25);
-	VOLTAGE_REGULATOR(config, "vref").add_route(0, "dac", 1.0, DAC_VREF_POS_INPUT);
 }
 
 void excel68k_state::fex68km2(machine_config &config)
@@ -632,7 +631,6 @@ void eag_state::eag_base(machine_config &config)
 	/* sound hardware */
 	SPEAKER(config, "speaker").front_center();
 	DAC_1BIT(config, m_dac).add_route(ALL_OUTPUTS, "speaker", 0.25);
-	VOLTAGE_REGULATOR(config, "vref").add_route(0, "dac", 1.0, DAC_VREF_POS_INPUT);
 
 	/* cartridge */
 	GENERIC_CARTSLOT(config, "cartslot", generic_plain_slot, "fidel_scc");
@@ -646,6 +644,7 @@ void eag_state::eagv2(machine_config &config)
 	/* basic machine hardware */
 	RAM(config, m_ram).set_extra_options("128K, 512K, 1M");
 	m_ram->set_default_size("128K");
+	m_ram->set_default_value(0);
 }
 
 void eag_state::eagv3(machine_config &config)
@@ -825,6 +824,7 @@ ROM_START( feagv11 )
 ROM_END
 
 } // anonymous namespace
+
 
 
 /******************************************************************************

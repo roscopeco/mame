@@ -72,7 +72,7 @@ void thunderj_state::machine_start()
  *
  *************************************/
 
-READ16_MEMBER(thunderj_state::special_port2_r)
+uint16_t thunderj_state::special_port2_r()
 {
 	int result = ioport("260012")->read();
 	result ^= 0x0010;
@@ -80,7 +80,7 @@ READ16_MEMBER(thunderj_state::special_port2_r)
 }
 
 
-WRITE16_MEMBER(thunderj_state::latch_w)
+void thunderj_state::latch_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 {
 	/* reset extra CPU */
 	if (ACCESSING_BITS_0_7)
@@ -282,7 +282,7 @@ void thunderj_state::thunderj(machine_config &config)
 	ATARI_JSA_II(config, m_jsa, 0);
 	m_jsa->main_int_cb().set_inputline(m_maincpu, M68K_IRQ_6);
 	m_jsa->test_read_cb().set_ioport("260012").bit(1);
-	m_jsa->add_route(ALL_OUTPUTS, "mono", 1.0);
+	m_jsa->add_route(ALL_OUTPUTS, "mono", 0.8);
 }
 
 

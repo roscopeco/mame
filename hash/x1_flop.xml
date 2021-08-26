@@ -1018,7 +1018,7 @@ Plus, some games crash MESS at exit (e.g. some sorcer disks or some arcus disks)
 		<info name="alt_title" value="はーりぃふぉっくす"/>
 		<part name="flop1" interface="floppy_5_25">
 			<dataarea name="flop" size="348848">
-				<rom name="harry fox.d88" size="348848" crc="493c9699" sha1="0fa37d988d20dd698d096025b645994b874ca8cb"/>
+				<rom name="hurry fox.d88" size="348848" crc="493c9699" sha1="0fa37d988d20dd698d096025b645994b874ca8cb"/>
 			</dataarea>
 		</part>
 	</software>
@@ -6391,6 +6391,17 @@ HP Osho
 		<part name="flop1" interface="floppy_5_25">
 			<dataarea name="flop" size="422160">
 				<rom name="bgmx1v2.d88" size="422160" crc="150d1d60" sha1="ab835259ba6ec3bcfc6cb6cdc7a67b66d3bb4cc6"/>
+			</dataarea>
+		</part>
+	</software>
+
+	<software name="dezalis">
+		<description>Dezalis</description>
+		<year>19??</year>
+		<publisher>&lt;unknown&gt;</publisher>
+		<part name="flop1" interface="floppy_5_25">
+			<dataarea name="flop" size="0x050000">
+				<rom name="dezalis.2d" size="0x050000" crc="d9ba6eb6" sha1="6a6a564b2eabc35dbc1591abb8efcf6a9e98bd10"/>
 			</dataarea>
 		</part>
 	</software>

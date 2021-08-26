@@ -86,7 +86,7 @@ constexpr XTAL AUDIO_CLOCK_1942P(MASTER_CLOCK_1942P/16);
 
 } // anonymous namespace
 
-WRITE8_MEMBER(_1942_state::_1942_bankswitch_w)
+void _1942_state::_1942_bankswitch_w(uint8_t data)
 {
 	membank("bank1")->set_entry(data & 0x03);
 }
@@ -137,12 +137,12 @@ void _1942_state::_1942_map(address_map &map)
 	map(0xe000, 0xefff).ram();
 }
 
-WRITE8_MEMBER(_1942p_state::_1942p_f600_w)
+void _1942p_state::_1942p_f600_w(uint8_t data)
 {
 //  printf("_1942p_f600_w %02x\n", data);
 }
 
-WRITE8_MEMBER(_1942p_state::_1942p_palette_w)
+void _1942p_state::_1942p_palette_w(offs_t offset, uint8_t data)
 {
 	m_protopal[offset] = data;
 
@@ -513,10 +513,7 @@ void _1942_state::_1942(machine_config &config)
 	PALETTE(config, m_palette, FUNC(_1942_state::_1942_palette), 64*4+4*32*8+16*16, 256);
 
 	SCREEN(config, m_screen, SCREEN_TYPE_RASTER);
-	m_screen->set_refresh_hz(60);
-	m_screen->set_vblank_time(ATTOSECONDS_IN_USEC(0));
-	m_screen->set_size(32*8, 32*8);
-	m_screen->set_visarea(0*8, 32*8-1, 2*8, 30*8-1);
+	m_screen->set_raw(MASTER_CLOCK/2, 384, 128, 0, 262, 22, 246);   // hsync is 50..77, vsync is 257..259
 	m_screen->set_screen_update(FUNC(_1942_state::screen_update));
 	m_screen->set_palette(m_palette);
 
@@ -552,7 +549,7 @@ void _1942_state::_1942(machine_config &config)
 	NETLIST_STREAM_INPUT(config, "snd_nl:cin4", 4, "R_AY2_2.R");
 	NETLIST_STREAM_INPUT(config, "snd_nl:cin5", 5, "R_AY2_3.R");
 
-	NETLIST_STREAM_OUTPUT(config, "snd_nl:cout0", 0, "R1.1").set_mult_offset(70000.0, 0.0);
+	NETLIST_STREAM_OUTPUT(config, "snd_nl:cout0", 0, "R1.1").set_mult_offset(70000.0 / 32768.0, 0.0);
 	//NETLIST_STREAM_OUTPUT(config, "snd_nl:cout0", 0, "VR.2");
 }
 
@@ -576,10 +573,7 @@ void _1942p_state::_1942p(machine_config &config)
 	PALETTE(config, m_palette, FUNC(_1942p_state::_1942p_palette), 0x500, 0x400);
 
 	SCREEN(config, m_screen, SCREEN_TYPE_RASTER);
-	m_screen->set_refresh_hz(60);
-	m_screen->set_vblank_time(ATTOSECONDS_IN_USEC(0));
-	m_screen->set_size(32*8, 32*8);
-	m_screen->set_visarea(0*8, 32*8-1, 2*8, 30*8-1);
+	m_screen->set_raw(MASTER_CLOCK/2, 384, 128, 0, 262, 22, 246);   // hsync is 50..77, vsync is 257..259
 	m_screen->set_screen_update(FUNC(_1942p_state::screen_update));
 	m_screen->set_palette(m_palette);
 

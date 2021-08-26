@@ -223,7 +223,6 @@ Notes:
 #include "machine/eepromser.h"
 #include "machine/timekpr.h"
 #include "sound/dac.h"
-#include "sound/volt_reg.h"
 #include "sound/ymz280b.h"
 #include "cdrom.h"
 #include "debug/debugcon.h"
@@ -1107,8 +1106,8 @@ INPUT_PORTS_END
 
 void konamim2_state::cr589_config(device_t *device)
 {
-	device->subdevice<cdda_device>("cdda")->add_route(0, ":lspeaker", 1.0);
-	device->subdevice<cdda_device>("cdda")->add_route(1, ":rspeaker", 1.0);
+	device->subdevice<cdda_device>("cdda")->add_route(0, ":lspeaker", 0.5);
+	device->subdevice<cdda_device>("cdda")->add_route(1, ":rspeaker", 0.5);
 	device = device->subdevice("cdda");
 }
 
@@ -1159,12 +1158,6 @@ void konamim2_state::konamim2(machine_config &config)
 	// TODO!
 	DAC_16BIT_R2R_TWOS_COMPLEMENT(config, m_ldac, 0).add_route(ALL_OUTPUTS, "lspeaker", 1.0);
 	DAC_16BIT_R2R_TWOS_COMPLEMENT(config, m_rdac, 0).add_route(ALL_OUTPUTS, "rspeaker", 1.0);
-
-	voltage_regulator_device &vref(VOLTAGE_REGULATOR(config, "vref", 0));
-	vref.add_route(0, "ldac", 1.0, DAC_VREF_POS_INPUT);
-	vref.add_route(0, "ldac", -1.0, DAC_VREF_NEG_INPUT);
-	vref.add_route(0, "rdac", 1.0, DAC_VREF_POS_INPUT);
-	vref.add_route(0, "rdac", -1.0, DAC_VREF_NEG_INPUT);
 }
 
 
@@ -1379,9 +1372,6 @@ ROM_START( totlvice )
 	ROM_REGION( 0x100000, "ymz", 0 ) /* YMZ280B sound rom on sub board */
 	ROM_LOAD( "639jaa02.bin",  0x000000, 0x100000, CRC(c6163818) SHA1(b6f8f2d808b98610becc0a5be5443ece3908df0b) )
 
-	// was converted from the following cue/bin pair, is this sufficient / good for this platform? - there are a lot of audio tracks that need verifying as non-corrupt
-	//ROM_LOAD( "TotalVice-GQ639-EBA01.cue",  0, 0x00000555, CRC(55ef2f62) SHA1(8e31b3e62244e6090a93228dae377552340dcdeb) )
-	//ROM_LOAD( "TotalVice-GQ639-EBA01.bin",  0, 0x1ec4db10, CRC(5882f8ba) SHA1(e589d500d99d2f4cff4506cd5ac9a5bfc8d30675) )
 	DISK_REGION( "cdrom" )
 	DISK_IMAGE_READONLY( "639eba01", 0, BAD_DUMP SHA1(d95c13575e015169b126f7e8492d150bd7e5ebda) )
 ROM_END

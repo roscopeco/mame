@@ -10,9 +10,9 @@
 
 #include "machine/6821pia.h"
 #include "cpu/m6809/m6809.h"
-#include "sound/ym2151.h"
-#include "sound/okim6295.h"
 #include "sound/hc55516.h"
+#include "sound/okim6295.h"
+#include "sound/ymopm.h"
 
 
 
@@ -63,6 +63,7 @@ private:
 	// devices
 	required_device<mc6809e_device> m_cpu;
 	required_device<pia6821_device> m_pia;
+	required_device<ym2151_device> m_ym2151;
 	required_device<hc55516_device> m_hc55516;
 
 	required_memory_bank m_rombank;

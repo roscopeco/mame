@@ -82,9 +82,9 @@ are almost identical, except for much darker BG layer colors).
 #include "machine/gen_latch.h"
 #include "machine/input_merger.h"
 #include "machine/timer.h"
-#include "sound/2203intf.h"
 #include "sound/okim6295.h"
-#include "sound/ym2151.h"
+#include "sound/ymopm.h"
+#include "sound/ymopn.h"
 
 #include "emupal.h"
 #include "screen.h"
@@ -318,13 +318,13 @@ protected:
 
 	void ctrl_w(u8 data)
 	{
-		/* bit 0 flips screen */
-		flip_screen_set(data & 0x01);
+		// bit 0 flips screen
+		flip_screen_set(BIT(data, 0));
 
-		/* bit 4 changes tilemaps priority */
-		m_bg2_priority = data & 0x10;
+		// bit 4 changes tilemaps priority
+		m_bg2_priority = BIT(data, 4);
 
-		/* bit 5 used but unknown */
+		// bit 5 used but unknown
 	}
 
 	TIMER_DEVICE_CALLBACK_MEMBER(scanline);
@@ -352,7 +352,7 @@ protected:
 
 	virtual void video_start() override
 	{
-		/* Register for save/restore */
+		// Register for save/restore
 		save_item(NAME(m_bg2_priority));
 	}
 
@@ -388,8 +388,8 @@ protected:
 		m_screen->register_screen_bitmap(m_bg_bitmap[0]);
 		m_screen->register_screen_bitmap(m_bg_bitmap[1]);
 
-		/* Register for save/restore */
-		save_item(NAME(m_bg2_priority)); // Not used atm
+		// Register for save/restore
+		save_item(NAME(m_bg2_priority)); // Not used ATM
 	}
 
 	void popbingo_tile_callback(u16 attr, u32 &code, u32 &color)
@@ -770,9 +770,9 @@ u32 popbingo_state::screen_update_popbingo(screen_device &screen, bitmap_ind16 &
 
 	for (int y = cliprect.top(); cliprect.bottom() >= y; y++)
 	{
-		const u16 *const bg_src(&m_bg_bitmap[0].pix16(y, 0));
-		const u16 *const bg2_src(&m_bg_bitmap[1].pix16(y, 0));
-		u16 *const dst(&bitmap.pix16(y, 0));
+		const u16 *const bg_src(&m_bg_bitmap[0].pix(y, 0));
+		const u16 *const bg2_src(&m_bg_bitmap[1].pix(y, 0));
+		u16 *const dst(&bitmap.pix(y, 0));
 		for (int x = cliprect.left(); cliprect.right() >= x; x++)
 			dst[x] = 0x100U | (bg_src[x] << 4) | bg2_src[x];
 	}
@@ -1260,6 +1260,12 @@ INPUT_PORTS_START( sadari )
 	PORT_DIPNAME( 0x40, 0x40, "Girl Show Point" )       PORT_DIPLOCATION("SWB:7")
 	PORT_DIPSETTING(    0x40, "Other Country" )
 	PORT_DIPSETTING(    0x00, DEF_STR( Asia ) )
+
+	PORT_MODIFY("P1")
+	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_BUTTON3 ) PORT_PLAYER(1)
+
+	PORT_MODIFY("P2")
+	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_BUTTON3 ) PORT_PLAYER(2)
 INPUT_PORTS_END
 
 INPUT_PORTS_START( primella )
@@ -1434,12 +1440,12 @@ u8 dooyong_z80_ym2203_state::unk_r()
 	return 0;
 }
 
+
 /***************************************************************************
 
     Machine driver(s)
 
 ***************************************************************************/
-
 
 void dooyong_z80_ym2203_state::sound_2203(machine_config &config)
 {

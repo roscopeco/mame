@@ -61,6 +61,84 @@ The original title of the game called B68 is unknown.
 This PCB is the same as the one that is used with EARTH-JOKER.
 <B68 is the verified Taito ROM id# for Asuka & Asuka - B.Troha>
 
+***************************************************************************
+Bonze Adventure, Taito, 1988
+Hardware info by Guru
+Last Update: 25th August 2021
+
+
+PCB Layout
+----------
+
+MAIN BOARD J1100144A K1100330A
+Sticker: K1100330B JIGOKU MEGURI
+|-------------------------------------------------------------------|
+|MB3735    YM2610                         Z0840004PSC     B41-03.IC1|
+|VOL       B41-04.IC48                    B41_13.IC20               |
+|                          |-------|      CXK5864                   |
+|   4556  TL074  YM3016F   |TAITO  |          |-------|             |
+|Y                         |TC0140SYT   16MHz | TAITO |             |
+|              TMM2063     |-------|          |TC0100SCN   CXK58256 |
+|      TL074   TMM2063                        |-------|             |
+|                         TC0110PCR                        CXK58256 |
+|       TC0070RGB                                 26.868MHz         |
+|J                2018       |---------|                  B41-02.IC6|
+|A                2018       | TAITO   |                            |
+|M                2018       | PC0900J |                            |
+|M       PC050CM  2018       |         |                            |
+|A                           |---------|                            |
+|            |-------------|                                        |
+|            | B41_05.IC43 |                                        |
+|            |-------------|          12MHz          B41-01.IC15    |
+|  48CR-1(x6)                                                       |
+|       |------------------|          B41_12.IC25    B41_10.IC15    |
+|       |       68000      |                                  MB3771|
+|       |------------------|          B41_11-1.IC26  B41_09-1.IC17  |
+|                 B41-08.IC45  B41-06.IC34                          |
+|      SWB  SWA   B41-07.IC46            TMM2064        TMM2064     |
+|-------------------------------------------------------------------|
+Notes:
+        MB3735 - Fujitsu MB3735 20W BTL mono power amplifier
+        MB3771 - Fujitsu MB3771 power supply monitor IC. This is used to provide the power-on reset.
+       SWA/SWB - 8-position DIP switch
+          4556 - 4556 dual operational amplifier
+         TL074 - Texas Instruments TL074 JFET Low-Noise Quad OP Amp
+           VOL - 5k volume pot
+      CXK58256 - Sony CXK58256 32k x8-bit static RAM
+       CXK5864 - Sony CXK5864 8k x8-bit static RAM
+       TMM2064 - Toshiba TMM2064 8k x8-bit static RAM
+          2018 - Toshiba TMM2018 2k x8-bit static RAM or equivalent Motorola MCM2016 or HM3-65728 or Sony CXK5816
+         68000 - Motorola MC68000P12 CPU. Clock input 8.000MHz [16/2]
+   Z0840004PSC - Zilog Z0840006PSC Z80 CPU. Clock input 4.000MHz [16/4]
+        YM2610 - Yamaha YM2610 sound chip. Clock input 8.000MHz [16/2]
+      YM3016-F - Yamaha Y3016-F 2-Channel Serial & Binary Input Floating D/A Converter (SOIC16)
+                 Clock input 2.66666MHz (16/2/3, source = pin 64 of YM2610)
+     TC0070RGB - 5-bit RGB Video Mixer/RGB DAC (Ceramic Flat Pack SIL25)
+       PC050CM - Taito PC050CM custom SIL28 ceramic module for coins, coin lockout and coin counters
+     TC0140SYT - Taito custom TC0140SYT sound communication IC
+     TC0110PCR - Taito custom palette generator IC
+     TC0100SCN - Taito custom tilemap generator IC
+       PC0900J - Taito custom sprite generator IC
+        48CR-1 - Custom resistor array used for inputs
+             Y - 3 pin connector for 2nd speaker output (mono only)
+         HSync - 15.55385kHz
+         VSync - 60.054Hz
+   B41-01.IC15 - MN234000 mask ROM (main program)
+    B41-02.IC6 - MN234000 mask ROM (sprites)
+    B41-03.IC1 - MN234000 mask ROM (tiles)
+   B41-04.IC48 - MN234000 mask ROM (ADPCM samples)
+   B41_05.IC43 - Taito TC0030CMD hybrid custom IC containing uPD78C11 MCU with 4k x8-bit mask ROM, uPD27C64 8k x8-bit EPROM, uPD4464 8k x8-bit static RAM & logic glue.
+                 Clock input 12.000MHz. This chip is known as a 'C-Chip'. Only the EPROM differs between different games.
+   B41-06.IC34 - MMI PAL16L8 marked 'B41-06'
+   B41-07.IC46 - MMI PAL16L8 marked 'B41-07'
+   B41-08.IC45 - MMI PAL20L8 marked 'B41-08'
+ B41_09-1.IC17 - Toshiba TMM27512 64k x8-bit EPROM (main program)
+   B41_10.IC15 - Toshiba TMM27512 64k x8-bit EPROM (main program)
+ B41_11-1.IC26 - Toshiba TMM27512 64k x8-bit EPROM (main program)
+   B41_12.IC25 - Toshiba TMM27512 64k x8-bit EPROM (main program)
+   B41_13.IC20 - Toshiba TMM27512 64k x8-bit EPROM (sound program)
+
+***************************************************************************
 
 Use of TC0100SCN
 ----------------
@@ -224,9 +302,9 @@ DIP locations verified for:
 #include "cpu/z180/z180.h"
 #include "cpu/z80/z80.h"
 #include "machine/watchdog.h"
-#include "sound/2610intf.h"
 #include "sound/msm5205.h"
-#include "sound/ym2151.h"
+#include "sound/ymopm.h"
+#include "sound/ymopn.h"
 #include "screen.h"
 #include "speaker.h"
 
@@ -1127,7 +1205,7 @@ ROM_START( bonzeadv )
 	ROM_REGION( 0x10000, "audiocpu", 0 )     /* sound cpu */
 	ROM_LOAD( "b41-13.20", 0x00000, 0x10000, CRC(9e464254) SHA1(b6f6126b54c15320ecaa652d0eeabaa4cd94bd26) ) /* banked */
 
-	ROM_REGION( 0x80000, "ymsnd", 0 )     /* ADPCM samples */
+	ROM_REGION( 0x80000, "ymsnd:adpcma", 0 )     /* ADPCM samples */
 	ROM_LOAD( "b41-04.48",  0x00000, 0x80000, CRC(c668638f) SHA1(07238a6cb4d93ffaf6351657163b5d80f0dbf688) )
 ROM_END
 
@@ -1152,7 +1230,7 @@ ROM_START( bonzeadvo )
 	ROM_REGION( 0x10000, "audiocpu", 0 )     /* sound cpu */
 	ROM_LOAD( "b41-13.20", 0x00000, 0x10000, CRC(9e464254) SHA1(b6f6126b54c15320ecaa652d0eeabaa4cd94bd26) ) /* banked */
 
-	ROM_REGION( 0x80000, "ymsnd", 0 )     /* ADPCM samples */
+	ROM_REGION( 0x80000, "ymsnd:adpcma", 0 )     /* ADPCM samples */
 	ROM_LOAD( "b41-04.48",  0x00000, 0x80000, CRC(c668638f) SHA1(07238a6cb4d93ffaf6351657163b5d80f0dbf688) )
 ROM_END
 
@@ -1177,7 +1255,7 @@ ROM_START( bonzeadvu )
 	ROM_REGION( 0x10000, "audiocpu", 0 )     /* sound cpu */
 	ROM_LOAD( "b41-13.20", 0x00000, 0x10000, CRC(9e464254) SHA1(b6f6126b54c15320ecaa652d0eeabaa4cd94bd26) ) /* banked */
 
-	ROM_REGION( 0x80000, "ymsnd", 0 )     /* ADPCM samples */
+	ROM_REGION( 0x80000, "ymsnd:adpcma", 0 )     /* ADPCM samples */
 	ROM_LOAD( "b41-04.48",  0x00000, 0x80000, CRC(c668638f) SHA1(07238a6cb4d93ffaf6351657163b5d80f0dbf688) )
 ROM_END
 
@@ -1202,7 +1280,7 @@ ROM_START( jigkmgri )
 	ROM_REGION( 0x10000, "audiocpu", 0 )     /* sound cpu */
 	ROM_LOAD( "b41-13.20", 0x00000, 0x10000, CRC(9e464254) SHA1(b6f6126b54c15320ecaa652d0eeabaa4cd94bd26) ) /* banked */
 
-	ROM_REGION( 0x80000, "ymsnd", 0 )     /* ADPCM samples */
+	ROM_REGION( 0x80000, "ymsnd:adpcma", 0 )     /* ADPCM samples */
 	ROM_LOAD( "b41-04.48",  0x00000, 0x80000, CRC(c668638f) SHA1(07238a6cb4d93ffaf6351657163b5d80f0dbf688) )
 ROM_END
 
@@ -1236,7 +1314,7 @@ ROM_START( bonzeadvp ) /* Labels consists of hand written checksum values of the
 	ROM_REGION( 0x10000, "audiocpu", 0 )     /* sound cpu */
 	ROM_LOAD( "b41-13.20", 0x00000, 0x10000, CRC(9e464254) SHA1(b6f6126b54c15320ecaa652d0eeabaa4cd94bd26) ) // missing from dump /* banked */
 
-	ROM_REGION( 0x80000, "ymsnd", 0 )     /* ADPCM samples */
+	ROM_REGION( 0x80000, "ymsnd:adpcma", 0 )     /* ADPCM samples */
 	ROM_LOAD( "6089.ic17",  0x00000, 0x20000, CRC(b092783c) SHA1(e13f765e2884b6194926bf982595de18376ffef9) ) // these 4 == b41-04.48 but split
 	ROM_LOAD( "2e1f.ic14",  0x20000, 0x20000, CRC(df1f87c0) SHA1(ad3df38c22f1bb7bdc449922bd3c2a5c78aa87f8) ) // ^
 	ROM_LOAD( "f66e.ic11",  0x40000, 0x20000, CRC(c6df1b3e) SHA1(84d6ad3e3af565060aa4324c6e3e91e4dc5089b6) ) // ^
@@ -1474,6 +1552,32 @@ ROM_START( cadashu )
 	ROM_LOAD( "pal20l8b-c21-12.ic47",   0x0600, 0x0144, CRC(bbc2cc97) SHA1(d4a68f28e0d3f5a3b39ecc25640bc9197ad0260b) )
 ROM_END
 
+ROM_START( cadashu1 )
+	ROM_REGION( 0x80000, "maincpu", 0 )     /* 512k for 68000 code */
+	ROM_LOAD16_BYTE( "c21_14-x.ic11",  0x00000, 0x20000, CRC(64f22e5e) SHA1(3a68a4460173e7a90611c2ade8aa313700f98cf9) ) /* These program ROMs are most likely Rev 1 */
+	ROM_LOAD16_BYTE( "c21_16-x.ic15",  0x00001, 0x20000, CRC(77f5d79f) SHA1(eddfa55fd1e3038f98e3b49ec4e146b0edb92b8f) ) /* Need to verify proper label and revision */
+	ROM_LOAD16_BYTE( "c21_13-x.ic10",  0x40000, 0x20000, CRC(488fd6d6) SHA1(fda175bbc4f41c821922fb7310b14f6c74575174) )
+	ROM_LOAD16_BYTE( "c21_15-x.ic14",  0x40001, 0x20000, CRC(3a44a8b4) SHA1(19a9775872824d0f3596a1cea379f7b325a7e878) )
+
+	ROM_REGION( 0x80000, "tc0100scn", 0 )
+	ROM_LOAD16_WORD_SWAP( "c21-02.9",  0x00000, 0x80000, CRC(205883b9) SHA1(5aafee8cab3f949a7db91bcc26912f331041b51e) ) /* SCR tiles (8 x 8) */
+
+	ROM_REGION( 0x80000, "pc090oj", 0 )
+	ROM_LOAD16_WORD_SWAP( "c21-01.1",  0x00000, 0x80000, CRC(1ff6f39c) SHA1(742f296efc8073fafa73da2c8d7d26ca9514b6bf) ) /* Sprites (16 x 16) */
+
+	ROM_REGION( 0x10000, "audiocpu", 0 )    /* sound cpu */
+	ROM_LOAD( "c21-08.38",   0x00000, 0x10000, CRC(dca495a0) SHA1(4e0f401f1b967da75f33fd7294860ad0b4bf2dce) ) /* banked */
+
+	ROM_REGION( 0x08000, "subcpu", 0 )  /* HD64180RP8 code (link) */
+	ROM_LOAD( "c21-07.57",   0x00000, 0x08000, CRC(f02292bd) SHA1(0a5c06a048ad67f90e0d766b504582e9eef035f7) )
+
+	ROM_REGION( 0x0800, "plds", 0 )
+	ROM_LOAD( "pal16l8b-c21-09.ic34",   0x0000, 0x0104, CRC(4b296700) SHA1(79d6c8fb13e30795d9c1f49885ada658f9722b68) )
+	ROM_LOAD( "pal16l8b-c21-10.ic45",   0x0200, 0x0104, CRC(35642f00) SHA1(a04403536b0ef7e8e7251dfc47274a6c8772fd2d) )
+	ROM_LOAD( "pal16l8b-c21-11-1.ic46", 0x0400, 0x0104, CRC(f4791e24) SHA1(7e3bbffec7b8f9171e6e09706e5622fef3c99ca0) )
+	ROM_LOAD( "pal20l8b-c21-12.ic47",   0x0600, 0x0144, CRC(bbc2cc97) SHA1(d4a68f28e0d3f5a3b39ecc25640bc9197ad0260b) )
+ROM_END
+
 ROM_START( cadashi )
 	ROM_REGION( 0x80000, "maincpu", 0 )     /* 512k for 68000 code */
 	ROM_LOAD16_BYTE( "c21_27-1.ic11",  0x00000, 0x20000, CRC(d1d9e613) SHA1(296c188daec962bdb4e78e20f1cc4c7d1f4dda09) )
@@ -1543,6 +1647,32 @@ ROM_START( cadashg )
 	ROM_LOAD( "c21-08.38",   0x00000, 0x10000, CRC(dca495a0) SHA1(4e0f401f1b967da75f33fd7294860ad0b4bf2dce) ) /* banked */
 
 	ROM_REGION( 0x08000, "subcpu", 0 )  /* HD64180RP8 code (link) */
+	ROM_LOAD( "c21-07.57",   0x00000, 0x08000, CRC(f02292bd) SHA1(0a5c06a048ad67f90e0d766b504582e9eef035f7) )
+
+	ROM_REGION( 0x0800, "plds", 0 )
+	ROM_LOAD( "pal16l8b-c21-09.ic34",   0x0000, 0x0104, CRC(4b296700) SHA1(79d6c8fb13e30795d9c1f49885ada658f9722b68) )
+	ROM_LOAD( "pal16l8b-c21-10.ic45",   0x0200, 0x0104, CRC(35642f00) SHA1(a04403536b0ef7e8e7251dfc47274a6c8772fd2d) )
+	ROM_LOAD( "pal16l8b-c21-11-1.ic46", 0x0400, 0x0104, CRC(f4791e24) SHA1(7e3bbffec7b8f9171e6e09706e5622fef3c99ca0) )
+	ROM_LOAD( "pal20l8b-c21-12.ic47",   0x0600, 0x0144, CRC(bbc2cc97) SHA1(d4a68f28e0d3f5a3b39ecc25640bc9197ad0260b) )
+ROM_END
+
+ROM_START( cadashgo )
+	ROM_REGION( 0x80000, "maincpu", 0 )     // 512k for 68000 code
+	ROM_LOAD16_BYTE( "c21_23.ic11",  0x00000, 0x20000, CRC(fad37785) SHA1(f61bccb29d354a57cebaa0c773f212bffbba19d5) )
+	ROM_LOAD16_BYTE( "c21_25.ic15",  0x00001, 0x20000, CRC(594dda9f) SHA1(ab9fcd44fb316b64cbb8a5265563dcade417895d) )
+	ROM_LOAD16_BYTE( "c21_22.ic10",  0x40000, 0x20000, CRC(7610a9b4) SHA1(25c858f25efdbd4c25cbd1cc64fc68c9aba762ea) )
+	ROM_LOAD16_BYTE( "c21_24.ic14",  0x40001, 0x20000, CRC(551d947e) SHA1(237397dfe1e4dcd76acc37536304dd526d2d6f41) )
+
+	ROM_REGION( 0x80000, "tc0100scn", 0 )
+	ROM_LOAD16_WORD_SWAP( "c21-02.9",  0x00000, 0x80000, CRC(205883b9) SHA1(5aafee8cab3f949a7db91bcc26912f331041b51e) ) // SCR tiles (8 x 8)
+
+	ROM_REGION( 0x80000, "pc090oj", 0 )
+	ROM_LOAD16_WORD_SWAP( "c21-01.1",  0x00000, 0x80000, CRC(1ff6f39c) SHA1(742f296efc8073fafa73da2c8d7d26ca9514b6bf) ) // Sprites (16 x 16)
+
+	ROM_REGION( 0x10000, "audiocpu", 0 )
+	ROM_LOAD( "c21-08.38",   0x00000, 0x10000, CRC(dca495a0) SHA1(4e0f401f1b967da75f33fd7294860ad0b4bf2dce) ) // banked
+
+	ROM_REGION( 0x08000, "subcpu", 0 )  // HD64180RP8 code (link)
 	ROM_LOAD( "c21-07.57",   0x00000, 0x08000, CRC(f02292bd) SHA1(0a5c06a048ad67f90e0d766b504582e9eef035f7) )
 
 	ROM_REGION( 0x0800, "plds", 0 )
@@ -1655,6 +1785,33 @@ ROM_START( earthjkra )
 	ROM_LOAD( "b68-05.ic43", 0x00000, 0x104, CRC(d6524ccc) SHA1(f3b56253692aebb63278d47832fc27b8b212b59c) )
 ROM_END
 
+ROM_START( earthjkrb ) /* Taito PCB: K1100726A / J1100169B */
+	ROM_REGION( 0x100000, "maincpu", 0 )     /* 1024k for 68000 code */
+	/* Very close to earthjkra set. Labels are numbered in the same way as earthjkrp, but 3 and 4 ones are swapped (Maybe a typo in earthjkrp ?). In this case 4 is placed at ic24 position and 3 is placed at ic8 position */
+	ROM_LOAD16_BYTE( "4.ic23", 0x00000, 0x20000, CRC(250f09f8) SHA1(124f65a499414b4ec06cf6c370850cdc962dd2ee) ) /* 4.ic23 vs ejok_ic23 99.967957% similar (42 changed bytes) */
+	ROM_LOAD16_BYTE( "3.ic8",  0x00001, 0x20000, CRC(88fc1c5d) SHA1(83d4177603c5671ece906810f01284a477388bf7) ) /* 3.ic8  vs ejok_ic8  99.967957% similar (42 changed bytes) */
+	/* 0x40000 - 0x7ffff is intentionally empty */
+	ROM_LOAD16_WORD( "ic30e.ic30", 0x80000, 0x80000, CRC(49d1f77f) SHA1(f6c9b2fc88b77cc9baa5be48da5c3eb72310e471) ) /* Fix ROM */
+
+	ROM_REGION( 0x80000, "tc0100scn", 0 )
+	ROM_LOAD16_WORD_SWAP( "ej_chr-0.ic3", 0x00000, 0x80000, CRC(ac675297) SHA1(2a34e1eae3a4be84dbf709053f5e8a781b1073fc) )    /* SCR tiles (8 x 8) - mask ROM */
+
+	ROM_REGION( 0xa0000, "pc090oj", 0 )
+	ROM_LOAD16_WORD_SWAP( "ej_obj-0.ic6", 0x00000, 0x80000, CRC(5f21ac47) SHA1(45c94ffb53ee9b822b0676f6fb151fed4ce6d967) ) /* Sprites (16 x 16) - mask ROM */
+	ROM_LOAD16_BYTE     ( "1.ic5",        0x80001, 0x10000, CRC(cb4891db) SHA1(af1112608cdd897ef6028ef617f5ca69d7964861) )
+	ROM_LOAD16_BYTE     ( "0.ic4",        0x80000, 0x10000, CRC(b612086f) SHA1(625748fcb698ec57b7b3ce46019cf85de99aaaa1) )
+
+	ROM_REGION( 0x10000, "audiocpu", 0 )    /* sound cpu */
+	ROM_LOAD( "2.ic27", 0x00000, 0x10000, CRC(42ba2566) SHA1(c437388684b565c7504d6bad6accd73aa000faca) ) /* banked */
+
+	ROM_REGION( 0x10000, "msm", ROMREGION_ERASEFF )   /* ADPCM samples */
+	/* Empty socket on U.N. Defense Force: Earth Joker - but sound chips present */
+
+	ROM_REGION( 0x144, "pals", 0 )
+	ROM_LOAD( "b68-04.ic32", 0x00000, 0x144, CRC(9be618d1) SHA1(61ee33c3db448a05ff8f455e77fe17d51106baec) )
+	ROM_LOAD( "b68-05.ic43", 0x00000, 0x104, CRC(d6524ccc) SHA1(f3b56253692aebb63278d47832fc27b8b212b59c) )
+ROM_END
+
 // Known to exist (not dumped) a Japanese version with ROMs 3 & 4 also stamped "A" same as above or different version??
 // Also known to exist (not dumped) a US version of Earth Joker, title screen shows "DISTRIBUTED BY ROMSTAR, INC."  ROMs were numbered
 // from 0 through 4 and the fix ROM at IC30 is labeled 1 even though IC5 is also labled as 1 similar to the below set:
@@ -1732,16 +1889,19 @@ GAME( 1989, cadashj,   cadash,   cadash,   cadashj,  asuka_state, init_cadash,  
 GAME( 1989, cadashj1,  cadash,   cadash,   cadashj,  asuka_state, init_cadash,   ROT0,   "Taito Corporation",         "Cadash (Japan, version 1)", MACHINE_SUPPORTS_SAVE | MACHINE_NODEVICE_LAN )
 GAME( 1989, cadashjo,  cadash,   cadash,   cadashj,  asuka_state, init_cadash,   ROT0,   "Taito Corporation",         "Cadash (Japan, oldest version)", MACHINE_SUPPORTS_SAVE | MACHINE_NODEVICE_LAN )
 GAME( 1989, cadashu,   cadash,   cadash,   cadashu,  asuka_state, init_cadash,   ROT0,   "Taito America Corporation", "Cadash (US, version 2)", MACHINE_SUPPORTS_SAVE | MACHINE_NODEVICE_LAN )
+GAME( 1989, cadashu1,  cadash,   cadash,   cadashu,  asuka_state, init_cadash,   ROT0,   "Taito America Corporation", "Cadash (US, version 1?)", MACHINE_SUPPORTS_SAVE | MACHINE_NODEVICE_LAN )
 GAME( 1989, cadashi,   cadash,   cadash,   cadash,   asuka_state, init_cadash,   ROT0,   "Taito Corporation Japan",   "Cadash (Italy)", MACHINE_SUPPORTS_SAVE | MACHINE_NODEVICE_LAN )
 GAME( 1989, cadashf,   cadash,   cadash,   cadash,   asuka_state, init_cadash,   ROT0,   "Taito Corporation Japan",   "Cadash (France)", MACHINE_SUPPORTS_SAVE | MACHINE_NODEVICE_LAN )
 GAME( 1989, cadashg,   cadash,   cadash,   cadash,   asuka_state, init_cadash,   ROT0,   "Taito Corporation Japan",   "Cadash (Germany, version 1)", MACHINE_SUPPORTS_SAVE | MACHINE_NODEVICE_LAN )
+GAME( 1989, cadashgo,  cadash,   cadash,   cadash,   asuka_state, init_cadash,   ROT0,   "Taito Corporation Japan",   "Cadash (Germany)", MACHINE_SUPPORTS_SAVE | MACHINE_NODEVICE_LAN )
 GAME( 1989, cadashp,   cadash,   cadash,   cadashj,  asuka_state, init_cadash,   ROT0,   "Taito Corporation Japan",   "Cadash (World, prototype)", MACHINE_SUPPORTS_SAVE | MACHINE_NODEVICE_LAN)
 GAME( 1989, cadashs,   cadash,   cadash,   cadash,   asuka_state, init_cadash,   ROT0,   "Taito Corporation Japan",   "Cadash (Spain, version 1)", MACHINE_SUPPORTS_SAVE | MACHINE_NODEVICE_LAN )
 
 GAME( 1992, galmedes,  0,        asuka,    galmedes, asuka_state, empty_init,    ROT270, "Visco",                     "Galmedes (Japan)", MACHINE_SUPPORTS_SAVE )
 
-GAME( 1993, earthjkr,  0,        asuka,    earthjkr, asuka_state, init_earthjkr, ROT270, "Visco",                     "U.N. Defense Force: Earth Joker (US / Japan, set 1)", MACHINE_SUPPORTS_SAVE ) // sets 1 + 2 have ROMSTAR (US?) license and no region disclaimer if you change the dipswitch
+GAME( 1993, earthjkr,  0,        asuka,    earthjkr, asuka_state, init_earthjkr, ROT270, "Visco",                     "U.N. Defense Force: Earth Joker (US / Japan, set 1)", MACHINE_SUPPORTS_SAVE ) // sets 1 + 2 + 3 have ROMSTAR (US?) license and no region disclaimer if you change the dipswitch
 GAME( 1993, earthjkra, earthjkr, asuka,    earthjkr, asuka_state, empty_init,    ROT270, "Visco",                     "U.N. Defense Force: Earth Joker (US / Japan, set 2)", MACHINE_SUPPORTS_SAVE )
+GAME( 1993, earthjkrb, earthjkr, asuka,    earthjkr, asuka_state, empty_init,    ROT270, "Visco",                     "U.N. Defense Force: Earth Joker (US / Japan, set 3)", MACHINE_SUPPORTS_SAVE )
 GAME( 1993, earthjkrp, earthjkr, asuka,    earthjkrp,asuka_state, empty_init,    ROT270, "Visco",                     "U.N. Defense Force: Earth Joker (Japan, prototype?)", MACHINE_SUPPORTS_SAVE )
 
 GAME( 1994, eto,       0,        eto,      eto,      asuka_state, empty_init,    ROT0,   "Visco",                     "Kokontouzai Eto Monogatari (Japan)", MACHINE_SUPPORTS_SAVE )

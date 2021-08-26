@@ -229,7 +229,7 @@ isbc202_device::~isbc202_device()
 
 void isbc202_device::install_io_rw(address_space& space)
 {
-	space.install_readwrite_handler(0x78 , 0x7f , read8_delegate(*this , FUNC(isbc202_device::io_r)) , write8_delegate(*this , FUNC(isbc202_device::io_w)));
+	space.install_readwrite_handler(0x78 , 0x7f , read8m_delegate(*this , FUNC(isbc202_device::io_r)) , write8m_delegate(*this , FUNC(isbc202_device::io_w)));
 }
 
 void isbc202_device::install_mem_rw(address_space& space)
@@ -237,7 +237,7 @@ void isbc202_device::install_mem_rw(address_space& space)
 	m_mem_space = &space;
 }
 
-READ8_MEMBER(isbc202_device::io_r)
+uint8_t isbc202_device::io_r(address_space &space, offs_t offset)
 {
 	uint8_t res = 0;
 
@@ -301,7 +301,7 @@ READ8_MEMBER(isbc202_device::io_r)
 	return res;
 }
 
-WRITE8_MEMBER(isbc202_device::io_w)
+void isbc202_device::io_w(address_space &space, offs_t offset, uint8_t data)
 {
 	LOG_BUS("IO W @%u=%02x\n" , offset , data);
 
@@ -497,10 +497,9 @@ static void isbc202_floppies(device_slot_interface &device)
 	device.option_add("8ssdd" , FLOPPY_8_SSDD);
 }
 
-static const floppy_format_type isbc202_floppy_formats[] = {
-	FLOPPY_MFI_FORMAT,
-	FLOPPY_IMG_FORMAT,
-	nullptr
+static void isbc202_floppy_formats(format_registration &fr)
+{
+	fr.add(FLOPPY_IMG_FORMAT);
 };
 
 void isbc202_device::device_add_mconfig(machine_config &config)

@@ -25,7 +25,7 @@
 #include "machine/upd765.h"
 #include "sound/flt_vol.h"
 #include "sound/okim6258.h"
-#include "sound/ym2151.h"
+#include "sound/ymopm.h"
 #include "video/x68k_crtc.h"
 #include "bus/x68k/x68kexp.h"
 
@@ -151,7 +151,7 @@ protected:
 	void floppy_load_unload(bool load, floppy_image_device *dev);
 	image_init_result floppy_load(floppy_image_device *dev);
 	void floppy_unload(floppy_image_device *dev);
-	DECLARE_FLOPPY_FORMATS( floppy_formats );
+	static void floppy_formats(format_registration &fr);
 
 	struct
 	{
@@ -198,7 +198,6 @@ protected:
 		int bg_hshift;
 		int bg_vshift;
 		int bg_hvres;  // bits 0,1 = H-Res, bits 2,3 = V-Res, bit 4 = L/H Freq (0=15.98kHz, 1=31.5kHz)
-		int bg_double;  // 1 if PCG is to be doubled.
 	} m_video;
 	struct
 	{
@@ -268,7 +267,7 @@ protected:
 	void ppi_port_c_w(uint8_t data);
 	DECLARE_WRITE_LINE_MEMBER(fdc_irq);
 	void ct_w(uint8_t data);
-	DECLARE_WRITE8_MEMBER(adpcm_w);
+	void adpcm_w(offs_t offset, uint8_t data);
 	DECLARE_WRITE_LINE_MEMBER(mfp_irq_callback);
 
 	//dmac
@@ -287,34 +286,34 @@ protected:
 	template <int N> DECLARE_WRITE_LINE_MEMBER(irq4_line);
 	template <int N> DECLARE_WRITE_LINE_MEMBER(nmi_line);
 
-	DECLARE_WRITE16_MEMBER(scc_w);
-	DECLARE_READ16_MEMBER(scc_r);
-	DECLARE_WRITE16_MEMBER(fdc_w);
-	DECLARE_READ16_MEMBER(fdc_r);
-	DECLARE_WRITE16_MEMBER(ioc_w);
-	DECLARE_READ16_MEMBER(ioc_r);
-	DECLARE_WRITE16_MEMBER(sysport_w);
-	DECLARE_READ16_MEMBER(sysport_r);
-	DECLARE_WRITE16_MEMBER(ppi_w);
-	DECLARE_READ16_MEMBER(ppi_r);
-	DECLARE_WRITE16_MEMBER(sram_w);
-	DECLARE_READ16_MEMBER(sram_r);
-	DECLARE_WRITE16_MEMBER(vid_w);
-	DECLARE_READ16_MEMBER(vid_r);
-	DECLARE_READ16_MEMBER(areaset_r);
-	DECLARE_WRITE16_MEMBER(areaset_w);
-	DECLARE_WRITE16_MEMBER(enh_areaset_w);
-	DECLARE_READ16_MEMBER(rom0_r);
-	DECLARE_WRITE16_MEMBER(rom0_w);
-	DECLARE_READ16_MEMBER(emptyram_r);
-	DECLARE_WRITE16_MEMBER(emptyram_w);
-	DECLARE_READ16_MEMBER(exp_r);
-	DECLARE_WRITE16_MEMBER(exp_w);
+	void scc_w(offs_t offset, uint16_t data);
+	uint16_t scc_r(offs_t offset);
+	void fdc_w(offs_t offset, uint16_t data);
+	uint16_t fdc_r(offs_t offset);
+	void ioc_w(offs_t offset, uint16_t data);
+	uint16_t ioc_r(offs_t offset);
+	void sysport_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
+	uint16_t sysport_r(offs_t offset);
+	void ppi_w(offs_t offset, uint16_t data);
+	uint16_t ppi_r(offs_t offset);
+	void sram_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
+	uint16_t sram_r(offs_t offset);
+	void vid_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
+	uint16_t vid_r(offs_t offset);
+	uint16_t areaset_r();
+	void areaset_w(uint16_t data);
+	void enh_areaset_w(offs_t offset, uint16_t data);
+	uint16_t rom0_r(offs_t offset, uint16_t mem_mask = ~0);
+	void rom0_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
+	uint16_t emptyram_r(offs_t offset, uint16_t mem_mask = ~0);
+	void emptyram_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
+	uint16_t exp_r(offs_t offset, uint16_t mem_mask = ~0);
+	void exp_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
 
-	DECLARE_READ16_MEMBER(spritereg_r);
-	DECLARE_WRITE16_MEMBER(spritereg_w);
-	DECLARE_READ16_MEMBER(spriteram_r);
-	DECLARE_WRITE16_MEMBER(spriteram_w);
+	uint16_t spritereg_r(offs_t offset);
+	void spritereg_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
+	uint16_t spriteram_r(offs_t offset);
+	void spriteram_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
 	uint16_t tvram_read(offs_t offset);
 	void tvram_write(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
 	uint16_t gvram_read(offs_t offset);
@@ -335,6 +334,7 @@ protected:
 	bool draw_gfx_scanline(bitmap_ind16 &bitmap, rectangle cliprect, uint8_t priority);
 	void draw_gfx(bitmap_rgb32 &bitmap,rectangle cliprect);
 	void draw_sprites(bitmap_ind16 &bitmap, int priority, rectangle cliprect);
+	void draw_bg(bitmap_ind16 &bitmap, screen_device &screen, int layer, bool opaque, rectangle rect);
 
 public:
 	static rgb_t GGGGGRRRRRBBBBBI(uint32_t raw);

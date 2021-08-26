@@ -95,7 +95,6 @@ public:
 		, m_hpc3(*this, "hpc3")
 		, m_ioc2(*this, "ioc2")
 		, m_rtc(*this, "rtc")
-		, m_softlist(*this, "softlist")
 		, m_vino(*this, "vino")
 		, m_dmsd(*this, "dmsd")
 		, m_gio64(*this, "gio64")
@@ -145,7 +144,6 @@ protected:
 	required_device<hpc3_device> m_hpc3;
 	required_device<ioc2_device> m_ioc2;
 	required_device<ds1386_device> m_rtc;
-	required_device<software_list_device> m_softlist;
 	optional_device<vino_device> m_vino;
 	optional_device<saa7191_device> m_dmsd;
 	optional_device<gio64_device> m_gio64;
@@ -312,7 +310,6 @@ void ip24_state::machine_reset()
 }
 
 static INPUT_PORTS_START( ip24 )
-	PORT_INCLUDE( at_keyboard )
 INPUT_PORTS_END
 
 void ip24_state::wd33c93(device_t *device)
@@ -383,7 +380,8 @@ void ip24_state::ip24_base(machine_config &config)
 	SGI_HAL2(config, m_hal2);
 	EEPROM_93C56_16BIT(config, m_eeprom);
 
-	SOFTWARE_LIST(config, m_softlist).set_original("sgi_mips");
+	SOFTWARE_LIST(config, "sgi_mips").set_original("sgi_mips");
+	SOFTWARE_LIST(config, "sgi_mips_hdd").set_original("sgi_mips_hdd");
 }
 
 void ip24_state::ip24(machine_config &config)
@@ -409,7 +407,7 @@ void ip24_state::indy_5015(machine_config &config)
 {
 	ip24(config);
 
-	R5000(config, m_maincpu, 50000000*3);
+	R5000(config, m_maincpu, 75'000'000);
 	m_maincpu->set_addrmap(AS_PROGRAM, &ip24_state::ip24_map);
 }
 
@@ -417,7 +415,7 @@ void ip24_state::indy_4613(machine_config &config)
 {
 	ip24(config);
 
-	R4600(config, m_maincpu, 33333333*4);
+	R4600(config, m_maincpu, 66'666'666);
 	m_maincpu->set_addrmap(AS_PROGRAM, &ip24_state::ip24_map);
 }
 
@@ -425,7 +423,7 @@ void ip24_state::indy_4610(machine_config &config)
 {
 	ip24(config);
 
-	R4600(config, m_maincpu, 33333333*3);
+	R4600(config, m_maincpu, 50'000'000);
 	m_maincpu->set_addrmap(AS_PROGRAM, &ip24_state::ip24_map);
 }
 
@@ -438,7 +436,7 @@ void ip22_state::wd33c93_2(device_t *device)
 
 void ip22_state::indigo2_4415(machine_config &config)
 {
-	R4400(config, m_maincpu, 50000000*3);
+	R4400(config, m_maincpu, 75'000'000);
 	m_maincpu->set_addrmap(AS_PROGRAM, &ip22_state::ip22_map);
 
 	ip24_base(config);

@@ -17,11 +17,12 @@
 #include "logmacro.h"
 
 
-FLOPPY_FORMATS_MEMBER( isa8_fdc_device::floppy_formats )
-	FLOPPY_PC_FORMAT,
-	FLOPPY_NASLITE_FORMAT,
-	FLOPPY_IBMXDF_FORMAT
-FLOPPY_FORMATS_END
+void isa8_fdc_device::floppy_formats(format_registration &fr)
+{
+	fr.add_pc_formats();
+	fr.add(FLOPPY_NASLITE_FORMAT);
+	fr.add(FLOPPY_IBMXDF_FORMAT);
+}
 
 static void pc_dd_floppies(device_slot_interface &device)
 {
@@ -42,10 +43,6 @@ isa8_fdc_device::isa8_fdc_device(const machine_config &mconfig, device_type type
 	device_t(mconfig, type, tag, owner, clock),
 	device_isa8_card_interface(mconfig, *this),
 	m_fdc(*this, "fdc")
-{
-}
-
-void isa8_fdc_device::device_reset()
 {
 }
 
@@ -80,7 +77,9 @@ void isa8_fdc_device::eop_w(int state)
 }
 
 
-isa8_upd765_fdc_device::isa8_upd765_fdc_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock) : isa8_fdc_device(mconfig, type, tag, owner, clock)
+isa8_upd765_fdc_device::isa8_upd765_fdc_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock)
+	: isa8_fdc_device(mconfig, type, tag, owner, clock)
+	, dor(0x00)
 {
 }
 
@@ -94,7 +93,11 @@ void isa8_upd765_fdc_device::device_start()
 
 	irq = drq = false;
 	fdc_irq = fdc_drq = false;
-	dor = 0x00;
+}
+
+void isa8_upd765_fdc_device::device_reset()
+{
+	dor_w(0x00);
 }
 
 // Bits 0-1 select one of the 4 drives, but only if the associated
@@ -109,7 +112,6 @@ void isa8_upd765_fdc_device::device_start()
 void isa8_upd765_fdc_device::dor_w(uint8_t data)
 {
 	LOG("dor = %02x\n", data);
-	uint8_t pdor = dor;
 	dor = data;
 
 	for(int i=0; i<4; i++)
@@ -124,8 +126,7 @@ void isa8_upd765_fdc_device::dor_w(uint8_t data)
 
 	check_irq();
 	check_drq();
-	if((pdor^dor) & 4)
-		m_fdc->soft_reset();
+	m_fdc->reset_w(!BIT(dor, 2));
 }
 
 uint8_t isa8_upd765_fdc_device::dor_r()

@@ -40,14 +40,6 @@
 
 
 //**************************************************************************
-//  CONSTANTS
-//**************************************************************************
-
-#define VIC20_EXPANSION_SLOT_TAG        "exp"
-
-
-
-//**************************************************************************
 //  TYPE DEFINITIONS
 //**************************************************************************
 
@@ -134,11 +126,10 @@ public:
 protected:
 	device_vic20_expansion_card_interface(const machine_config &mconfig, device_t &device);
 
-	optional_shared_ptr<uint8_t> m_blk1;
-	optional_shared_ptr<uint8_t> m_blk2;
-	optional_shared_ptr<uint8_t> m_blk3;
-	optional_shared_ptr<uint8_t> m_blk5;
-	optional_shared_ptr<uint8_t> m_nvram;
+	std::unique_ptr<uint8_t[]> m_blk1;
+	std::unique_ptr<uint8_t[]> m_blk2;
+	std::unique_ptr<uint8_t[]> m_blk3;
+	std::unique_ptr<uint8_t[]> m_blk5;
 
 	vic20_expansion_slot_device *m_slot;
 };

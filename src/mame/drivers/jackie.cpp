@@ -49,7 +49,7 @@ Note
 #include "cpu/z80/z80.h"
 #include "machine/i8255.h"
 #include "machine/timer.h"
-#include "sound/ym2413.h"
+#include "sound/ymopl.h"
 #include "emupal.h"
 #include "screen.h"
 #include "speaker.h"
@@ -342,7 +342,7 @@ uint8_t jackie_state::expram_r(offs_t offset)
 void jackie_state::prg_map(address_map &map)
 {
 	map(0x0000, 0xefff).rom();
-	map(0xf000, 0xffff).ram().region("maincpu", 0xf000);
+	map(0xf000, 0xffff).ram();
 }
 
 void jackie_state::io_map(address_map &map)

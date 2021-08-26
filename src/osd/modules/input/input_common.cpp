@@ -8,20 +8,16 @@
 //
 //============================================================
 
-#include "input_module.h"
 #include "modules/lib/osdobj_common.h"
-
-#include <memory>
 
 // MAME headers
 #include "emu.h"
+#include "input_common.h"
 
 // winnt.h defines this
 #ifdef DELETE
 #undef DELETE
 #endif
-
-#include "input_common.h"
 
 //============================================================
 //  Keyboard translation table
@@ -193,7 +189,7 @@ key_trans_entry keyboard_trans_table::s_default_table[] =
 keyboard_trans_table::keyboard_trans_table()
 {
 	m_table = s_default_table;
-	m_table_size = ARRAY_LENGTH(s_default_table);
+	m_table_size = std::size(s_default_table);
 }
 #else
 keyboard_trans_table::keyboard_trans_table()

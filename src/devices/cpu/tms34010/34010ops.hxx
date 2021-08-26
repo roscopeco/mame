@@ -80,13 +80,13 @@ void tms340x0_device::unimpl(uint16_t op)
 {
 	/* kludge for Super High Impact -- this doesn't seem to cause */
 	/* an illegal opcode exception */
-	if (m_cache.read_word(m_pc - 0x10) == 0x0007)
+	if (space(AS_PROGRAM).read_word(m_pc - 0x10) == 0x0007)
 		return;
 
 	/* 9 Ball Shootout calls to FFDF7468, expecting it */
 	/* to execute the next instruction from FFDF7470 */
 	/* but the instruction at FFDF7460 is an 0x0001 */
-	if (m_cache.read_word(m_pc - 0x10) == 0x0001)
+	if (space(AS_PROGRAM).read_word(m_pc - 0x10) == 0x0001)
 		return;
 
 	PUSH(m_pc);
@@ -96,7 +96,7 @@ void tms340x0_device::unimpl(uint16_t op)
 	COUNT_UNKNOWN_CYCLES(16);
 
 	/* extra check to prevent bad things */
-	if (m_pc == 0 || s_opcode_table[m_cache.read_word(m_pc) >> 4] == &tms34010_device::unimpl)
+	if (m_pc == 0 || s_opcode_table[space(AS_PROGRAM).read_word(m_pc) >> 4] == &tms34010_device::unimpl)
 	{
 		set_input_line(INPUT_LINE_HALT, ASSERT_LINE);
 		machine().debug_break();
@@ -2458,16 +2458,16 @@ void tms340x0_device::setcdp(uint16_t op)
 			// .. only single bit set, pitch is power of two!
 			case 1:
 			{
-				m_convdp = 32 - count_leading_zeros(dptch);
+				m_convdp = 32 - count_leading_zeros_32(dptch);
 				COUNT_CYCLES(4);
 				return;
 			}
 			// .. two bits, we can decompose it to sum of two power of two numbers
 			case 2:
 			{
-				uint8_t first_one = count_leading_zeros(dptch);
+				uint8_t first_one = count_leading_zeros_32(dptch);
 				uint8_t v1 = 32 - first_one;
-				uint8_t v2 = 32 - count_leading_zeros(dptch & ~(1 << (first_one - 1)));
+				uint8_t v2 = 32 - count_leading_zeros_32(dptch & ~(1 << (first_one - 1)));
 
 				m_convdp = v2 | (v1 << 8);
 				COUNT_CYCLES(6);

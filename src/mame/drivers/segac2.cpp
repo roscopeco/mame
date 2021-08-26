@@ -83,11 +83,13 @@
 #include "machine/315_5296.h"
 #include "sound/okim6295.h"
 #include "sound/sn76496.h"
-#include "sound/2612intf.h"
 #include "sound/upd7759.h"
+#include "sound/ymopn.h"
 #include "emupal.h"
 #include "speaker.h"
 
+
+namespace {
 
 #define XL1_CLOCK           XTAL(640'000)
 #define XL2_CLOCK           XTAL(53'693'175)
@@ -99,6 +101,7 @@
 
 typedef device_delegate<int (int in)> segac2_prot_delegate;
 
+// does this need to inherit from md_base? really we only need the VDP and some basics like the maincpu
 class segac2_state : public md_base_state
 {
 public:
@@ -107,6 +110,7 @@ public:
 		, m_paletteram(*this, "paletteram")
 		, m_upd_region(*this, "upd")
 		, m_prot_func(*this)
+		, m_sound_banks(0)
 		, m_upd7759(*this, "upd")
 		, m_screen(*this, "screen")
 		, m_palette(*this, "palette")
@@ -147,6 +151,10 @@ public:
 	void init_pclubjv4();
 	void init_pclubjv5();
 
+protected:
+	virtual void machine_start() override;
+	virtual void machine_reset() override;
+
 private:
 	// for Print Club only
 	int m_cam_data;
@@ -171,9 +179,7 @@ private:
 	uint8_t       m_sound_banks;      /* number of sound banks */
 
 	void segac2_common_init(segac2_prot_delegate prot_func);
-	DECLARE_VIDEO_START(segac2_new);
-	DECLARE_MACHINE_START(segac2);
-	DECLARE_MACHINE_RESET(segac2);
+
 
 	uint32_t screen_update_segac2_new(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect);
 	int m_segac2_bg_pal_lookup[4];
@@ -248,7 +254,7 @@ public:
 
 ******************************************************************************/
 
-MACHINE_START_MEMBER(segac2_state,segac2)
+void segac2_state::machine_start()
 {
 	save_item(NAME(m_prot_write_buf));
 	save_item(NAME(m_prot_read_buf));
@@ -257,7 +263,7 @@ MACHINE_START_MEMBER(segac2_state,segac2)
 }
 
 
-MACHINE_RESET_MEMBER(segac2_state,segac2)
+void segac2_state::machine_reset()
 {
 //  megadriv_scanline_timer = machine().device<timer_device>("md_scan_timer");
 //  megadriv_scanline_timer->adjust(attotime::zero);
@@ -1321,29 +1327,39 @@ static INPUT_PORTS_START( bloxeedc )
 	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_UNUSED )     /* Button 3 Unused */
 
 	PORT_MODIFY("DSW")
-	PORT_DIPNAME( 0x07, 0x07, DEF_STR( Coinage ) )      PORT_DIPLOCATION("SW2:1,2,3") // needs to be double checked
-	PORT_DIPSETTING(    0x00, "0" )
-	PORT_DIPSETTING(    0x01, "1" )
-	PORT_DIPSETTING(    0x02, "2" )
-	PORT_DIPSETTING(    0x03, "3" )
-	PORT_DIPSETTING(    0x04, "4" )
-	PORT_DIPSETTING(    0x05, "5" )
-	PORT_DIPSETTING(    0x06, "6" )
-	PORT_DIPSETTING(    0x07, "7" )
-	PORT_DIPNAME( 0x08, 0x00, DEF_STR( Demo_Sounds ) )  PORT_DIPLOCATION("SW2:4")
+	PORT_DIPNAME( 0x01, 0x01, "Credits to Start (VS)" )     PORT_DIPLOCATION("SW2:1")
+	PORT_DIPSETTING(    0x00, "1" ) PORT_CONDITION("DSW", 0x02, EQUALS, 0x02)
+	PORT_DIPSETTING(    0x01, "2" ) PORT_CONDITION("DSW", 0x02, EQUALS, 0x02)
+	PORT_DIPSETTING(    0x00, "2" ) PORT_CONDITION("DSW", 0x02, EQUALS, 0x00)
+	PORT_DIPSETTING(    0x01, "4" ) PORT_CONDITION("DSW", 0x02, EQUALS, 0x00)
+	PORT_DIPNAME( 0x02, 0x02, "Credits to Start (Normal)" ) PORT_DIPLOCATION("SW2:2")
+	PORT_DIPSETTING(    0x02, "1" )
+	PORT_DIPSETTING(    0x00, "2" )
+	//"SW2:3" unused
+	PORT_DIPNAME( 0x08, 0x00, DEF_STR( Demo_Sounds ) )      PORT_DIPLOCATION("SW2:4")
 	PORT_DIPSETTING(    0x08, DEF_STR( Off ) )
 	PORT_DIPSETTING(    0x00, DEF_STR( On ) )
-	PORT_DIPNAME( 0x30, 0x30, DEF_STR( Difficulty ) )   PORT_DIPLOCATION("SW2:5,6")
+	PORT_DIPNAME( 0x30, 0x30, DEF_STR( Difficulty ) )       PORT_DIPLOCATION("SW2:5,6")
 	PORT_DIPSETTING(    0x20, DEF_STR( Easy ) )
 	PORT_DIPSETTING(    0x30, DEF_STR( Normal ) )
 	PORT_DIPSETTING(    0x10, DEF_STR( Hard ) )
 	PORT_DIPSETTING(    0x00, DEF_STR( Hardest ) )
-	PORT_DIPNAME( 0x40, 0x40, DEF_STR( Unknown ) )      PORT_DIPLOCATION("SW2:7") // ?
-	PORT_DIPSETTING(    0x40, DEF_STR( Off ) )
-	PORT_DIPSETTING(    0x00, DEF_STR( On ) )
-	PORT_DIPNAME( 0x80, 0x00, "High Speed Mode" )       PORT_DIPLOCATION("SW2:8")
+	//"SW2:7" unused
+	PORT_DIPNAME( 0x80, 0x00, "High Speed Mode" )           PORT_DIPLOCATION("SW2:8")
 	PORT_DIPSETTING(    0x00, DEF_STR( Off ) )
 	PORT_DIPSETTING(    0x80, DEF_STR( On ) )
+INPUT_PORTS_END
+
+
+static INPUT_PORTS_START( bloxeedu )
+	PORT_INCLUDE( bloxeedc )
+
+	PORT_MODIFY("DSW")
+	PORT_DIPNAME( 0x03, 0x03, "Credits to Start (Normal / VS)" ) PORT_DIPLOCATION("SW2:1,2")
+	PORT_DIPSETTING(    0x01, "1 / 1" )
+	PORT_DIPSETTING(    0x03, "1 / 2" )
+	PORT_DIPSETTING(    0x02, "1 / 2" )
+	PORT_DIPSETTING(    0x00, "2 / 4" )
 INPUT_PORTS_END
 
 
@@ -1494,11 +1510,6 @@ WRITE_LINE_MEMBER(segac2_state::segac2_irq2_interrupt)
 
 ******************************************************************************/
 
-VIDEO_START_MEMBER(segac2_state,segac2_new)
-{
-	VIDEO_START_CALL_MEMBER(megadriv);
-}
-
 // C2 doesn't use the internal VDP CRAM, instead it uses the digital output of the chip
 //  and applies it's own external colour circuity
 uint32_t segac2_state::screen_update_segac2_new(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect)
@@ -1513,10 +1524,8 @@ uint32_t segac2_state::screen_update_segac2_new(screen_device &screen, bitmap_rg
 	/* Copy our screen buffer here */
 	for (int y = cliprect.min_y; y <= cliprect.max_y; y++)
 	{
-		uint32_t* desty = &bitmap.pix32(y, 0);
-		uint16_t* srcy;
-
-		srcy = m_vdp->m_render_line_raw.get();
+		uint32_t *const desty = &bitmap.pix(y, 0);
+		uint16_t const *const srcy = m_vdp->m_render_line_raw.get();
 
 		for (int x = cliprect.min_x; x <= cliprect.max_x; x++)
 		{
@@ -1597,9 +1606,6 @@ void segac2_state::segac(machine_config &config)
 	m_maincpu->set_addrmap(AS_PROGRAM, &segac2_state::main_map);
 	m_maincpu->set_irq_acknowledge_callback(FUNC(md_base_state::genesis_int_callback));
 
-	MCFG_MACHINE_START_OVERRIDE(segac2_state,segac2)
-	MCFG_MACHINE_RESET_OVERRIDE(segac2_state,segac2)
-
 	NVRAM(config, "nvram", nvram_device::DEFAULT_ALL_1); // borencha requires 0xff fill or there is no sound (it lacks some of the init code of the borench set)
 
 	SEGA_315_5296(config, m_io, XL2_CLOCK/6); // clock divider guessed
@@ -1634,8 +1640,6 @@ void segac2_state::segac(machine_config &config)
 	screen.screen_vblank().set(FUNC(segac2_state::screen_vblank_megadriv));
 
 	PALETTE(config, m_palette).set_entries(2048*3);
-
-	MCFG_VIDEO_START_OVERRIDE(segac2_state,segac2_new)
 
 	/* sound hardware */
 	SPEAKER(config, "mono").front_center();
@@ -1887,7 +1891,7 @@ ROM_START( wwmarine ) /* Waku Waku Marine  (c)1992 Sega - 834-9082 WAKUWAKU MARI
 	ROM_LOAD( "epr-15095.ic4", 0x000000, 0x040000, CRC(df13755b) SHA1(177aac7aaadc36e14dbcdf12bd42dbe70b3edd49) )
 ROM_END
 
-ROM_START( anpanman ) /* Sega Soreike! Anpanman Popcorn Factory (Rev.B) (c)1993 Sega - 834-8795-01 (EMP5032 labeled 317-0140) */
+ROM_START( anpanman ) /* Sega Soreike! Anpanman Popcorn Koujou (Rev.B) (c)1993 Sega - 834-8795-01 (EMP5032 labeled 317-0140) */
 	ROM_REGION( 0x200000, "maincpu", 0 )
 	ROM_LOAD16_BYTE( "epr-14804b.ic32", 0x000000, 0x040000, CRC(7ce88c49) SHA1(959ee459a5b4a6324488a935fa6a48e38ce93464) ) // 27C020
 	ROM_LOAD16_BYTE( "epr-14803b.ic31", 0x000001, 0x040000, CRC(eb3ca1b9) SHA1(e4dd9d2bd2301f47f167d6516457386ba4e57df0) ) // 27C020
@@ -2625,6 +2629,7 @@ void segac2_state::init_pclubjv5()
 }
 
 
+} // Anonymous namespace
 
 /******************************************************************************
     Game Drivers
@@ -2645,7 +2650,7 @@ void segac2_state::init_pclubjv5()
 //    YEAR, NAME,      PARENT,   MACHINE,INPUT,    INIT,     MONITOR,COMPANY,FULLNAME,FLAGS
 /* System C Games */
 GAME( 1989, bloxeedc,  bloxeed,  segac,  bloxeedc,        segac2_state,    init_bloxeedc, ROT0,   "Sega / Elorg", "Bloxeed (World, C System)", 0 )
-GAME( 1989, bloxeedu,  bloxeed,  segac,  bloxeedc,        segac2_state,    init_bloxeedc, ROT0,   "Sega / Elorg", "Bloxeed (US, C System, Rev A)", 0 )
+GAME( 1989, bloxeedu,  bloxeed,  segac,  bloxeedu,        segac2_state,    init_bloxeedc, ROT0,   "Sega / Elorg", "Bloxeed (US, C System, Rev A)", 0 )
 
 GAME( 1990, columns,   0,        segac,  columns,         segac2_state,    init_columns,  ROT0,   "Sega", "Columns (World)", 0 )
 GAME( 1990, columnsu,  columns,  segac,  columnsu,        segac2_state,    init_columns,  ROT0,   "Sega", "Columns (US, cocktail, Rev A)", 0 ) // has cocktail mode dsw
@@ -2686,7 +2691,7 @@ GAME( 1994, tantrbl3,  tantr,    segac,  ichir,           segac2_state,    init_
 GAME( 1992, wwmarine,  0,        segac2, wwmarine,        segac2_state,    init_bloxeedc, ROT0,   "Sega", "Waku Waku Marine", 0 )
 
 // not really sure how this should hook up, things like the 'sold out' flags could be mechanical sensors, or from another MCU / CPU board in the actual popcorn part of the machine?
-GAME( 1992, anpanman,  0,        segac2, anpanman,        segac2_state,    init_bloxeedc, ROT0,   "Sega", "Soreike! Anpanman Popcorn Factory (Rev B)", MACHINE_MECHANICAL ) // 'Mechanical' part isn't emulated
+GAME( 1992, anpanman,  0,        segac2, anpanman,        segac2_state,    init_bloxeedc, ROT0,   "Sega", "Soreike! Anpanman Popcorn Koujou (Rev B)", MACHINE_MECHANICAL ) // 'Mechanical' part isn't emulated
 GAME( 1993, sonicpop,  0,        segac2, sonicpop,        segac2_state,    init_bloxeedc, ROT0,   "Sega", "SegaSonic Popcorn Shop (Rev B)", MACHINE_MECHANICAL ) // region DSW for USA / Export / Japan, still speaks Japanese tho.  'Mechanical' part isn't emulated
 
 GAME( 1993, sonicfgt,  0,        segac2, systemc_generic, segac2_state,    init_bloxeedc, ROT0,   "Sega", "Sega Sonic Cosmo Fighter", 0 )

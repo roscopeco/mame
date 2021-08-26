@@ -198,7 +198,7 @@ void ui_gfx_init(running_machine &machine)
 static void ui_gfx_count_devices(running_machine &machine, ui_gfx_state &state)
 {
 	// count the palette devices
-	state.palette.devcount = palette_interface_iterator(machine.root_device()).count();
+	state.palette.devcount = palette_interface_enumerator(machine.root_device()).count();
 
 	// set the pointer to the first palette
 	if (state.palette.devcount > 0)
@@ -206,7 +206,7 @@ static void ui_gfx_count_devices(running_machine &machine, ui_gfx_state &state)
 
 	// count the gfx devices
 	state.gfxset.devcount = 0;
-	for (device_gfx_interface &interface : gfx_interface_iterator(machine.root_device()))
+	for (device_gfx_interface &interface : gfx_interface_enumerator(machine.root_device()))
 	{
 		// count the gfx sets in each device, skipping devices with none
 		uint8_t count = 0;
@@ -307,9 +307,8 @@ again:
 				break;
 			}
 
-			// fall through...
 			state.mode++;
-
+			[[fallthrough]];
 		case UI_GFX_GFXSET:
 			// if we have graphics sets, display them
 			if (state.gfxset.devcount > 0)
@@ -318,9 +317,8 @@ again:
 				break;
 			}
 
-			// fall through...
 			state.mode++;
-
+			[[fallthrough]];
 		case UI_GFX_TILEMAP:
 			// if we have tilemaps, display them
 			if (mui.machine().tilemap().count() > 0)
@@ -373,7 +371,7 @@ cancel:
 
 static void palette_set_device(running_machine &machine, ui_gfx_state &state)
 {
-	palette_interface_iterator pal_iter(machine.root_device());
+	palette_interface_enumerator pal_iter(machine.root_device());
 	state.palette.interface = pal_iter.byindex(state.palette.devindex);
 }
 
@@ -454,7 +452,7 @@ static void palette_handler(mame_ui_manager &mui, render_container &container, u
 
 	// expand the outer box to fit the title
 	const std::string title = title_buf.str();
-	titlewidth = ui_font->string_width(chheight, aspect, title.c_str());
+	titlewidth = ui_font->string_width(chheight, aspect, title);
 	x0 = 0.0f;
 	if (boxbounds.x1 - boxbounds.x0 < titlewidth + chwidth)
 		x0 = boxbounds.x0 - (0.5f - 0.5f * (titlewidth + chwidth));
@@ -745,7 +743,7 @@ static void gfxset_handler(mame_ui_manager &mui, render_container &container, ui
 
 	// expand the outer box to fit the title
 	const std::string title = title_buf.str();
-	const float titlewidth = ui_font->string_width(chheight, aspect, title.c_str());
+	const float titlewidth = ui_font->string_width(chheight, aspect, title);
 	x0 = 0.0f;
 	if (boxbounds.x1 - boxbounds.x0 < titlewidth + chwidth)
 		x0 = boxbounds.x0 - (0.5f - 0.5f * (titlewidth + chwidth));
@@ -994,18 +992,16 @@ static void gfxset_draw_item(running_machine &machine, gfx_element &gfx, int ind
 {
 	int width = (rotate & ORIENTATION_SWAP_XY) ? gfx.height() : gfx.width();
 	int height = (rotate & ORIENTATION_SWAP_XY) ? gfx.width() : gfx.height();
-	const rgb_t *palette = dpalette->palette()->entry_list_raw() + gfx.colorbase() + color * gfx.granularity();
-
-	int x, y;
+	rgb_t const *const palette = dpalette->palette()->entry_list_raw() + gfx.colorbase() + color * gfx.granularity();
 
 	// loop over rows in the cell
-	for (y = 0; y < height; y++)
+	for (int y = 0; y < height; y++)
 	{
-		uint32_t *dest = &bitmap.pix32(dsty + y, dstx);
+		uint32_t *dest = &bitmap.pix(dsty + y, dstx);
 		const uint8_t *src = gfx.get_data(index);
 
 		// loop over columns in the cell
-		for (x = 0; x < width; x++)
+		for (int x = 0; x < width; x++)
 		{
 			int effx = x, effy = y;
 			const uint8_t *s;
@@ -1152,7 +1148,7 @@ static void tilemap_handler(mame_ui_manager &mui, render_container &container, u
 
 	// expand the outer box to fit the title
 	const std::string title = title_buf.str();
-	titlewidth = ui_font->string_width(chheight, aspect, title.c_str());
+	titlewidth = ui_font->string_width(chheight, aspect, title);
 	if (boxbounds.x1 - boxbounds.x0 < titlewidth + chwidth)
 	{
 		boxbounds.x0 = 0.5f - 0.5f * (titlewidth + chwidth);
@@ -1341,7 +1337,7 @@ static void tilemap_update_bitmap(running_machine &machine, ui_gfx_state &state,
 	{
 		state.bitmap.fill(0);
 		tilemap_t *tilemap = machine.tilemap().find(state.tilemap.which);
-		screen_device *first_screen = screen_device_iterator(machine.root_device()).first();
+		screen_device *first_screen = screen_device_enumerator(machine.root_device()).first();
 		if (first_screen)
 		{
 			tilemap->draw_debug(*first_screen, state.bitmap, state.tilemap.xoffs, state.tilemap.yoffs, state.tilemap.flags);
