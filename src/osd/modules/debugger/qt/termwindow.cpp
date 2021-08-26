@@ -15,7 +15,7 @@ void osd_term_write(uint8_t data)
 extern void osd_send_key(uint8_t key);
 
 TermWindow::TermWindow(running_machine* machine, QWidget* parent) :
-	WindowQt(machine, nullptr)
+	WindowQt(*machine, nullptr)
 {
 	setWindowTitle("Terminal");
 

@@ -24,11 +24,12 @@ public:
 
 private:
 	DECLARE_WRITE_LINE_MEMBER( acia_irq_w );
-	DECLARE_READ8_MEMBER(ide_cs0_r);
-	DECLARE_WRITE8_MEMBER(ide_cs0_w);
-	DECLARE_WRITE8_MEMBER(bank_w);
-	DECLARE_WRITE8_MEMBER(bank_en_w);
-	DECLARE_WRITE8_MEMBER(ram_w);
+
+    uint8_t ide_cs0_r(offs_t offset);
+    void ide_cs0_w(offs_t offset, uint8_t data);
+    void bank_w(offs_t offset, uint8_t data);
+    void bank_en_w(uint8_t data);
+    void ram_w(uint8_t data);
 
 	void mem_map(address_map &map);
 	void mem_io(address_map &map);
@@ -55,23 +56,23 @@ WRITE_LINE_MEMBER( rc2014_wbw_state::acia_irq_w )
 	m_maincpu->set_input_line(0, state);
 }
 
-READ8_MEMBER(rc2014_wbw_state::ide_cs0_r)
+uint8_t rc2014_wbw_state::ide_cs0_r(offs_t offset)
 {
 	return m_ata->cs0_r(offset);
 }
 
-WRITE8_MEMBER(rc2014_wbw_state::ide_cs0_w)
+void rc2014_wbw_state::ide_cs0_w(offs_t offset, uint8_t data)
 {
 	m_ata->cs0_w(offset, data);
 }
 
-WRITE8_MEMBER(rc2014_wbw_state::bank_w)
+void rc2014_wbw_state::bank_w(offs_t offset, uint8_t data)
 {
 	m_bank_reg[offset & 3] = data & 0x3f;
 	update_banks();
 }
 
-WRITE8_MEMBER(rc2014_wbw_state::bank_en_w)
+void rc2014_wbw_state::bank_en_w(uint8_t data)
 {
 	m_bank_enabled = data & 1;
 	update_banks();
@@ -96,22 +97,22 @@ void rc2014_wbw_state::update_banks()
 	m_bank4->set_base(mem + (m_bank_reg[3] << 14));
 
 	if (m_bank_reg[0] & 0x20) {
-		space.install_write_bank(0x0000, 0x3fff, "bank1");
+		space.install_write_bank(0x0000, 0x3fff, membank("bank1"));
 	} else {
 		space.unmap_write(0x0000, 0x3fff);
 	}
 	if (m_bank_reg[1] & 0x20) {
-		space.install_write_bank(0x4000, 0x7fff, "bank2");
+		space.install_write_bank(0x4000, 0x7fff, membank("bank2"));
 	} else {
 		space.unmap_write(0x4000, 0x7fff);
 	}
 	if (m_bank_reg[2] & 0x20) {
-		space.install_write_bank(0x8000, 0xbfff, "bank3");
+		space.install_write_bank(0x8000, 0xbfff, membank("bank3"));
 	} else {
 		space.unmap_write(0x8000, 0xbfff);
 	}
 	if (m_bank_reg[3] & 0x20) {
-		space.install_write_bank(0xc000, 0xffff, "bank4");
+		space.install_write_bank(0xc000, 0xffff, membank("bank4"));
 	} else {
 		space.unmap_write(0xc000, 0xffff);
 	}
@@ -157,7 +158,6 @@ INPUT_PORTS_END
 static DEVICE_INPUT_DEFAULTS_START( terminal )
 	DEVICE_INPUT_DEFAULTS( "RS232_TXBAUD", 0xff, RS232_BAUD_115200 )
 	DEVICE_INPUT_DEFAULTS( "RS232_RXBAUD", 0xff, RS232_BAUD_115200 )
-	DEVICE_INPUT_DEFAULTS( "RS232_STARTBITS", 0xff, RS232_STARTBITS_1 )
 	DEVICE_INPUT_DEFAULTS( "RS232_DATABITS", 0xff, RS232_DATABITS_8 )
 	DEVICE_INPUT_DEFAULTS( "RS232_PARITY", 0xff, RS232_PARITY_NONE )
 	DEVICE_INPUT_DEFAULTS( "RS232_STOPBITS", 0xff, RS232_STOPBITS_1 )
