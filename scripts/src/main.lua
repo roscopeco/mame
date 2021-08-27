@@ -219,7 +219,6 @@ end
 	}
 	links {
 		"qtdbg_" .. _OPTIONS["osd"],
-		"qtermwidget"
 	}
 if (STANDALONE~=true) then
 	links {

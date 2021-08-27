@@ -339,8 +339,6 @@ function qtdebuggerbuild()
 			MAME_DIR .. "src/osd/modules/debugger/qt/deviceinformationwindow.cpp",
 			MAME_DIR .. "src/osd/modules/debugger/qt/deviceinformationwindow.h",
 			MAME_DIR .. "src/osd/modules/debugger/qt/deviceswindow.h",
-			MAME_DIR .. "src/osd/modules/debugger/qt/termwindow.cpp",
-			MAME_DIR .. "src/osd/modules/debugger/qt/termwindow.h",
 			GEN_DIR .. "osd/modules/debugger/qt/debuggerview.moc.cpp",
 			GEN_DIR .. "osd/modules/debugger/qt/windowqt.moc.cpp",
 			GEN_DIR .. "osd/modules/debugger/qt/logwindow.moc.cpp",
@@ -350,7 +348,6 @@ function qtdebuggerbuild()
 			GEN_DIR .. "osd/modules/debugger/qt/breakpointswindow.moc.cpp",
 			GEN_DIR .. "osd/modules/debugger/qt/deviceswindow.moc.cpp",
 			GEN_DIR .. "osd/modules/debugger/qt/deviceinformationwindow.moc.cpp",
-			GEN_DIR .. "osd/modules/debugger/qt/termwindow.moc.cpp",
 		}
 		defines {
 			"USE_QTDEBUG=1",
@@ -391,7 +388,6 @@ function qtdebuggerbuild()
 			{ MAME_DIR .. "src/osd/modules/debugger/qt/breakpointswindow.h",        GEN_DIR .. "osd/modules/debugger/qt/breakpointswindow.moc.cpp", { },        { MOC .. "$(MOCINCPATH) -b emu.h $(<) -o $(@)" }},
 			{ MAME_DIR .. "src/osd/modules/debugger/qt/deviceswindow.h",            GEN_DIR .. "osd/modules/debugger/qt/deviceswindow.moc.cpp", { },            { MOC .. "$(MOCINCPATH) -b emu.h $(<) -o $(@)" }},
 			{ MAME_DIR .. "src/osd/modules/debugger/qt/deviceinformationwindow.h",  GEN_DIR .. "osd/modules/debugger/qt/deviceinformationwindow.moc.cpp", { },{ MOC .. "$(MOCINCPATH) -b emu.h $(<) -o $(@)" }},
-			{ MAME_DIR .. "src/osd/modules/debugger/qt/termwindow.h",               GEN_DIR .. "osd/modules/debugger/qt/termwindow.moc.cpp", { },           { MOC .. "$(MOCINCPATH) -b emu.h $(<) -o $(@)" }},
 
 		}
 

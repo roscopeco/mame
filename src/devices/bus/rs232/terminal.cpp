@@ -3,15 +3,8 @@
 #include "emu.h"
 #include "terminal.h"
 
-static serial_terminal_device *serial_intf = nullptr;
-extern void osd_term_write(uint8_t data);
-
-void osd_send_key(uint8_t key)
-{
-	serial_intf->send_key(key);
-}
 serial_terminal_device::serial_terminal_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
-	: device_t(mconfig, SERIAL_TERMINAL, tag, owner, clock)
+	: generic_terminal_device(mconfig, SERIAL_TERMINAL, tag, owner, clock, TERMINAL_WIDTH, TERMINAL_HEIGHT)
 	, device_buffered_serial_interface(mconfig, *this)
 	, device_rs232_port_interface(mconfig, *this)
 	, m_rs232_txbaud(*this, "RS232_TXBAUD")
@@ -20,10 +13,11 @@ serial_terminal_device::serial_terminal_device(const machine_config &mconfig, co
 	, m_rs232_parity(*this, "RS232_PARITY")
 	, m_rs232_stopbits(*this, "RS232_STOPBITS")
 {
-	serial_intf = this;
 }
 
 static INPUT_PORTS_START(serial_terminal)
+	PORT_INCLUDE(generic_terminal)
+
 	PORT_RS232_BAUD("RS232_TXBAUD", RS232_BAUD_9600, "TX Baud", serial_terminal_device, update_serial)
 	PORT_RS232_BAUD("RS232_RXBAUD", RS232_BAUD_9600, "RX Baud", serial_terminal_device, update_serial)
 	PORT_RS232_DATABITS("RS232_DATABITS", RS232_DATABITS_8, "Data Bits", serial_terminal_device, update_serial)
@@ -31,14 +25,10 @@ static INPUT_PORTS_START(serial_terminal)
 	PORT_RS232_STOPBITS("RS232_STOPBITS", RS232_STOPBITS_1, "Stop Bits", serial_terminal_device, update_serial)
 INPUT_PORTS_END
 
-void serial_terminal_device::device_start()
-{
-}
 ioport_constructor serial_terminal_device::device_input_ports() const
 {
 	return INPUT_PORTS_NAME(serial_terminal);
 }
-
 
 WRITE_LINE_MEMBER(serial_terminal_device::update_serial)
 {
@@ -69,6 +59,8 @@ WRITE_LINE_MEMBER(serial_terminal_device::update_serial)
 
 void serial_terminal_device::device_reset()
 {
+	generic_terminal_device::device_reset();
+
 	update_serial(0);
 }
 
@@ -84,7 +76,7 @@ void serial_terminal_device::tra_callback()
 
 void serial_terminal_device::received_byte(uint8_t byte)
 {
-	osd_term_write(byte);
+	term_write(byte);
 }
 
 DEFINE_DEVICE_TYPE(SERIAL_TERMINAL, serial_terminal_device, "serial_terminal", "Serial Terminal")
