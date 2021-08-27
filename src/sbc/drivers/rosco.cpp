@@ -132,7 +132,7 @@ void rosco_state::rosco(machine_config &config)
 	m_maincpu->set_addrmap(AS_PROGRAM, &rosco_state::rosco_map);
 	m_maincpu->set_addrmap(m68000_base_device::AS_CPU_SPACE, &rosco_state::cpu_space_map);
 
-	MC68901(config, m_mfp, 8_MHz_XTAL);
+	MC68901(config, m_mfp, 10_MHz_XTAL);
 	m_mfp->set_timer_clock(3.6864_MHz_XTAL);
 	m_mfp->out_so_cb().set("rs232", FUNC(rs232_port_device::write_txd));
 	m_mfp->out_tdo_cb().set(m_mfp, FUNC(mc68901_device::rc_w));
