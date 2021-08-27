@@ -2425,8 +2425,8 @@ if (BUSES["A2BUS"]~=null) then
 		MAME_DIR .. "src/devices/bus/a2bus/a2memexp.h",
 		MAME_DIR .. "src/devices/bus/a2bus/a2midi.cpp",
 		MAME_DIR .. "src/devices/bus/a2bus/a2midi.h",
-		MAME_DIR .. "src/devices/bus/a2bus/a2mockingboard.cpp",
-		MAME_DIR .. "src/devices/bus/a2bus/a2mockingboard.h",
+--		MAME_DIR .. "src/devices/bus/a2bus/a2mockingboard.cpp",
+--		MAME_DIR .. "src/devices/bus/a2bus/a2mockingboard.h",
 		MAME_DIR .. "src/devices/bus/a2bus/a2parprn.cpp",
 		MAME_DIR .. "src/devices/bus/a2bus/a2parprn.h",
 		MAME_DIR .. "src/devices/bus/a2bus/a2pic.cpp",
@@ -2715,8 +2715,8 @@ if (BUSES["RS232"]~=null) then
 		MAME_DIR .. "src/devices/bus/rs232/exorterm.h",
 		MAME_DIR .. "src/devices/bus/rs232/rs232_sync_io.cpp",
 		MAME_DIR .. "src/devices/bus/rs232/rs232_sync_io.h",
-		MAME_DIR .. "src/devices/bus/rs232/mboardd.cpp",
-		MAME_DIR .. "src/devices/bus/rs232/mboardd.h",
+--		MAME_DIR .. "src/devices/bus/rs232/mboardd.cpp",
+--		MAME_DIR .. "src/devices/bus/rs232/mboardd.h",
 	}
 end
 
