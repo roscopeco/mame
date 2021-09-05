@@ -8,15 +8,17 @@
 
 #pragma once
 
-#include "emuopts.h"
-#include "bus/ti99/ti99defs.h"
-#include "machine/tmc0430.h"
-#include "softlist_dev.h"
 #include "gromport.h"
-#include "unzip.h"
-#include "xmlfile.h"
 
-namespace bus { namespace ti99 { namespace gromport {
+#include "machine/tmc0430.h"
+
+#include "emuopts.h"
+#include "softlist_dev.h"
+
+#include "utilfwd.h"
+
+
+namespace bus::ti99::gromport {
 
 class ti99_cartridge_pcb;
 
@@ -65,9 +67,9 @@ class ti99_cartridge_device : public device_t, public device_image_interface
 public:
 	ti99_cartridge_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
 
-	DECLARE_READ8Z_MEMBER(readz);
+	void readz(offs_t offset, uint8_t *value);
 	void write(offs_t offset, uint8_t data);
-	DECLARE_READ8Z_MEMBER(crureadz);
+	void crureadz(offs_t offset, uint8_t *value);
 	void cruwrite(offs_t offset, uint8_t data);
 
 	DECLARE_WRITE_LINE_MEMBER(ready_line);
@@ -138,7 +140,7 @@ private:
 	public:
 		rpk_reader(const pcb_type *types) : m_types(types) { }
 
-		rpk *open(emu_options &options, const char *filename, const char *system_name);
+		rpk *open(emu_options &options, util::core_file &file, const char *system_name);
 
 	private:
 		int find_file(util::archive_file &zip, const char *filename, uint32_t crc);
@@ -171,21 +173,21 @@ private:
 	class rpk_socket
 	{
 	public:
-		rpk_socket(const char *id, int length, uint8_t *contents);
-		rpk_socket(const char *id, int length, uint8_t *contents, std::string &&pathname);
+		rpk_socket(const char *id, int length, std::unique_ptr<uint8_t []> &&contents);
+		rpk_socket(const char *id, int length, std::unique_ptr<uint8_t []> &&contents, std::string &&pathname);
 		~rpk_socket() {}
 
 		const char*     id() { return m_id; }
 		int             get_content_length() { return m_length; }
-		uint8_t*          get_contents() { return m_contents; }
+		uint8_t*          get_contents() { return m_contents.get(); }
 		bool            persistent_ram() { return !m_pathname.empty(); }
 		const char*     get_pathname() { return m_pathname.c_str(); }
-		void            cleanup() { if (m_contents != nullptr) global_free_array(m_contents); }
+		void            cleanup() { m_contents.reset(); }
 
 	private:
 		const char*     m_id;
 		uint32_t          m_length;
-		uint8_t*          m_contents;
+		std::unique_ptr<uint8_t []> m_contents;
 		const std::string m_pathname;
 	};
 
@@ -212,9 +214,9 @@ public:
 	virtual ~ti99_cartridge_pcb() { }
 
 protected:
-	virtual DECLARE_READ8Z_MEMBER(readz);
+	virtual void readz(offs_t offset, uint8_t *value);
 	virtual void write(offs_t offset, uint8_t data);
-	virtual DECLARE_READ8Z_MEMBER(crureadz);
+	virtual void crureadz(offs_t offset, uint8_t *value);
 	virtual void cruwrite(offs_t offset, uint8_t data);
 
 	DECLARE_WRITE_LINE_MEMBER(romgq_line);
@@ -237,6 +239,7 @@ protected:
 	int                 m_grom_size;
 	int                 m_rom_size;
 	int                 m_ram_size;
+	int                 m_bank_mask;
 
 	uint8_t*              m_rom_ptr;
 	uint8_t*              m_ram_ptr;
@@ -262,7 +265,7 @@ public:
 class ti99_paged12k_cartridge : public ti99_cartridge_pcb
 {
 public:
-	DECLARE_READ8Z_MEMBER(readz) override;
+	void readz(offs_t offset, uint8_t *value) override;
 	void write(offs_t offset, uint8_t data) override;
 };
 
@@ -271,7 +274,7 @@ public:
 class ti99_paged16k_cartridge : public ti99_cartridge_pcb
 {
 public:
-	DECLARE_READ8Z_MEMBER(readz) override;
+	void readz(offs_t offset, uint8_t *value) override;
 	void write(offs_t offset, uint8_t data) override;
 };
 
@@ -280,7 +283,7 @@ public:
 class ti99_paged7_cartridge : public ti99_cartridge_pcb
 {
 public:
-	DECLARE_READ8Z_MEMBER(readz) override;
+	void readz(offs_t offset, uint8_t *value) override;
 	void write(offs_t offset, uint8_t data) override;
 };
 
@@ -289,7 +292,7 @@ public:
 class ti99_minimem_cartridge : public ti99_cartridge_pcb
 {
 public:
-	DECLARE_READ8Z_MEMBER(readz) override;
+	void readz(offs_t offset, uint8_t *value) override;
 	void write(offs_t offset, uint8_t data) override;
 };
 
@@ -298,9 +301,9 @@ public:
 class ti99_super_cartridge : public ti99_cartridge_pcb
 {
 public:
-	DECLARE_READ8Z_MEMBER(readz) override;
+	void readz(offs_t offset, uint8_t *value) override;
 	void write(offs_t offset, uint8_t data) override;
-	DECLARE_READ8Z_MEMBER(crureadz) override;
+	void crureadz(offs_t offset, uint8_t *value) override;
 	void cruwrite(offs_t offset, uint8_t data) override;
 };
 
@@ -309,7 +312,7 @@ public:
 class ti99_mbx_cartridge : public ti99_cartridge_pcb
 {
 public:
-	DECLARE_READ8Z_MEMBER(readz) override;
+	void readz(offs_t offset, uint8_t *value) override;
 	void write(offs_t offset, uint8_t data) override;
 };
 
@@ -318,7 +321,7 @@ public:
 class ti99_paged379i_cartridge : public ti99_cartridge_pcb
 {
 public:
-	DECLARE_READ8Z_MEMBER(readz) override;
+	void readz(offs_t offset, uint8_t *value) override;
 	void write(offs_t offset, uint8_t data) override;
 private:
 	int     get_paged379i_bank(int rompage);
@@ -329,7 +332,7 @@ private:
 class ti99_paged378_cartridge : public ti99_cartridge_pcb
 {
 public:
-	DECLARE_READ8Z_MEMBER(readz) override;
+	void readz(offs_t offset, uint8_t *value) override;
 	void write(offs_t offset, uint8_t data) override;
 };
 
@@ -338,7 +341,7 @@ public:
 class ti99_paged377_cartridge : public ti99_cartridge_pcb
 {
 public:
-	DECLARE_READ8Z_MEMBER(readz) override;
+	void readz(offs_t offset, uint8_t *value) override;
 	void write(offs_t offset, uint8_t data) override;
 };
 
@@ -347,9 +350,9 @@ public:
 class ti99_pagedcru_cartridge : public ti99_cartridge_pcb
 {
 public:
-	DECLARE_READ8Z_MEMBER(readz) override;
+	void readz(offs_t offset, uint8_t *value) override;
 	void write(offs_t offset, uint8_t data) override;
-	DECLARE_READ8Z_MEMBER(crureadz) override;
+	void crureadz(offs_t offset, uint8_t *value) override;
 	void cruwrite(offs_t offset, uint8_t data) override;
 };
 
@@ -360,9 +363,9 @@ class ti99_gromemu_cartridge : public ti99_cartridge_pcb
 public:
 	ti99_gromemu_cartridge(): m_waddr_LSB(false), m_grom_selected(false), m_grom_read_mode(false), m_grom_address_mode(false)
 	{  m_grom_address = 0; }
-	DECLARE_READ8Z_MEMBER(readz) override;
+	void readz(offs_t offset, uint8_t *value) override;
 	void write(offs_t offset, uint8_t data) override;
-	DECLARE_READ8Z_MEMBER(gromemureadz);
+	void gromemureadz(offs_t offset, uint8_t *value);
 	void gromemuwrite(offs_t offset, uint8_t data);
 	void set_gromlines(line_state mline, line_state moline, line_state gsq) override;
 
@@ -372,7 +375,8 @@ private:
 	bool    m_grom_read_mode;
 	bool    m_grom_address_mode;
 };
-} } } // end namespace bus::ti99::gromport
+
+} // end namespace bus::ti99::gromport
 
 DECLARE_DEVICE_TYPE_NS(TI99_CART, bus::ti99::gromport, ti99_cartridge_device)
 

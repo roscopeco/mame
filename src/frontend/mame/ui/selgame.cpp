@@ -24,13 +24,14 @@
 #include "luaengine.h"
 #include "mame.h"
 
-#include "audit.h"
+#include "corestr.h"
 #include "drivenum.h"
 #include "emuopts.h"
 #include "rendutil.h"
 #include "romload.h"
 #include "softlist_dev.h"
 #include "uiinput.h"
+#include "unicode.h"
 
 #include <atomic>
 #include <condition_variable>
@@ -265,7 +266,7 @@ menu_select_game::menu_select_game(mame_ui_manager &mui, render_container &conta
 		}
 
 		emu_file file(ui().options().ui_path(), OPEN_FLAG_READ);
-		if (file.open_ram(fake_ini.c_str(), fake_ini.size()) == osd_file::error::NONE)
+		if (!file.open_ram(fake_ini.c_str(), fake_ini.size()))
 		{
 			m_persistent_data.filter_data().load_ini(file);
 			file.close();
@@ -556,7 +557,7 @@ void menu_select_game::populate(float &customtop, float &custombottom)
 					cloneof = false;
 			}
 
-			item_append(elem.driver->type.fullname(), "", (cloneof) ? (FLAGS_UI | FLAG_INVERT) : FLAGS_UI, (void *)elem.driver);
+			item_append(elem.driver->type.fullname(), (cloneof) ? (FLAGS_UI | FLAG_INVERT) : FLAGS_UI, (void *)elem.driver);
 			curitem++;
 		}
 	}
@@ -581,7 +582,7 @@ void menu_select_game::populate(float &customtop, float &custombottom)
 								cloneof = false;
 						}
 
-						item_append(info.longname, "", cloneof ? (FLAGS_UI | FLAG_INVERT) : FLAGS_UI, (void *)&info);
+						item_append(info.longname, cloneof ? (FLAGS_UI | FLAG_INVERT) : FLAGS_UI, (void *)&info);
 					}
 					else
 					{
@@ -599,12 +600,12 @@ void menu_select_game::populate(float &customtop, float &custombottom)
 	// add special items
 	if (stack_has_special_main_menu())
 	{
-		item_append(_("Configure Options"), "", FLAGS_UI, (void *)(uintptr_t)CONF_OPTS);
-		item_append(_("Configure Machine"), "", FLAGS_UI, (void *)(uintptr_t)CONF_MACHINE);
+		item_append(_("Configure Options"), FLAGS_UI, (void *)(uintptr_t)CONF_OPTS);
+		item_append(_("Configure Machine"), FLAGS_UI, (void *)(uintptr_t)CONF_MACHINE);
 		skip_main_items = 2;
 		if (machine().options().plugins())
 		{
-			item_append(_("Plugins"), "", FLAGS_UI, (void *)(uintptr_t)CONF_PLUGINS);
+			item_append(_("Plugins"), FLAGS_UI, (void *)(uintptr_t)CONF_PLUGINS);
 			skip_main_items++;
 		}
 	}
@@ -651,7 +652,7 @@ void menu_select_game::build_available_list()
 		char const *src;
 
 		// build a name for it
-		for (src = dir->name; *src != 0 && *src != '.' && dst < &drivername[ARRAY_LENGTH(drivername) - 1]; ++src)
+		for (src = dir->name; *src != 0 && *src != '.' && dst < &drivername[std::size(drivername) - 1]; ++src)
 			*dst++ = tolower(uint8_t(*src));
 
 		*dst = 0;
@@ -786,32 +787,33 @@ void menu_select_game::inkey_select(const event *menu_event)
 	else
 	{
 		// anything else is a driver
-
-		// audit the game first to see if we're going to work
 		driver_enumerator enumerator(machine().options(), *driver);
 		enumerator.next();
+
+		// if there are software entries, show a software selection menu
+		for (software_list_device &swlistdev : software_list_device_enumerator(enumerator.config()->root_device()))
+		{
+			if (!swlistdev.get_info().empty())
+			{
+				menu::stack_push<menu_select_software>(ui(), container(), *driver);
+				return;
+			}
+		}
+
+		// audit the system ROMs first to see if we're going to work
 		media_auditor auditor(enumerator);
 		media_auditor::summary const summary = auditor.audit_media(AUDIT_VALIDATE_FAST);
 
 		// if everything looks good, schedule the new driver
-		if (summary == media_auditor::CORRECT || summary == media_auditor::BEST_AVAILABLE || summary == media_auditor::NONE_NEEDED)
+		if (audit_passed(summary))
 		{
-			for (software_list_device &swlistdev : software_list_device_iterator(enumerator.config()->root_device()))
-			{
-				if (!swlistdev.get_info().empty())
-				{
-					menu::stack_push<menu_select_software>(ui(), container(), *driver);
-					return;
-				}
-			}
-
 			if (!select_bios(*driver, false))
 				launch_system(*driver);
 		}
 		else
 		{
 			// otherwise, display an error
-			set_error(reset_options::REMEMBER_REF, make_error_text(media_auditor::NOTFOUND != summary, auditor));
+			set_error(reset_options::REMEMBER_REF, make_system_audit_fail_text(auditor, summary));
 		}
 	}
 }
@@ -858,23 +860,25 @@ void menu_select_game::inkey_select_favorite(const event *menu_event)
 	}
 	else if (ui_swinfo->startempty == 1)
 	{
-		// audit the game first to see if we're going to work
 		driver_enumerator enumerator(machine().options(), *ui_swinfo->driver);
 		enumerator.next();
+
+		// if there are software entries, show a software selection menu
+		for (software_list_device &swlistdev : software_list_device_enumerator(enumerator.config()->root_device()))
+		{
+			if (!swlistdev.get_info().empty())
+			{
+				menu::stack_push<menu_select_software>(ui(), container(), *ui_swinfo->driver);
+				return;
+			}
+		}
+
+		// audit the system ROMs first to see if we're going to work
 		media_auditor auditor(enumerator);
 		media_auditor::summary const summary = auditor.audit_media(AUDIT_VALIDATE_FAST);
 
-		if (summary == media_auditor::CORRECT || summary == media_auditor::BEST_AVAILABLE || summary == media_auditor::NONE_NEEDED)
+		if (audit_passed(summary))
 		{
-			for (software_list_device &swlistdev : software_list_device_iterator(enumerator.config()->root_device()))
-			{
-				if (!swlistdev.get_info().empty())
-				{
-					menu::stack_push<menu_select_software>(ui(), container(), *ui_swinfo->driver);
-					return;
-				}
-			}
-
 			// if everything looks good, schedule the new driver
 			if (!select_bios(*ui_swinfo->driver, false))
 			{
@@ -885,29 +889,39 @@ void menu_select_game::inkey_select_favorite(const event *menu_event)
 		else
 		{
 			// otherwise, display an error
-			set_error(reset_options::REMEMBER_REF, make_error_text(media_auditor::NOTFOUND != summary, auditor));
+			set_error(reset_options::REMEMBER_REF, make_system_audit_fail_text(auditor, summary));
 		}
 	}
 	else
 	{
-		// first validate
+		// first audit the system ROMs
 		driver_enumerator drv(machine().options(), *ui_swinfo->driver);
 		media_auditor auditor(drv);
 		drv.next();
-		software_list_device *swlist = software_list_device::find_by_name(*drv.config(), ui_swinfo->listname);
-		const software_info *swinfo = swlist->find(ui_swinfo->shortname);
-
-		media_auditor::summary const summary = auditor.audit_software(*swlist, *swinfo, AUDIT_VALIDATE_FAST);
-
-		if (summary == media_auditor::CORRECT || summary == media_auditor::BEST_AVAILABLE || summary == media_auditor::NONE_NEEDED)
+		media_auditor::summary const sysaudit = auditor.audit_media(AUDIT_VALIDATE_FAST);
+		if (!audit_passed(sysaudit))
 		{
-			if (!select_bios(*ui_swinfo, false) && !select_part(*swinfo, *ui_swinfo))
-				launch_system(drv.driver(), *ui_swinfo, ui_swinfo->part);
+			set_error(reset_options::REMEMBER_REF, make_system_audit_fail_text(auditor, sysaudit));
 		}
 		else
 		{
-			// otherwise, display an error
-			set_error(reset_options::REMEMBER_POSITION, make_error_text(media_auditor::NOTFOUND != summary, auditor));
+			// now audit the software
+			software_list_device *swlist = software_list_device::find_by_name(*drv.config(), ui_swinfo->listname);
+			const software_info *swinfo = swlist->find(ui_swinfo->shortname);
+
+			media_auditor::summary const swaudit = auditor.audit_software(*swlist, *swinfo, AUDIT_VALIDATE_FAST);
+
+			if (audit_passed(swaudit))
+			{
+				reselect_last::reselect(true);
+				if (!select_bios(*ui_swinfo, false) && !select_part(*swinfo, *ui_swinfo))
+					launch_system(drv.driver(), *ui_swinfo, ui_swinfo->part);
+			}
+			else
+			{
+				// otherwise, display an error
+				set_error(reset_options::REMEMBER_REF, make_software_audit_fail_text(auditor, swaudit));
+			}
 		}
 	}
 }
@@ -1159,7 +1173,8 @@ void menu_select_game::general_info(const game_driver *driver, std::string &buff
 	str << ((flags.machine_flags() & machine_flags::MECHANICAL)        ? _("Mechanical Machine\tYes\n")         : _("Mechanical Machine\tNo\n"));
 	str << ((flags.machine_flags() & machine_flags::REQUIRES_ARTWORK)  ? _("Requires Artwork\tYes\n")           : _("Requires Artwork\tNo\n"));
 	str << ((flags.machine_flags() & machine_flags::CLICKABLE_ARTWORK) ? _("Requires Clickable Artwork\tYes\n") : _("Requires Clickable Artwork\tNo\n"));
-	str << ((flags.machine_flags() & machine_flags::NO_COCKTAIL)       ? _("Support Cocktail\tYes\n")           : _("Support Cocktail\tNo\n"));
+	if (flags.machine_flags() & machine_flags::NO_COCKTAIL)
+		str << _("Support Cocktail\tNo\n");
 	str << ((flags.machine_flags() & machine_flags::IS_BIOS_ROOT)      ? _("Driver is BIOS\tYes\n")             : _("Driver is BIOS\tNo\n"));
 	str << ((flags.machine_flags() & machine_flags::SUPPORTS_SAVE)     ? _("Support Save\tYes\n")               : _("Support Save\tNo\n"));
 	str << ((flags.machine_flags() & ORIENTATION_SWAP_XY)              ? _("Screen Orientation\tVertical\n")    : _("Screen Orientation\tHorizontal\n"));
@@ -1184,14 +1199,14 @@ void menu_select_game::general_info(const game_driver *driver, std::string &buff
 		media_auditor::summary summary_samples = auditor.audit_samples();
 
 		// if everything looks good, schedule the new driver
-		if (summary == media_auditor::CORRECT || summary == media_auditor::BEST_AVAILABLE || summary == media_auditor::NONE_NEEDED)
+		if (audit_passed(summary))
 			str << _("ROM Audit Result\tOK\n");
 		else
 			str << _("ROM Audit Result\tBAD\n");
 
 		if (summary_samples == media_auditor::NONE_NEEDED)
 			str << _("Samples Audit Result\tNone Needed\n");
-		else if (summary_samples == media_auditor::CORRECT || summary_samples == media_auditor::BEST_AVAILABLE)
+		else if (audit_passed(summary_samples))
 			str << _("Samples Audit Result\tOK\n");
 		else
 			str << _("Samples Audit Result\tBAD\n");
@@ -1244,12 +1259,12 @@ render_texture *menu_select_game::get_icon_texture(int linenum, void *selectedre
 
 		bitmap_argb32 tmp;
 		emu_file snapfile(std::string(m_icon_paths), OPEN_FLAG_READ);
-		if (snapfile.open(std::string(driver->name) + ".ico") == osd_file::error::NONE)
+		if (!snapfile.open(std::string(driver->name) + ".ico"))
 		{
 			render_load_ico_highest_detail(snapfile, tmp);
 			snapfile.close();
 		}
-		if (!tmp.valid() && cloneof && (snapfile.open(std::string(driver->parent) + ".ico") == osd_file::error::NONE))
+		if (!tmp.valid() && cloneof && !snapfile.open(std::string(driver->parent) + ".ico"))
 		{
 			render_load_ico_highest_detail(snapfile, tmp);
 			snapfile.close();
@@ -1294,7 +1309,7 @@ bool menu_select_game::load_available_machines()
 {
 	// try to load available drivers from file
 	emu_file file(ui().options().ui_path(), OPEN_FLAG_READ);
-	if (file.open(std::string(emulator_info::get_configname()) + "_avail.ini") != osd_file::error::NONE)
+	if (file.open(std::string(emulator_info::get_configname()) + "_avail.ini"))
 		return false;
 
 	char rbuf[MAX_CHAR_INFO];
@@ -1315,8 +1330,7 @@ bool menu_select_game::load_available_machines()
 	std::unordered_set<std::string> available;
 	while (file.gets(rbuf, MAX_CHAR_INFO))
 	{
-		readbuf = rbuf;
-		strtrimspace(readbuf);
+		readbuf = strtrimspace(rbuf);
 
 		if (readbuf.empty() || ('#' == readbuf[0])) // ignore empty lines and line comments
 			;
@@ -1347,7 +1361,7 @@ bool menu_select_game::load_available_machines()
 void menu_select_game::load_custom_filters()
 {
 	emu_file file(ui().options().ui_path(), OPEN_FLAG_READ);
-	if (file.open(util::string_format("custom_%s_filter.ini", emulator_info::get_configname())) == osd_file::error::NONE)
+	if (!file.open(util::string_format("custom_%s_filter.ini", emulator_info::get_configname())))
 	{
 		machine_filter::ptr flt(machine_filter::create(file, m_persistent_data.filter_data()));
 		if (flt)
@@ -1442,7 +1456,7 @@ void menu_select_game::filter_selected()
 					if (machine_filter::CUSTOM == new_type)
 					{
 						emu_file file(ui().options().ui_path(), OPEN_FLAG_WRITE | OPEN_FLAG_CREATE | OPEN_FLAG_CREATE_PATHS);
-						if (file.open(util::string_format("custom_%s_filter.ini", emulator_info::get_configname())) == osd_file::error::NONE)
+						if (!file.open(util::string_format("custom_%s_filter.ini", emulator_info::get_configname())))
 						{
 							filter.save_ini(file, 0);
 							file.close();
@@ -1452,20 +1466,6 @@ void menu_select_game::filter_selected()
 					reset(reset_options::SELECT_FIRST);
 				});
 	}
-}
-
-
-std::string menu_select_game::make_error_text(bool summary, media_auditor const &auditor)
-{
-	std::ostringstream str;
-	str << _("The selected machine is missing one or more required ROM or CHD images. Please select a different machine.\n\n");
-	if (summary)
-	{
-		auditor.summarize(nullptr, &str);
-		str << "\n";
-	}
-	str << _("Press any key to continue.");
-	return str.str();
 }
 
 } // namespace ui

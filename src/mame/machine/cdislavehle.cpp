@@ -23,7 +23,7 @@ TODO:
 #define LOG_READS       (1 << 2)
 #define LOG_WRITES      (1 << 3)
 #define LOG_UNKNOWNS    (1 << 4)
-#define LOG_ALL			(LOG_IRQS | LOG_COMMANDS | LOG_READS | LOG_WRITES | LOG_UNKNOWNS)
+#define LOG_ALL         (LOG_IRQS | LOG_COMMANDS | LOG_READS | LOG_WRITES | LOG_UNKNOWNS)
 
 #define VERBOSE         (0)
 #include "logmacro.h"
@@ -124,7 +124,7 @@ uint16_t cdislave_hle_device::slave_r(offs_t offset)
 	if (m_channel[offset].m_out_count)
 	{
 		uint8_t ret = m_channel[offset].m_out_buf[m_channel[offset].m_out_index];
-		LOGMASKED(LOG_READS, "slave_r: Channel %d: %d, %02x\n", offset, m_channel[offset].m_out_index, ret);
+		LOGMASKED(LOG_READS, "%s: slave_r: Channel %d: %d, %02x\n", machine().describe_context(), offset, m_channel[offset].m_out_index, ret);
 		if (m_channel[offset].m_out_index == 0)
 		{
 			switch (m_channel[offset].m_out_cmd)

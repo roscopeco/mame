@@ -66,16 +66,17 @@ Notes:
 
 #include "emu.h"
 #include "cpu/m68000/m68000.h"
-#include "sound/okim6295.h"
-#include "sound/ym2413.h"
-#include "sound/3812intf.h"
 #include "sound/ics2115.h"
+#include "sound/okim6295.h"
+#include "sound/ymopl.h"
 #include "machine/nvram.h"
 #include "machine/timer.h"
 #include "emupal.h"
 #include "screen.h"
 #include "speaker.h"
 
+
+namespace {
 
 class igs011_state : public driver_device
 {
@@ -394,10 +395,10 @@ u32 igs011_state::screen_update(screen_device &screen, bitmap_ind16 &bitmap, con
 
 #ifdef MAME_DEBUG
 			if ((layer_enable != -1) && (pri_addr == 0xff))
-				bitmap.pix16(y, x) = m_palette->black_pen();
+				bitmap.pix(y, x) = m_palette->black_pen();
 			else
 #endif
-				bitmap.pix16(y, x) = m_layer[l][scr_addr] | (l << 8);
+				bitmap.pix(y, x) = m_layer[l][scr_addr] | (l << 8);
 		}
 	}
 	return 0;
@@ -618,6 +619,9 @@ void igs011_state::igs011_blit_flags_w(offs_t offset, u16 data, u16 mem_mask)
 
 void igs011_state::machine_start()
 {
+	m_prot1_addr = 0;
+	m_lhb_irq_enable = 0;
+
 	save_item(NAME(m_igs_dips_sel));
 	save_item(NAME(m_igs_input_sel));
 	save_item(NAME(m_igs_hopper));
@@ -1215,7 +1219,7 @@ void igs011_state::prot_mem_range_set()
 	sp.install_read_handler (m_prot1_addr + 8, m_prot1_addr + 9, read16smo_delegate(*this, FUNC(igs011_state::igs011_prot1_r)));
 }
 /*
-READ16_MEMBER(igs011_state::igs011_prot_fake_r)
+u16 igs011_state::igs011_prot_fake_r(offs_t offset)
 {
     switch (offset)
     {
@@ -1429,7 +1433,7 @@ void igs011_state::igs012_prot_reset_w(u16 data)
 	m_igs012_prot_mode = 0;
 }
 /*
-READ16_MEMBER(igs011_state::igs012_prot_fake_r)
+u16 igs011_state::igs012_prot_fake_r(offs_t offset)
 {
     switch (offset)
     {
@@ -1743,7 +1747,7 @@ u16 igs011_state::lhb2_igs003_r()
 			if (~m_igs_input_sel & 0x04)    return m_io_key[2]->read();
 			if (~m_igs_input_sel & 0x08)    return m_io_key[3]->read();
 			if (~m_igs_input_sel & 0x10)    return m_io_key[4]->read();
-			/* fall through */
+			[[fallthrough]];
 		default:
 			logerror("%06x: warning, reading with igs003_reg = %02x\n", m_maincpu->pc(), m_igs003_reg);
 			break;
@@ -1878,7 +1882,7 @@ u16 igs011_state::xymg_igs003_r()
 			if (~m_igs_input_sel & 0x04)    return m_io_key[2]->read();
 			if (~m_igs_input_sel & 0x08)    return m_io_key[3]->read();
 			if (~m_igs_input_sel & 0x10)    return m_io_key[4]->read();
-			/* fall through */
+			[[fallthrough]];
 
 		case 0x20:  return 0x49;
 		case 0x21:  return 0x47;
@@ -4904,6 +4908,8 @@ ROM_START( xymg )
 	ROM_LOAD( "m0202.snd", 0x00000, 0x80000, CRC(220949aa) SHA1(1e0dba168a0687d32aaaed42714ae24358f4a3e7) ) // 2 banks
 	ROM_CONTINUE(          0x00000, 0x80000 ) // 1ST+2ND IDENTICAL
 ROM_END
+
+} // Anonymous namespace
 
 
 /***************************************************************************

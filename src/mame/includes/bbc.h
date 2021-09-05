@@ -91,8 +91,7 @@ public:
 		, m_rtc(*this, "rtc")
 		, m_i2cmem(*this, "i2cmem")
 		, m_fdc(*this, "fdc")
-		, m_wd1770(*this, "wd1770")
-		, m_wd1772(*this, "wd1772")
+		, m_wd_fdc(*this, "wd_fdc")
 		, m_rom(*this, "romslot%u", 0U)
 		, m_cart(*this, "cartslot%u", 1U)
 		, m_region_mos(*this, "mos")
@@ -101,6 +100,7 @@ public:
 		, m_bank2(*this, "bank2")
 		, m_bankdev(*this, "bankdev")
 		, m_bbcconfig(*this, "BBCCONFIG")
+		, m_motor_led(*this, "motor_led")
 	{ }
 
 	enum class monitor_type
@@ -111,7 +111,7 @@ public:
 		AMBER
 	};
 
-	DECLARE_FLOPPY_FORMATS(floppy_formats);
+	static void floppy_formats(format_registration &fr);
 
 	uint8_t bbc_ram_r(offs_t offset);
 	void bbc_ram_w(offs_t offset, uint8_t data);
@@ -143,7 +143,6 @@ public:
 	void bbcmc_paged_w(offs_t offset, uint8_t data);
 	void bbcbp_drive_control_w(uint8_t data);
 	void bbcm_drive_control_w(uint8_t data);
-	void bbcmc_drive_control_w(uint8_t data);
 	void serial_ula_w(uint8_t data);
 	void video_ula_w(offs_t offset, uint8_t data);
 	uint8_t bbc_fe_r() { return 0xfe; };
@@ -160,8 +159,6 @@ public:
 	DECLARE_WRITE_LINE_MEMBER(speech_rsq_w);
 	DECLARE_WRITE_LINE_MEMBER(speech_wsq_w);
 	DECLARE_WRITE_LINE_MEMBER(kbd_enable_w);
-	DECLARE_WRITE_LINE_MEMBER(capslock_led_w);
-	DECLARE_WRITE_LINE_MEMBER(shiftlock_led_w);
 	uint8_t via_system_porta_r();
 	void via_system_porta_w(uint8_t data);
 	uint8_t via_system_portb_r();
@@ -248,8 +245,7 @@ protected:
 	optional_device<mc146818_device> m_rtc;
 	optional_device<i2cmem_device> m_i2cmem;
 	optional_device<bbc_fdc_slot_device> m_fdc;
-	optional_device<wd1770_device> m_wd1770;
-	optional_device<wd1772_device> m_wd1772;
+	optional_device<wd_fdc_digital_device_base> m_wd_fdc;
 	optional_device_array<bbc_romslot_device, 16> m_rom;
 	optional_device_array<bbc_cartslot_device, 2> m_cart;
 
@@ -259,6 +255,8 @@ protected:
 	optional_memory_bank m_bank2; //           bbcbp bbcbp128 bbcm
 	optional_device<address_map_bank_device> m_bankdev; //    bbcm
 	optional_ioport m_bbcconfig;
+
+	output_finder<> m_motor_led;
 
 	int m_romsel;           // This is the latch that holds the sideways ROM bank to read
 	int m_paged_ram;        // BBC B+ memory handling
@@ -407,6 +405,7 @@ public:
 	void abc110(machine_config &config);
 	void acw443(machine_config &config);
 	void abc310(machine_config &config);
+	void cfa3000bp(machine_config &config);
 	void econx25(machine_config &config);
 	void reutapm(machine_config &config);
 
@@ -423,7 +422,10 @@ protected:
 class bbcm_state : public bbc_state
 {
 public:
-	using bbc_state::bbc_state;
+	bbcm_state(const machine_config &mconfig, device_type type, const char *tag)
+		: bbc_state(mconfig, type, tag)
+		, m_power_led(*this, "power_led")
+	{ }
 
 	void bbcm(machine_config &config);
 	void bbcmt(machine_config &config);
@@ -435,9 +437,14 @@ public:
 	void daisy(machine_config &config);
 	void discmon(machine_config &config);
 	void discmate(machine_config &config);
+	void mpc800(machine_config& config);
+	void mpc900(machine_config& config);
+	void mpc900gx(machine_config& config);
 	void bbcmc(machine_config &config);
 	void pro128s(machine_config &config);
 	void autoc15(machine_config &config);
+
+	static void mpc_prisma_default(device_t *device);
 
 protected:
 	virtual void machine_start() override;
@@ -450,6 +457,8 @@ protected:
 	void bbcmc_bankdev(address_map &map);
 	void autoc15_bankdev(address_map &map);
 	void bbcm_fetch(address_map &map);
+
+	output_finder<> m_power_led;
 };
 
 

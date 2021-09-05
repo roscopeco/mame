@@ -19,7 +19,7 @@
 #include "machine/74259.h"
 #include "machine/tms9902.h"
 
-namespace bus { namespace ti99 { namespace peb {
+namespace bus::ti99::peb {
 
 class ti_pio_attached_device;
 class ti_rs232_attached_device;
@@ -31,10 +31,10 @@ class ti_rs232_pio_device : public device_t, public device_ti99_peribox_card_int
 
 public:
 	ti_rs232_pio_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
-	DECLARE_READ8Z_MEMBER(readz) override;
+	void readz(offs_t offset, uint8_t *value) override;
 	void write(offs_t offset, uint8_t data) override;
 
-	DECLARE_READ8Z_MEMBER(crureadz) override;
+	void crureadz(offs_t offset, uint8_t *value) override;
 	void cruwrite(offs_t offset, uint8_t data) override;
 
 protected:
@@ -176,7 +176,7 @@ protected:
 	void    call_unload() override;
 };
 
-} } } // end namespace bus::ti99::peb
+} // end namespace bus::ti99::peb
 
 DECLARE_DEVICE_TYPE_NS(TI99_RS232,     bus::ti99::peb, ti_rs232_pio_device)
 DECLARE_DEVICE_TYPE_NS(TI99_RS232_DEV, bus::ti99::peb, ti_rs232_attached_device)

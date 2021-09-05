@@ -36,8 +36,8 @@
 #include "includes/segaipt.h"
 
 #include "machine/nvram.h"
-#include "sound/2612intf.h"
 #include "sound/rf5c68.h"
+#include "sound/ymopn.h"
 #include "speaker.h"
 
 /*************************************
@@ -203,7 +203,7 @@ void segas18_state::misc_outputs_w(uint8_t data)
 }
 
 
-READ16_MEMBER( segas18_state::misc_io_r )
+uint16_t segas18_state::misc_io_r(address_space &space, offs_t offset, uint16_t mem_mask)
 {
 	offset &= 0x1fff;
 	switch (offset & (0x3000/2))
@@ -222,12 +222,12 @@ READ16_MEMBER( segas18_state::misc_io_r )
 	}
 
 	if (!m_custom_io_r.isnull())
-		return m_custom_io_r(space, offset, mem_mask);
+		return m_custom_io_r(offset);
 	logerror("%06X:misc_io_r - unknown read access to address %04X\n", m_maincpu->pc(), offset * 2);
 	return m_mapper->open_bus_r();
 }
 
-WRITE16_MEMBER( segas18_state::misc_io_w )
+void segas18_state::misc_io_w(address_space &space, offs_t offset, uint16_t data, uint16_t mem_mask)
 {
 	offset &= 0x1fff;
 	switch (offset & (0x3000/2))
@@ -254,7 +254,7 @@ WRITE16_MEMBER( segas18_state::misc_io_w )
 
 	if (!m_custom_io_w.isnull())
 	{
-		m_custom_io_w(space, offset, data, mem_mask);
+		m_custom_io_w(offset, data);
 		return;
 	}
 	logerror("%06X:misc_io_w - unknown write access to address %04X = %04X & %04X\n", m_maincpu->pc(), offset * 2, data, mem_mask);
@@ -281,7 +281,7 @@ void segas18_state::rom_5874_bank_w(uint8_t data)
 }
 
 
-WRITE16_MEMBER( segas18_state::rom_5987_bank_w )
+void segas18_state::rom_5987_bank_w(address_space &space, offs_t offset, uint16_t data, uint16_t mem_mask)
 {
 	if (!ACCESSING_BITS_0_7)
 		return;
@@ -309,7 +309,7 @@ WRITE16_MEMBER( segas18_state::rom_5987_bank_w )
 	}
 }
 
-WRITE16_MEMBER( segas18_state::rom_837_7525_bank_w )
+void segas18_state::rom_837_7525_bank_w(address_space &space, offs_t offset, uint16_t data, uint16_t mem_mask)
 {
 	if (!ACCESSING_BITS_0_7)
 		return;
@@ -343,7 +343,7 @@ WRITE16_MEMBER( segas18_state::rom_837_7525_bank_w )
  *
  *************************************/
 
-READ16_MEMBER( segas18_state::ddcrew_custom_io_r )
+uint16_t segas18_state::ddcrew_custom_io_r(offs_t offset)
 {
 	switch (offset)
 	{
@@ -367,7 +367,7 @@ READ16_MEMBER( segas18_state::ddcrew_custom_io_r )
  *
  *************************************/
 
-READ16_MEMBER( segas18_state::lghost_custom_io_r )
+uint16_t segas18_state::lghost_custom_io_r(offs_t offset)
 {
 	uint16_t result;
 	switch (offset)
@@ -383,7 +383,7 @@ READ16_MEMBER( segas18_state::lghost_custom_io_r )
 	return m_mapper->open_bus_r();
 }
 
-WRITE16_MEMBER( segas18_state::lghost_custom_io_w )
+void segas18_state::lghost_custom_io_w(offs_t offset, uint16_t data)
 {
 	uint8_t pos_value_x, pos_value_y;
 
@@ -579,7 +579,7 @@ void segas18_state::lghost_gun_recoil_w(uint8_t data)
  *
  *************************************/
 
-READ16_MEMBER( segas18_state::wwally_custom_io_r )
+uint16_t segas18_state::wwally_custom_io_r(offs_t offset)
 {
 	if (offset >= 0x3000/2 && offset < 0x3018/2)
 		return m_upd4701[(offset & 0x0018/2) >> 2]->read_xy(offset & 0x0006/2);
@@ -588,7 +588,7 @@ READ16_MEMBER( segas18_state::wwally_custom_io_r )
 }
 
 
-WRITE16_MEMBER( segas18_state::wwally_custom_io_w )
+void segas18_state::wwally_custom_io_w(offs_t offset, uint16_t data)
 {
 	if (offset >= 0x3000/2 && offset < 0x3018/2)
 		m_upd4701[(offset & 0x0018/2) >> 2]->reset_xy_r();
@@ -1375,7 +1375,7 @@ void segas18_state::system18(machine_config &config)
 	ym3438_device &ym2(YM3438(config, "ym2", 8000000));
 	ym2.add_route(ALL_OUTPUTS, "mono", 0.40);
 
-	rf5c68_device &rfsnd(RF5C68(config, "rfsnd", 10000000));
+	rf5c68_device &rfsnd(RF5C68(config, "rfsnd", 10000000)); // ASSP (RF)5C68A
 	rfsnd.add_route(ALL_OUTPUTS, "mono", 1.0);
 	rfsnd.set_addrmap(0, &segas18_state::pcm_map);
 }
@@ -2297,7 +2297,7 @@ ROM_END
     game No. 833-8830-02
     pcb  No. 837-8832-02 (171-5873-02b)
     ROM  No. 834-8831-02 (171-5987a)
-    CPU Hiatchi FD1094 317-0196
+    CPU Hitachi FD1094 317-0196
 */
 ROM_START( desertbr )
 	ROM_REGION( 0x200000, "maincpu", 0 ) // 68000 code - custom CPU 317-0196
@@ -2367,7 +2367,7 @@ ROM_END
     game No. 833-8830?
     pcb  No. 837-8832? (171-5873B)
     ROM  No. 834-8831 (171-5987A)
-    CPU Hiatchi FD1094 317-0194
+    CPU Hitachi FD1094 317-0194
 */
 ROM_START( desertbrj )
 	ROM_REGION( 0x200000, "maincpu", 0 ) // 68000 code - custom CPU 317-0196
@@ -2463,7 +2463,7 @@ ROM_START( hamaway )
 	ROM_LOAD16_BYTE( "c18.bin", 0x080001, 0x40000, CRC(0f8fe8bb) SHA1(e6f68442b8d4def29b106458496a47344f70d511) )
 	ROM_LOAD16_BYTE( "11.bin",  0x080000, 0x40000, CRC(2b5eacbc) SHA1(ba3690501588b9c88a31022b44bc3c82b44ae26b) )
 	ROM_LOAD16_BYTE( "c19.bin", 0x100001, 0x40000, CRC(3c616caa) SHA1(d48a6239b7a52ac13971f7513a65a17af492bfdf) ) // 11xxxxxxxxxxxxxxxx = 0xFF
-	ROM_LOAD16_BYTE( "12.bin",  0x100000, 0x40000, CRC(c7bbd579) SHA1(ab87bfdad66ea241cb23c9bbfea05f5a1574d6c9) ) // 1ST AND 2ND HALF IDENTICAL (but ok, because pairing ROM has no data in the 2nd half anyway)
+	ROM_LOAD16_BYTE( "12.bin",  0x100000, 0x40000, CRC(c7bbd579) SHA1(ab87bfdad66ea241cb23c9bbfea05f5a1574d6c9) ) // 1ST AND 2ND HALF IDENTICAL (but ok, because pairing ROM has no data in the 2nd half anyway), also found with the second half filled with 0xff
 
 	ROM_REGION( 0x200000, "soundcpu", ROMREGION_ERASEFF ) // sound CPU
 	ROM_LOAD( "c16.bin", 0x000000, 0x40000, CRC(913cc18c) SHA1(4bf4ec14937586c3ae77fcad57dcb21f6433ef81) )
@@ -3187,21 +3187,21 @@ void segas18_state::init_hamaway()
 void segas18_state::init_ddcrew()
 {
 	init_generic_5987();
-	m_custom_io_r = read16_delegate(*this, FUNC(segas18_state::ddcrew_custom_io_r));
+	m_custom_io_r = read16sm_delegate(*this, FUNC(segas18_state::ddcrew_custom_io_r));
 }
 
 void segas18_state::init_lghost()
 {
 	init_generic_5987();
-	m_custom_io_r = read16_delegate(*this, FUNC(segas18_state::lghost_custom_io_r));
-	m_custom_io_w = write16_delegate(*this, FUNC(segas18_state::lghost_custom_io_w));
+	m_custom_io_r = read16sm_delegate(*this, FUNC(segas18_state::lghost_custom_io_r));
+	m_custom_io_w = write16sm_delegate(*this, FUNC(segas18_state::lghost_custom_io_w));
 }
 
 void segas18_state::init_wwally()
 {
 	init_generic_5987();
-	m_custom_io_r = read16_delegate(*this, FUNC(segas18_state::wwally_custom_io_r));
-	m_custom_io_w = write16_delegate(*this, FUNC(segas18_state::wwally_custom_io_w));
+	m_custom_io_r = read16sm_delegate(*this, FUNC(segas18_state::wwally_custom_io_r));
+	m_custom_io_w = write16sm_delegate(*this, FUNC(segas18_state::wwally_custom_io_w));
 }
 
 

@@ -16,7 +16,7 @@
 #include "ui/inifile.h"
 #include "ui/selector.h"
 
-#include "audit.h"
+#include "corestr.h"
 #include "drivenum.h"
 #include "emuopts.h"
 #include "mame.h"
@@ -24,6 +24,7 @@
 #include "softlist_dev.h"
 #include "uiinput.h"
 #include "luaengine.h"
+#include "unicode.h"
 
 #include <algorithm>
 #include <iterator>
@@ -249,19 +250,7 @@ void menu_select_software::populate(float &customtop, float &custombottom)
 		icon.second.texture.reset();
 
 	uint32_t flags_ui = FLAG_LEFT_ARROW | FLAG_RIGHT_ARROW;
-	m_has_empty_start = true;
 	int old_software = -1;
-
-	// FIXME: why does it do this relatively expensive operation every time?
-	machine_config config(m_driver, machine().options());
-	for (device_image_interface &image : image_interface_iterator(config.root_device()))
-	{
-		if (!image.filename() && image.must_be_loaded())
-		{
-			m_has_empty_start = false;
-			break;
-		}
-	}
 
 	// start with an empty list
 	m_displaylist.clear();
@@ -272,7 +261,7 @@ void menu_select_software::populate(float &customtop, float &custombottom)
 	{
 		// if the device can be loaded empty, add an item
 		if (m_has_empty_start)
-			item_append("[Start empty]", "", flags_ui, (void *)&m_swinfo[0]);
+			item_append("[Start empty]", flags_ui, (void *)&m_swinfo[0]);
 
 		if (m_filters.end() == flt)
 			std::copy(std::next(m_swinfo.begin()), m_swinfo.end(), std::back_inserter(m_displaylist));
@@ -340,6 +329,17 @@ void menu_select_software::build_software_list()
 
 	machine_config config(m_driver, machine().options());
 
+	// see if any media devices require an image to be loaded
+	m_has_empty_start = true;
+	for (device_image_interface &image : image_interface_enumerator(config.root_device()))
+	{
+		if (!image.filename() && image.must_be_loaded())
+		{
+			m_has_empty_start = false;
+			break;
+		}
+	}
+
 	// iterate through all software lists
 	std::vector<std::size_t> orphans;
 	struct orphan_less
@@ -351,7 +351,7 @@ void menu_select_software::build_software_list()
 		bool operator()(std::size_t a, std::size_t b) const { return swinfo[a].parentname < swinfo[b].parentname; };
 	};
 	orphan_less const orphan_cmp{ m_swinfo };
-	for (software_list_device &swlist : software_list_device_iterator(config.root_device()))
+	for (software_list_device &swlist : software_list_device_enumerator(config.root_device()))
 	{
 		m_filter_data.add_list(swlist.list_name(), swlist.description());
 		check_for_icons(swlist.list_name().c_str());
@@ -381,7 +381,7 @@ void menu_select_software::build_software_list()
 			{
 				char const *instance_name(nullptr);
 				char const *type_name(nullptr);
-				for (device_image_interface &image : image_interface_iterator(config.root_device()))
+				for (device_image_interface &image : image_interface_enumerator(config.root_device()))
 				{
 					char const *const interface = image.image_interface();
 					if (interface && part.matches_interface(interface))
@@ -424,7 +424,7 @@ void menu_select_software::build_software_list()
 	}
 
 	std::string searchstr, curpath;
-	for (auto & elem : m_filter_data.list_names())
+	for (auto &elem : m_filter_data.list_names())
 	{
 		path_iterator path(machine().options().media_path());
 		while (path.next(curpath))
@@ -438,13 +438,12 @@ void menu_select_software::build_software_list()
 			{
 				std::string name;
 				if (dir->type == osd::directory::entry::entry_type::FILE)
-					name = core_filename_extract_base(dir->name, true);
+					name = strmakelower(core_filename_extract_base(dir->name, true));
 				else if (dir->type == osd::directory::entry::entry_type::DIR && strcmp(dir->name, ".") != 0)
-					name = dir->name;
+					name = strmakelower(dir->name);
 				else
 					continue;
 
-				strmakelower(name);
 				for (auto & yelem : m_swinfo)
 					if (yelem.shortname == name && yelem.listname == elem)
 					{
@@ -468,8 +467,17 @@ void menu_select_software::build_software_list()
 void menu_select_software::inkey_select(const event *menu_event)
 {
 	ui_software_info *ui_swinfo = (ui_software_info *)menu_event->itemref;
+	driver_enumerator drivlist(machine().options(), *ui_swinfo->driver);
+	media_auditor auditor(drivlist);
+	drivlist.next();
 
-	if (ui_swinfo->startempty == 1)
+	// audit the system ROMs first to see if we're going to work
+	media_auditor::summary const sysaudit = auditor.audit_media(AUDIT_VALIDATE_FAST);
+	if (!audit_passed(sysaudit))
+	{
+		set_error(reset_options::REMEMBER_REF, make_system_audit_fail_text(auditor, sysaudit));
+	}
+	else if (ui_swinfo->startempty == 1)
 	{
 		if (!select_bios(*ui_swinfo->driver, true))
 		{
@@ -479,16 +487,12 @@ void menu_select_software::inkey_select(const event *menu_event)
 	}
 	else
 	{
-		// first validate
-		driver_enumerator drivlist(machine().options(), *ui_swinfo->driver);
-		media_auditor auditor(drivlist);
-		drivlist.next();
+		// now audit the software
 		software_list_device *swlist = software_list_device::find_by_name(*drivlist.config(), ui_swinfo->listname);
 		const software_info *swinfo = swlist->find(ui_swinfo->shortname);
+		media_auditor::summary const swaudit = auditor.audit_software(*swlist, *swinfo, AUDIT_VALIDATE_FAST);
 
-		media_auditor::summary const summary = auditor.audit_software(*swlist, *swinfo, AUDIT_VALIDATE_FAST);
-
-		if (summary == media_auditor::CORRECT || summary == media_auditor::BEST_AVAILABLE || summary == media_auditor::NONE_NEEDED)
+		if (audit_passed(swaudit))
 		{
 			if (!select_bios(*ui_swinfo, false) && !select_part(*swinfo, *ui_swinfo))
 			{
@@ -499,15 +503,7 @@ void menu_select_software::inkey_select(const event *menu_event)
 		else
 		{
 			// otherwise, display an error
-			std::ostringstream str;
-			str << _("The selected software is missing one or more required files. Please select a different software.\n\n");
-			if (media_auditor::NOTFOUND != summary)
-			{
-				auditor.summarize(nullptr, &str);
-				str << "\n";
-			}
-			str << _("Press any key to continue."),
-			set_error(reset_options::REMEMBER_POSITION, str.str());
+			set_error(reset_options::REMEMBER_REF, make_software_audit_fail_text(auditor, swaudit));
 		}
 	}
 }
@@ -521,7 +517,7 @@ void menu_select_software::load_sw_custom_filters()
 {
 	// attempt to open the output file
 	emu_file file(ui().options().ui_path(), OPEN_FLAG_READ);
-	if (file.open(util::string_format("custom_%s_filter.ini", m_driver.name)) == osd_file::error::NONE)
+	if (!file.open(util::string_format("custom_%s_filter.ini", m_driver.name)))
 	{
 		software_filter::ptr flt(software_filter::create(file, m_filter_data));
 		if (flt)
@@ -597,12 +593,12 @@ render_texture *menu_select_software::get_icon_texture(int linenum, void *select
 
 		bitmap_argb32 tmp;
 		emu_file snapfile(std::string(paths->second), OPEN_FLAG_READ);
-		if (snapfile.open(std::string(swinfo->shortname) + ".ico") == osd_file::error::NONE)
+		if (!snapfile.open(std::string(swinfo->shortname) + ".ico"))
 		{
 			render_load_ico_highest_detail(snapfile, tmp);
 			snapfile.close();
 		}
-		if (!tmp.valid() && !swinfo->parentname.empty() && (snapfile.open(std::string(swinfo->parentname) + ".ico") == osd_file::error::NONE))
+		if (!tmp.valid() && !swinfo->parentname.empty() && !snapfile.open(std::string(swinfo->parentname) + ".ico"))
 		{
 			render_load_ico_highest_detail(snapfile, tmp);
 			snapfile.close();
@@ -672,7 +668,7 @@ void menu_select_software::filter_selected()
 					if (software_filter::CUSTOM == new_type)
 					{
 						emu_file file(ui().options().ui_path(), OPEN_FLAG_WRITE | OPEN_FLAG_CREATE | OPEN_FLAG_CREATE_PATHS);
-						if (file.open(util::string_format("custom_%s_filter.ini", m_driver.name)) == osd_file::error::NONE)
+						if (!file.open(util::string_format("custom_%s_filter.ini", m_driver.name)))
 						{
 							filter.save_ini(file, 0);
 							file.close();

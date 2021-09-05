@@ -232,20 +232,15 @@ void p1_state::p1_ppi2_porta_w(uint8_t data)
 	// NMI DISABLE
 	if (BIT((data ^ m_video.color_select_68), 3))
 	{
-		program.unmap_readwrite(0xb8000, 0xbbfff, 0);
 		if (BIT(data, 3))
-		{
-			program.install_readwrite_bank(0xb8000, 0xbbfff, "bank11");
-		}
+			program.install_writeonly(0xb8000, 0xbbfff, m_video.videoram_base.get());
 		else
-		{
-			program.install_read_bank(0xb8000, 0xbbfff, "bank11");
 			program.install_write_handler(0xb8000, 0xbbfff, write8sm_delegate(*this, FUNC(p1_state::p1_vram_w)));
-		}
 	}
 	// DISPLAY BANK
 	if (BIT((data ^ m_video.color_select_68), 6))
 	{
+
 		if (BIT(data, 6))
 			m_video.videoram = m_video.videoram_base.get() + 0x4000;
 		else
@@ -323,15 +318,13 @@ void p1_state::set_palette_luts(void)
 
 POISK1_UPDATE_ROW(p1_state::cga_gfx_2bpp_update_row)
 {
-	const rgb_t *palette = m_palette->palette()->entry_list_raw();
-	uint32_t *p = &bitmap.pix32(ra);
-	uint16_t odd, offset;
-	int i;
+	rgb_t const *const palette = m_palette->palette()->entry_list_raw();
+	uint32_t *p = &bitmap.pix(ra);
 
 	if (ra == 0) LOG("cga_gfx_2bpp_update_row\n");
-	odd = (ra & 1) << 13;
-	offset = (ma & 0x1fff) | odd;
-	for (i = 0; i < stride; i++)
+	uint16_t odd = (ra & 1) << 13;
+	uint16_t offset = (ma & 0x1fff) | odd;
+	for (int i = 0; i < stride; i++)
 	{
 		uint8_t data = videoram[ offset++ ];
 
@@ -350,16 +343,14 @@ POISK1_UPDATE_ROW(p1_state::cga_gfx_2bpp_update_row)
 
 POISK1_UPDATE_ROW(p1_state::cga_gfx_1bpp_update_row)
 {
-	const rgb_t *palette = m_palette->palette()->entry_list_raw();
-	uint32_t *p = &bitmap.pix32(ra);
+	rgb_t const *const palette = m_palette->palette()->entry_list_raw();
+	uint32_t *p = &bitmap.pix(ra);
 	uint8_t fg = 15, bg = BG_COLOR(m_video.color_select_68);
-	uint16_t odd, offset;
-	int i;
 
 	if (ra == 0) LOG("cga_gfx_1bpp_update_row bg %d\n", bg);
-	odd = (ra & 1) << 13;
-	offset = (ma & 0x1fff) | odd;
-	for (i = 0; i < stride; i++)
+	uint16_t odd = (ra & 1) << 13;
+	uint16_t offset = (ma & 0x1fff) | odd;
+	for (int i = 0; i < stride; i++)
 	{
 		uint8_t data = videoram[ offset++ ];
 
@@ -382,20 +373,18 @@ POISK1_UPDATE_ROW(p1_state::cga_gfx_1bpp_update_row)
 
 POISK1_UPDATE_ROW(p1_state::poisk1_gfx_1bpp_update_row)
 {
-	const rgb_t *palette = m_palette->palette()->entry_list_raw();
-	uint32_t *p = &bitmap.pix32(ra);
-	uint8_t fg, bg = BG_COLOR(m_video.color_select_68);
-	uint16_t odd, offset;
-	int i;
+	rgb_t const *const palette = m_palette->palette()->entry_list_raw();
+	uint32_t *p = &bitmap.pix(ra);
+	uint8_t bg = BG_COLOR(m_video.color_select_68);
 
 	if (ra == 0) LOG("poisk1_gfx_1bpp_update_row bg %d\n", bg);
-	odd = (ra & 1) << 13;
-	offset = (ma & 0x1fff) | odd;
-	for (i = 0; i < stride; i++)
+	uint16_t odd = (ra & 1) << 13;
+	uint16_t offset = (ma & 0x1fff) | odd;
+	for (int i = 0; i < stride; i++)
 	{
 		uint8_t data = videoram[ offset++ ];
 
-		fg = (data & 0x80) ? ( (m_video.color_select_68 & 0x20) ? 10 : 11 ) : 15; // XXX
+		uint8_t fg = (data & 0x80) ? ( (m_video.color_select_68 & 0x20) ? 10 : 11 ) : 15; // XXX
 		*p = palette[bg]; p++;
 		*p = palette[( data & 0x40 ) ? fg : bg ]; p++;
 		*p = palette[( data & 0x20 ) ? fg : bg ]; p++;
@@ -423,10 +412,7 @@ void p1_state::video_start()
 	m_video.videoram = m_video.videoram_base.get();
 	m_video.stride = 80;
 
-	space.install_readwrite_bank(0xb8000, 0xbbfff, "bank11");
-	machine().root_device().membank("bank11")->set_base(m_video.videoram);
-	space.install_readwrite_bank(0xbc000, 0xbffff, "bank12");
-	machine().root_device().membank("bank12")->set_base(m_video.videoram + 0x4000);
+	space.install_ram(0xb8000, 0xbffff, m_video.videoram);
 }
 
 uint32_t p1_state::screen_update(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect)
@@ -599,8 +585,7 @@ void p1_state::init_poisk1()
 {
 	address_space &program = m_maincpu->space(AS_PROGRAM);
 
-	program.install_readwrite_bank(0, m_ram->size() - 1, "bank10");
-	membank("bank10")->set_base(m_ram->pointer());
+	program.install_ram(0, m_ram->size() - 1, m_ram->pointer());
 }
 
 void p1_state::machine_start()

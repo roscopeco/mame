@@ -313,7 +313,7 @@ static INPUT_PORTS_START( acrnsys )
 //PORT_BIT(0x01, IP_ACTIVE_LOW, IPT_KEYBOARD) PORT_NAME("REPT")         PORT_CODE(KEYCODE_RCONTROL)   PORT_CHAR(UCHAR_MAMEKEY(RCONTROL))
 
 	PORT_START("BRK")
-	PORT_BIT(0x01, IP_ACTIVE_LOW, IPT_KEYBOARD) PORT_NAME("BREAK") PORT_CODE(KEYCODE_F12) PORT_CHAR(UCHAR_MAMEKEY(F12)) PORT_CHANGED_MEMBER(DEVICE_SELF, acrnsys_state, trigger_reset, 0)
+	PORT_BIT(0x01, IP_ACTIVE_LOW, IPT_OTHER) PORT_NAME("BREAK") PORT_CODE(KEYCODE_F12) PORT_CHANGED_MEMBER(DEVICE_SELF, acrnsys_state, trigger_reset, 0)
 INPUT_PORTS_END
 
 
@@ -388,7 +388,7 @@ void acrnsys_state::a6502a(machine_config &config)
 
 	INPUT_MERGER_ANY_HIGH(config, m_irqs).output_handler().set_inputline(m_maincpu, M6502_IRQ_LINE);
 
-	VIA6522(config, m_via6522, 4_MHz_XTAL / 4);
+	MOS6522(config, m_via6522, 4_MHz_XTAL / 4);
 	m_via6522->readpa_handler().set(FUNC(acrnsys_state::kbd_r));
 	//m_via6522->cb2_handler().set(FUNC(acrnsys_state::cass_w));
 	m_via6522->irq_handler().set(m_irqs, FUNC(input_merger_device::in_w<0>));
@@ -409,7 +409,7 @@ void acrnsys_state::a6809(machine_config &config)
 
 	INPUT_MERGER_ANY_HIGH(config, m_irqs).output_handler().set_inputline(m_maincpu, M6809_IRQ_LINE);
 
-	VIA6522(config, m_via6522, 4_MHz_XTAL / 4);
+	MOS6522(config, m_via6522, 4_MHz_XTAL / 4);
 	m_via6522->writepa_handler().set("cent_data_out", FUNC(output_latch_device::write));
 	m_via6522->ca2_handler().set("centronics", FUNC(centronics_device::write_strobe));
 	//m_via6522->cb2_handler().set(FUNC(acrnsys_state::cass_w));
@@ -588,8 +588,8 @@ ROM_END
 /* Driver */
 
 /*    YEAR  NAME           PARENT    COMPAT  MACHINE        INPUT    CLASS          INIT        COMPANY  FULLNAME                     FLAGS */
-COMP( 1980, acrnsys2,      acrnsys3, 0,      acrnsys2,      acrnsys, acrnsys_state, empty_init, "Acorn", "Acorn System 2",            MACHINE_NO_SOUND_HW )
-COMP( 1980, acrnsys3,      0,        0,      acrnsys3,      acrnsys, acrnsys_state, empty_init, "Acorn", "Acorn System 3 (6502 CPU)", MACHINE_NO_SOUND_HW )
-COMP( 1980, acrnsys3_6809, acrnsys3, 0,      acrnsys3_6809, acrnsys, acrnsys_state, empty_init, "Acorn", "Acorn System 3 (6809 CPU)", MACHINE_NO_SOUND_HW )
-COMP( 1980, acrnsys4,      acrnsys3, 0,      acrnsys4,      acrnsys, acrnsys_state, empty_init, "Acorn", "Acorn System 4",            MACHINE_NO_SOUND_HW )
-COMP( 1982, acrnsys5,      0,        0,      acrnsys5,      acrnsys, acrnsys_state, empty_init, "Acorn", "Acorn System 5",            MACHINE_NO_SOUND_HW )
+COMP( 1980, acrnsys2,      acrnsys3, 0,      acrnsys2,      acrnsys, acrnsys_state, empty_init, "Acorn", "Acorn System 2",            MACHINE_NO_SOUND_HW | MACHINE_SUPPORTS_SAVE )
+COMP( 1980, acrnsys3,      0,        0,      acrnsys3,      acrnsys, acrnsys_state, empty_init, "Acorn", "Acorn System 3 (6502 CPU)", MACHINE_NO_SOUND_HW | MACHINE_SUPPORTS_SAVE )
+COMP( 1980, acrnsys3_6809, acrnsys3, 0,      acrnsys3_6809, acrnsys, acrnsys_state, empty_init, "Acorn", "Acorn System 3 (6809 CPU)", MACHINE_NO_SOUND_HW | MACHINE_SUPPORTS_SAVE )
+COMP( 1980, acrnsys4,      acrnsys3, 0,      acrnsys4,      acrnsys, acrnsys_state, empty_init, "Acorn", "Acorn System 4",            MACHINE_NO_SOUND_HW | MACHINE_SUPPORTS_SAVE )
+COMP( 1982, acrnsys5,      0,        0,      acrnsys5,      acrnsys, acrnsys_state, empty_init, "Acorn", "Acorn System 5",            MACHINE_NO_SOUND_HW | MACHINE_SUPPORTS_SAVE )

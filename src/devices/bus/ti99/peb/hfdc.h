@@ -27,7 +27,7 @@
 #include "machine/hdc92x4.h"
 #include "machine/ram.h"
 
-namespace bus { namespace ti99 { namespace peb {
+namespace bus::ti99::peb {
 
 /*
     Implementation for modern floppy system.
@@ -37,10 +37,10 @@ class myarc_hfdc_device : public device_t, public device_ti99_peribox_card_inter
 public:
 	myarc_hfdc_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
 
-	DECLARE_READ8Z_MEMBER(readz) override;
+	void readz(offs_t offset, uint8_t *value) override;
 	void write(offs_t offset, uint8_t data) override;
-	DECLARE_SETADDRESS_DBIN_MEMBER(setaddress_dbin) override;
-	DECLARE_READ8Z_MEMBER(crureadz) override;
+	void setaddress_dbin(offs_t offset, int state) override;
+	void crureadz(offs_t offset, uint8_t *value) override;
 	void cruwrite(offs_t offset, uint8_t data) override;
 
 protected:
@@ -62,7 +62,7 @@ private:
 	uint8_t read_buffer();
 	void write_buffer(uint8_t data);
 
-	DECLARE_FLOPPY_FORMATS( floppy_formats );
+	static void floppy_formats(format_registration &fr);
 
 	// Debug accessors
 	void debug_read(offs_t offset, uint8_t* value);
@@ -110,6 +110,12 @@ private:
 
 	// Currently selected hard drive
 	mfm_harddisk_device*    m_current_harddisk;
+
+	// Currently selected floppy disk index
+	int     m_current_floppy_index;
+
+	// Currently selected hard disk index
+	int     m_current_hd_index;
 
 	// True: Access to DIP switch settings, false: access to line states
 	bool    m_see_switches;
@@ -187,7 +193,7 @@ private:
 	int  m_readyflags;
 };
 
-} } } // end namespace bus::ti99::peb
+} // end namespace bus::ti99::peb
 
 DECLARE_DEVICE_TYPE_NS(TI99_HFDC, bus::ti99::peb, myarc_hfdc_device)
 

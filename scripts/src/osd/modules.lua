@@ -82,6 +82,7 @@ function osdmodulesbuild()
 		MAME_DIR .. "src/osd/modules/sound/js_sound.cpp",
 		MAME_DIR .. "src/osd/modules/sound/direct_sound.cpp",
 		MAME_DIR .. "src/osd/modules/sound/pa_sound.cpp",
+		MAME_DIR .. "src/osd/modules/sound/pulse_sound.cpp",
 		MAME_DIR .. "src/osd/modules/sound/coreaudio_sound.cpp",
 		MAME_DIR .. "src/osd/modules/sound/sdl_sound.cpp",
 		MAME_DIR .. "src/osd/modules/sound/xaudio2_sound.cpp",
@@ -161,7 +162,6 @@ function osdmodulesbuild()
 		"__STDC_LIMIT_MACROS",
 		"__STDC_FORMAT_MACROS",
 		"__STDC_CONSTANT_MACROS",
-		"IMGUI_DISABLE_OBSOLETE_FUNCTIONS",
 	}
 
 	files {
@@ -172,46 +172,84 @@ function osdmodulesbuild()
 		MAME_DIR .. "src/osd/modules/render/bgfxutil.h",
 		MAME_DIR .. "src/osd/modules/render/binpacker.cpp",
 		MAME_DIR .. "src/osd/modules/render/bgfx/blendreader.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/blendreader.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/chain.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/chain.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/chainentry.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/chainentry.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/chainentryreader.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/chainentryreader.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/chainmanager.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/chainmanager.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/chainreader.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/chainreader.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/clear.cpp",
 		MAME_DIR .. "src/osd/modules/render/bgfx/clear.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/clearreader.cpp",
 		MAME_DIR .. "src/osd/modules/render/bgfx/clearreader.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/cullreader.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/cullreader.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/depthreader.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/depthreader.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/effect.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/effect.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/effectmanager.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/effectmanager.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/effectreader.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/effectreader.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/entryuniformreader.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/entryuniformreader.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/inputpair.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/inputpair.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/frameparameter.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/frameparameter.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/timeparameter.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/timeparameter.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/paramreader.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/paramreader.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/paramuniform.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/paramuniform.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/paramuniformreader.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/paramuniformreader.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/shadermanager.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/shadermanager.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/slider.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/slider.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/sliderreader.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/sliderreader.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/slideruniform.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/slideruniform.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/slideruniformreader.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/slideruniformreader.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/statereader.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/statereader.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/suppressor.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/suppressor.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/suppressorreader.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/suppressorreader.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/target.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/target.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/targetreader.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/targetreader.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/targetmanager.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/targetmanager.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/texture.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/texture.h",
+		MAME_DIR .. "src/osd/modules/render/bgfx/texturehandleprovider.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/texturemanager.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/texturemanager.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/uniform.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/uniform.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/uniformreader.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/uniformreader.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/valueuniform.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/valueuniform.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/valueuniformreader.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/valueuniformreader.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/view.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/view.h",
 		MAME_DIR .. "src/osd/modules/render/bgfx/writereader.cpp",
+		MAME_DIR .. "src/osd/modules/render/bgfx/writereader.h",
 	}
 	includedirs {
 		MAME_DIR .. "3rdparty/bgfx/examples/common",
@@ -229,6 +267,12 @@ function osdmodulesbuild()
 	else
 		includedirs {
 			ext_includedir("portaudio"),
+		}
+	end
+
+	if _OPTIONS["NO_USE_PULSEAUDIO"]=="1" then
+		defines {
+			"NO_USE_PULSEAUDIO",
 		}
 	end
 
@@ -295,8 +339,6 @@ function qtdebuggerbuild()
 			MAME_DIR .. "src/osd/modules/debugger/qt/deviceinformationwindow.cpp",
 			MAME_DIR .. "src/osd/modules/debugger/qt/deviceinformationwindow.h",
 			MAME_DIR .. "src/osd/modules/debugger/qt/deviceswindow.h",
-			MAME_DIR .. "src/osd/modules/debugger/qt/termwindow.cpp",
-			MAME_DIR .. "src/osd/modules/debugger/qt/termwindow.h",
 			GEN_DIR .. "osd/modules/debugger/qt/debuggerview.moc.cpp",
 			GEN_DIR .. "osd/modules/debugger/qt/windowqt.moc.cpp",
 			GEN_DIR .. "osd/modules/debugger/qt/logwindow.moc.cpp",
@@ -306,7 +348,6 @@ function qtdebuggerbuild()
 			GEN_DIR .. "osd/modules/debugger/qt/breakpointswindow.moc.cpp",
 			GEN_DIR .. "osd/modules/debugger/qt/deviceswindow.moc.cpp",
 			GEN_DIR .. "osd/modules/debugger/qt/deviceinformationwindow.moc.cpp",
-			GEN_DIR .. "osd/modules/debugger/qt/termwindow.moc.cpp",
 		}
 		defines {
 			"USE_QTDEBUG=1",
@@ -347,7 +388,6 @@ function qtdebuggerbuild()
 			{ MAME_DIR .. "src/osd/modules/debugger/qt/breakpointswindow.h",        GEN_DIR .. "osd/modules/debugger/qt/breakpointswindow.moc.cpp", { },        { MOC .. "$(MOCINCPATH) -b emu.h $(<) -o $(@)" }},
 			{ MAME_DIR .. "src/osd/modules/debugger/qt/deviceswindow.h",            GEN_DIR .. "osd/modules/debugger/qt/deviceswindow.moc.cpp", { },            { MOC .. "$(MOCINCPATH) -b emu.h $(<) -o $(@)" }},
 			{ MAME_DIR .. "src/osd/modules/debugger/qt/deviceinformationwindow.h",  GEN_DIR .. "osd/modules/debugger/qt/deviceinformationwindow.moc.cpp", { },{ MOC .. "$(MOCINCPATH) -b emu.h $(<) -o $(@)" }},
-			{ MAME_DIR .. "src/osd/modules/debugger/qt/termwindow.h",               GEN_DIR .. "osd/modules/debugger/qt/termwindow.moc.cpp", { },           { MOC .. "$(MOCINCPATH) -b emu.h $(<) -o $(@)" }},
 
 		}
 
@@ -360,9 +400,9 @@ function qtdebuggerbuild()
 		elseif _OPTIONS["targetos"]=="macosx" then
 			buildoptions {
 				"-F" .. backtick("qmake -query QT_INSTALL_LIBS"),
-				"-isystem /usr/local/opt/qt/lib/QtWidgets.framework/Headers",
-				"-isystem /usr/local/opt/qt/lib/QtGui.framework/Headers",
-				"-isystem /usr/local/opt/qt/lib/QtCore.framework/Headers"
+				"-isystem /usr/local/opt/qt5/lib/QtWidgets.framework/Headers",
+				"-isystem /usr/local/opt/qt5/lib/QtGui.framework/Headers",
+				"-isystem /usr/local/opt/qt5/lib/QtCore.framework/Headers"
 			}
 		else
 			if _OPTIONS["QT_HOME"]~=nil then
@@ -470,6 +510,11 @@ function osdmodulestargetconf()
 		}
 	end
 
+	if _OPTIONS["NO_USE_PULSEAUDIO"]=="0" then
+		links {
+			ext_lib("pulse"),
+		}
+	end
 end
 
 
@@ -544,6 +589,23 @@ if not _OPTIONS["NO_USE_PORTAUDIO"] then
 		_OPTIONS["NO_USE_PORTAUDIO"] = "0"
 	else
 		_OPTIONS["NO_USE_PORTAUDIO"] = "1"
+	end
+end
+
+newoption {
+	trigger = "NO_USE_PULSEAUDIO",
+	description = "Disable PulseAudio interface",
+	allowed = {
+		{ "0",  "Enable PulseAudio"  },
+		{ "1",  "Disable PulseAudio" },
+	},
+}
+
+if not _OPTIONS["NO_USE_PULSEAUDIO"] then
+	if _OPTIONS["targetos"]=="linux" then
+		_OPTIONS["NO_USE_PULSEAUDIO"] = "0"
+	else
+		_OPTIONS["NO_USE_PULSEAUDIO"] = "1"
 	end
 end
 

@@ -360,9 +360,9 @@ uint16_t hd61830_device::draw_scanline(bitmap_ind16 &bitmap, const rectangle &cl
 			if(y >= 0 && y < bitmap.height())
 			{
 				if(((sx * m_hp) + x) >= 0 && ((sx * m_hp) + x) < bitmap.width())
-					bitmap.pix16(y, (sx * m_hp) + x) = BIT(data1, x);
+					bitmap.pix(y, (sx * m_hp) + x) = BIT(data1, x);
 				if(((sx * m_hp) + x + m_hp) >= 0 && ((sx * m_hp) + x + m_hp) < bitmap.width())
-					bitmap.pix16(y, (sx * m_hp) + x + m_hp) = BIT(data2, x);
+					bitmap.pix(y, (sx * m_hp) + x + m_hp) = BIT(data2, x);
 			}
 		}
 	}
@@ -440,7 +440,7 @@ void hd61830_device::draw_char(bitmap_ind16 &bitmap, const rectangle &cliprect, 
 			{
 				// cursor off, character blink
 				if (!cursor)
-					pixel = m_cursor ? pixel : 0;
+					pixel = m_cursor ? 1 : pixel;
 
 				// cursor blink
 				if (cursor && (cl == m_cp))
@@ -454,7 +454,7 @@ void hd61830_device::draw_char(bitmap_ind16 &bitmap, const rectangle &cliprect, 
 			}
 
 			if (sy < screen().height() && sx < screen().width())
-				bitmap.pix16(sy, sx) = pixel;
+				bitmap.pix(sy, sx) = pixel;
 		}
 	}
 }
@@ -483,8 +483,8 @@ void hd61830_device::update_text(bitmap_ind16 &bitmap, const rectangle &cliprect
 			md1 = readbyte(rac2);
 			md2 = readbyte(rac2+1);
 
-			draw_char(bitmap, cliprect, ma, x, y + rows, md1);
-			draw_char(bitmap, cliprect, ma+1, x+1, y + rows, md2);
+			draw_char(bitmap, cliprect, ma + (rows * m_hn), x, y + rows, md1);
+			draw_char(bitmap, cliprect, ma+1 + (rows * m_hn), x+1, y + rows, md2);
 
 			ma+=2;
 			rac1+=2;

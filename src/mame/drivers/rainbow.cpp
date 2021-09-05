@@ -458,14 +458,14 @@ public:
 		m_inp2(*this, "W14"),
 		m_inp3(*this, "W15"),
 		m_inp4(*this, "W18"),
-		m_inp5(*this, "DEC HARD DISK"), // DO NOT CHANGE ORDER
-		m_inp6(*this, "CORVUS HARD DISKS"), // DO NOT CHANGE ORDER
-		m_inp7(*this, "GRAPHICS OPTION"),   // DO NOT CHANGE ORDER
-		m_inp9(*this, "MONO MONITOR TYPE"),
+		m_inp5(*this, "DEC_HARD_DISK"), // DO NOT CHANGE ORDER
+		m_inp6(*this, "CORVUS_HARD_DISKS"), // DO NOT CHANGE ORDER
+		m_inp7(*this, "GRAPHICS_OPTION"),   // DO NOT CHANGE ORDER
+		m_inp9(*this, "MONO_MONITOR_TYPE"),
 		m_inp10(*this, "J17"),
 		m_inp11(*this, "CLIKCLOK"),
 		m_inp12(*this, "WATCHDOG"),
-		m_inp13(*this, "MONITOR CONFIGURATION"),
+		m_inp13(*this, "MONITOR_CONFIGURATION"),
 
 		m_crtc(*this, "vt100_video"),
 
@@ -497,7 +497,9 @@ public:
 		m_palette2(*this, "palette2"), // GDC
 		m_video_ram(*this, "vram"),
 
-		m_digits(*this, "digit%u", 0U)
+		m_digits(*this, "digit%u", 0U),
+		m_leds(*this, "led%u", 1U),
+		m_driveleds(*this, "driveled%u", 0U)
 	{
 	}
 
@@ -586,7 +588,7 @@ protected:
 
 	TIMER_DEVICE_CALLBACK_MEMBER(hd_motor_tick);
 
-	DECLARE_FLOPPY_FORMATS(floppy_formats);
+	static void floppy_formats(format_registration &fr);
 
 	UPD7220_DISPLAY_PIXELS_MEMBER( hgdc_display_pixels );
 	uint16_t vram_r(offs_t offset);
@@ -652,6 +654,8 @@ protected:
 	required_shared_ptr<uint16_t> m_video_ram;
 
 	output_finder<2> m_digits;
+	output_finder<7> m_leds;
+	output_finder<4> m_driveleds;
 
 	void raise_8088_irq(int ref);
 	void lower_8088_irq(int ref);
@@ -830,7 +834,7 @@ UPD7220_DISPLAY_PIXELS_MEMBER( rainbow_base_state::hgdc_display_pixels )
 		for (int xi = 0; xi < 16; xi++) // blank screen when VT102 output active (..)
 		{
 			if (bitmap.cliprect().contains(x + xi, y))
-				bitmap.pix32(y, x + xi) = 0;
+				bitmap.pix(y, x + xi) = 0;
 		}
 		return; // no output from graphics option
 	}
@@ -840,18 +844,18 @@ UPD7220_DISPLAY_PIXELS_MEMBER( rainbow_base_state::hgdc_display_pixels )
 	if (m_gdc_mode_register & GDC_MODE_HIGHRES)
 	{
 		address = ( m_gdc_scroll_buffer[ ((address & 0x7FC0) >> 7) & 0xff ] << 7) |  (address & 0x7F);
-		plane0 = m_video_ram[((address & 0x7fff) + 0x00000) >> 1];
-		plane1 = m_video_ram[((address & 0x7fff) + 0x10000) >> 1];
+		plane0 = m_video_ram[((address & 0x3fff) + 0x0000)];
+		plane1 = m_video_ram[((address & 0x3fff) + 0x8000)];
 		plane2 = plane3 = 0;
 	}
 	else
 	{
 		address = ( m_gdc_scroll_buffer[ ((address & 0x3FC0) >> 7) & 0xff ] << 7) |  (address & 0x7F);
 		// MED.RESOLUTION (4 planes, 4 color bits, 16 color map entries / 16 -or 4- MONOCHROME SHADES)
-		plane0 = m_video_ram[((address & 0x3fff) + 0x00000) >> 1];
-		plane1 = m_video_ram[((address & 0x3fff) + 0x10000) >> 1];
-		plane2 = m_video_ram[((address & 0x3fff) + 0x20000) >> 1];
-		plane3 = m_video_ram[((address & 0x3fff) + 0x30000) >> 1];
+		plane0 = m_video_ram[((address & 0x1fff) + 0x00000)];
+		plane1 = m_video_ram[((address & 0x1fff) + 0x08000)];
+		plane2 = m_video_ram[((address & 0x1fff) + 0x10000)];
+		plane3 = m_video_ram[((address & 0x1fff) + 0x18000)];
 	}
 
 	bool mono = (m_monitor_suggested == MONO_MONITOR) ? true : false; // 1 = MONO, 2 = COLOR, 3 = DUAL MONITOR; 4 = AUTO
@@ -864,16 +868,15 @@ UPD7220_DISPLAY_PIXELS_MEMBER( rainbow_base_state::hgdc_display_pixels )
 			 (BIT(plane3 ,xi) << 3);
 
 		if (bitmap.cliprect().contains(x + xi, y))
-			bitmap.pix32(y, x + xi) = paletteX[mono ? (pen + 16) : pen];
+			bitmap.pix(y, x + xi) = paletteX[mono ? (pen + 16) : pen];
 	}
 }
 
-FLOPPY_FORMATS_MEMBER(rainbow_base_state::floppy_formats)
-FLOPPY_RX50IMG_FORMAT,
-FLOPPY_TD0_FORMAT,
-FLOPPY_IMD_FORMAT,
-FLOPPY_PC_FORMAT
-FLOPPY_FORMATS_END
+void rainbow_base_state::floppy_formats(format_registration &fr)
+{
+	fr.add_pc_formats();
+	fr.add(FLOPPY_RX50IMG_FORMAT);
+}
 
 static void rainbow_floppies(device_slot_interface &device)
 {
@@ -893,6 +896,8 @@ void rainbow_base_state::machine_start()
 	switch_off_timer->adjust(attotime::from_msec(10));
 
 	m_digits.resolve();
+	m_leds.resolve();
+	m_driveleds.resolve();
 
 	m_screen_blank = false;
 
@@ -1093,7 +1098,7 @@ void rainbow_base_state::rainbowz80_io(address_map &map)
 /* DIP switches */
 static INPUT_PORTS_START(rainbow100b_in)
 
-	PORT_START("MONO MONITOR TYPE")
+	PORT_START("MONO_MONITOR_TYPE")
 	PORT_DIPNAME(0x03, 0x03, "MONO MONITOR TYPE")
 	PORT_DIPSETTING(0x01, "WHITE (VR201-A)")
 	PORT_DIPSETTING(0x02, "GREEN (VR201-B)")
@@ -1102,12 +1107,12 @@ static INPUT_PORTS_START(rainbow100b_in)
 	// FLOPPY, BUNDLE, GRAPHICS affect 'system_parameter_r':
 
 	// EXT.COMM.card -or- RD51 HD. controller (marketed later).
-	PORT_START("DEC HARD DISK") // BUNDLE_OPTION
+	PORT_START("DEC_HARD_DISK") // BUNDLE_OPTION
 	PORT_DIPNAME(0x01, 0x00, "DEC HARD DISK (#1)") PORT_TOGGLE
 	PORT_DIPSETTING(0x00, DEF_STR(Off))
 	PORT_DIPSETTING(0x01, DEF_STR(On))
 
-	PORT_START("CORVUS HARD DISKS")
+	PORT_START("CORVUS_HARD_DISKS")
 	PORT_DIPNAME(0x01, 0x00, "CORVUS HARD DISKS (#2 to #5)") PORT_TOGGLE
 	PORT_DIPSETTING(0x00, DEF_STR(Off))
 	PORT_DIPSETTING(0x01, DEF_STR(On))
@@ -1117,7 +1122,7 @@ static INPUT_PORTS_START(rainbow100b_in)
 	PORT_DIPSETTING(0x00, DEF_STR(Off))
 	PORT_DIPSETTING(0x01, DEF_STR(On))
 
-	PORT_START("GRAPHICS OPTION") // GDC
+	PORT_START("GRAPHICS_OPTION") // GDC
 	PORT_DIPNAME(0x01, 0x00, "GRAPHICS OPTION") PORT_TOGGLE
 	PORT_DIPSETTING(0x00, DEF_STR(Off))
 	PORT_DIPSETTING(0x01, DEF_STR(On))
@@ -1154,7 +1159,7 @@ static INPUT_PORTS_START(rainbow100b_in)
 	PORT_DIPSETTING(0x00, DEF_STR(Off))
 	PORT_DIPSETTING(0x01, DEF_STR(On))
 
-	PORT_START("MONITOR CONFIGURATION") // GDC
+	PORT_START("MONITOR_CONFIGURATION") // GDC
 	PORT_DIPNAME(0x0F, 0x04, "MONITOR CONFIGURATION")
 	PORT_DIPSETTING(0x04, "AUTODETECT")
 	PORT_DIPSETTING(0x01, "MONO ONLY / 4 to 16 monochrome shades (single VR-201)")
@@ -1188,7 +1193,7 @@ void rainbow_base_state::machine_reset()
 		hard_disk_file *local_hard_disk;
 		local_hard_disk = rainbow_hdc_file(0); // one hard disk for now.
 
-		output().set_value("led1", 0);
+		m_leds[0] = 0;
 		switch_off_timer->adjust(attotime::from_msec(500));
 
 		if (local_hard_disk)
@@ -1196,7 +1201,7 @@ void rainbow_base_state::machine_reset()
 			hard_disk_info *info;
 			if ((info = hard_disk_get_info(local_hard_disk)))
 			{
-				output().set_value("led1", 1);
+				m_leds[0] = 1;
 
 				uint32_t max_sector = (info->cylinders) * (info->heads) * (info->sectors);
 				popmessage("DEC %u (%3.2f) MB HARD DISK MOUNTED.\nGEOMETRY: %d HEADS (1..%d ARE OK).\n%d CYLINDERS (151 to %d ARE OK).\n%d SECTORS / TRACK (up to %d ARE OK). \n%d BYTES / SECTOR (128 to 1024 ARE OK).\n",
@@ -1251,19 +1256,15 @@ void rainbow_base_state::machine_reset()
 	m_irq_mask = 0;
 
 	// RESET RED LEDs
-	output().set_value("led1", 1);
-	output().set_value("led2", 1);
-	output().set_value("led3", 1);
-	output().set_value("led4", 1);
-	output().set_value("led5", 1);
-	output().set_value("led6", 1);
-	output().set_value("led7", 1);
+	m_leds[0] = 1;
+	m_leds[1] = 1;
+	m_leds[2] = 1;
+	m_leds[3] = 1;
+	m_leds[4] = 1;
+	m_leds[5] = 1;
+	m_leds[6] = 1;
 
-	// GREEN KEYBOARD LEDs (1 = on, 0 = off):
-	output().set_value("led_wait", 0);    // led8
-	output().set_value("led_compose", 0); // led9
-	output().set_value("led_lock", 0);    // led10
-	output().set_value("led_hold", 0);    // led11
+	// GREEN KEYBOARD LEDs (see machine/dec_lk201.cpp)
 }
 
 void rainbow_modela_state::machine_reset()
@@ -1302,13 +1303,13 @@ void rainbow_base_state::device_timer(emu_timer &timer, device_timer_id tid, int
 
 		switch_off_timer->adjust(attotime::never);
 
-		output().set_value("driveled0", 0); // DRIVE 0 (A)
-		output().set_value("driveled1", 0); // DRIVE 1 (B)
-		output().set_value("driveled2", 0); // DRIVE 2 (C)
-		output().set_value("driveled3", 0); // DRIVE 3 (D)
+		m_driveleds[0] = 0; // DRIVE 0 (A)
+		m_driveleds[1] = 0; // DRIVE 1 (B)
+		m_driveleds[2] = 0; // DRIVE 2 (C)
+		m_driveleds[3] = 0; // DRIVE 3 (D)
 
-		output().set_value("led1", 1);  // 1 = OFF (One of the CPU LEDs as drive LED for DEC hard disk)
-		output().set_value("led2", 1);  // 1 = OFF (One of the CPU LEDs as drive LED for Corvus HD)
+		m_leds[0] = 1;  // 1 = OFF (One of the CPU LEDs as drive LED for DEC hard disk)
+		m_leds[1] = 1;  // 1 = OFF (One of the CPU LEDs as drive LED for Corvus HD)
 
 		break; // case 1
 
@@ -1599,7 +1600,7 @@ uint8_t rainbow_modelb_state::rtc_r(offs_t offset)
 		case 0x2004:  // 0xFE004 (MIRROR)
 			if (m_rtc->chip_enable())
 				return (m_rtc->read_data() & 0x01);
-
+			[[fallthrough]]; // FIXME: really?
 		// (RTC ACTIVATION) read magic pattern 0
 		case 0x0100:  // 0xFC100
 		case 0x2100:  // 0xFE100 (MIRROR)
@@ -1637,7 +1638,7 @@ uint8_t rainbow_base_state::corvus_status_r()
 	}
 	else
 	{
-		output().set_value("led2", 0);
+		m_leds[1] = 0;
 		switch_off_timer->adjust(attotime::from_msec(500));
 
 		uint8_t status = m_corvus_hdc->status_r();
@@ -1747,7 +1748,7 @@ WRITE_LINE_MEMBER(rainbow_base_state::hdc_read_sector)
 		if ((state == 0) && (last_state == 1) && (drv == 0))
 		{
 			read_status = 2; //          logerror("\nTRYING TO READ");
-			output().set_value("led1", 0);
+			m_leds[0] = 0;
 			switch_off_timer->adjust(attotime::from_msec(500));
 
 			int hi = (m_hdc->read(0x05)) & 0x07;
@@ -1765,7 +1766,7 @@ WRITE_LINE_MEMBER(rainbow_base_state::hdc_read_sector)
 				if ((info = hard_disk_get_info(local_hard_disk)))
 				{
 					read_status = 4;
-					output().set_value("led1", 1);
+					m_leds[0] = 1;
 
 					// Pointer to info + C + H + S
 					uint32_t lbasector = get_and_print_lbasector(this, info, cylinder, sdh & 0x07, sector_number);
@@ -1816,7 +1817,7 @@ WRITE_LINE_MEMBER(rainbow_base_state::hdc_write_sector)
 
 	if (state == 0 && wg_last == 1 && drv == 0)  // Check correct state transition and DRIVE 0 ....
 	{
-		output().set_value("led1", 0);  // (1 = OFF ) =HARD DISK ACTIVITY =
+		m_leds[0] = 0;  // (1 = OFF ) =HARD DISK ACTIVITY =
 		switch_off_timer->adjust(attotime::from_msec(500));
 
 		if (rainbow_hdc_file(0) != nullptr)
@@ -1853,7 +1854,7 @@ WRITE_LINE_MEMBER(rainbow_base_state::hdc_write_sector)
 int rainbow_base_state::do_write_sector()
 {
 	int feedback = 0; // no error
-	output().set_value("led1", 0); // ON
+	m_leds[0] = 0; // ON
 	switch_off_timer->adjust(attotime::from_msec(500));
 
 	hard_disk_file *local_hard_disk = rainbow_hdc_file(0); // one hard disk for now.
@@ -1864,7 +1865,7 @@ int rainbow_base_state::do_write_sector()
 		if (info)
 		{
 			feedback = 10;
-			output().set_value("led1", 1); // OFF
+			m_leds[0] = 1; // OFF
 
 			uint8_t sdh = (m_hdc->read(0x06));
 
@@ -2007,7 +2008,7 @@ void rainbow_base_state::hd_status_68_w(uint8_t data)
 	//                 1 : see  @ 088D after 'READ_SECTOR_OK'
 	if (data & 0x01)
 	{
-		output().set_value("led1", 0);  // 1 = OFF (One of the CPU LEDs as DRIVE LED) = HARD DISK ACTIVITY =
+		m_leds[0] = 0;  // 1 = OFF (One of the CPU LEDs as DRIVE LED) = HARD DISK ACTIVITY =
 		switch_off_timer->adjust(attotime::from_msec(500));
 
 		m_hdc->buffer_ready(true);
@@ -2075,7 +2076,7 @@ WRITE_LINE_MEMBER(rainbow_base_state::hdc_step)
 {
 	m_hdc_step_latch = true;
 
-	output().set_value("led1", 0);  // 1 = OFF (One of the CPU LEDs as DRIVE LED)  = HARD DISK ACTIVITY =
+	m_leds[0] = 0;  // 1 = OFF (One of the CPU LEDs as DRIVE LED)  = HARD DISK ACTIVITY =
 	switch_off_timer->adjust(attotime::from_msec(500));
 }
 
@@ -2240,10 +2241,10 @@ void rainbow_base_state::comm_control_w(uint8_t data)
 	D6 -D5-D4-D3  <- INTERNAL LED NUMBER (DEC PDF)
 	-4--5--6--7-  <- NUMBERS EMBOSSED ON BACK OF PLASTIC HOUSING (see error chart)
 	*/
-	output().set_value("led4", BIT(data, 5)); // LED "D6"
-	output().set_value("led5", BIT(data, 7)); // LED "D5"
-	output().set_value("led6", BIT(data, 6)); // LED "D4"
-	output().set_value("led7", BIT(data, 4)); // LED "D3"
+	m_leds[3] = BIT(data, 5); // LED "D6"
+	m_leds[4] = BIT(data, 7); // LED "D5"
+	m_leds[5] = BIT(data, 6); // LED "D4"
+	m_leds[6] = BIT(data, 4); // LED "D3"
 }
 
 // 8088 writes to port 0x00 (interrupts Z80)
@@ -2307,9 +2308,9 @@ void rainbow_base_state::z80_diskdiag_write_w(uint8_t data)
 	D11 D10 -D9 <- INTERNAL LED NUMBER (see PDF)
 	-1 --2-- 3  <- NUMBERS EMBOSSED ON BACK OF PLASTIC HOUSING (see error chart)
 	*/
-	output().set_value("led1", BIT(data, 4)); // LED "D11"
-	output().set_value("led2", BIT(data, 5)); // LED "D10"
-	output().set_value("led3", BIT(data, 6)); // LED "D9"
+	m_leds[0] = BIT(data, 4); // LED "D11"
+	m_leds[1] = BIT(data, 5); // LED "D10"
+	m_leds[2] = BIT(data, 6); // LED "D9"
 
 	m_zflip = false; // "a write to 21H will reset ZFLIP"
 }
@@ -2457,11 +2458,8 @@ void rainbow_base_state::z80_diskcontrol_w(uint8_t data)
 		m_floppy = nullptr;
 	}
 
-	output().set_value("driveled0", (selected_drive == 0) ? 1 : 0);
-	output().set_value("driveled1", (selected_drive == 1) ? 1 : 0);
-
-	output().set_value("driveled2", (selected_drive == 2) ? 1 : 0);
-	output().set_value("driveled3", (selected_drive == 3) ? 1 : 0);
+	for (int i = 0; i < 4; i++)
+		m_driveleds[i] = (selected_drive == i) ? 1 : 0;
 	switch_off_timer->adjust(attotime::from_msec(500));
 
 	if (m_floppy != nullptr)
@@ -2483,14 +2481,14 @@ void rainbow_base_state::z80_diskcontrol_w(uint8_t data)
 		m_fdc->set_force_ready(force_ready); // 1 : assert DRIVE READY on FDC (diagnostic override)
 
 		if (selected_drive < 2)
-		{   data |= 8;
+		{
+			data |= 8;
 			enable_start = 0;
 			disable_start = 2;
 		}
-			else
+		else
 		{
 			data |= 16;
-
 			enable_start = 2;
 			disable_start = 4;
 		}
@@ -3389,10 +3387,19 @@ void rainbow_modelb_state::rainbow_modelb(machine_config &config)
 ROM_START(rainbow100a)
 	ROM_REGION(0x100000, "maincpu", 0)
 
-	ROM_LOAD("23-176e4-00.e89", 0xfa000, 0x2000, CRC(405e9619) SHA1(86604dccea84b46e05d705abeda25b12f7cc8c59)) // ROM (FA000-FBFFF) (E89) 8 K
-	ROM_LOAD("23-177e4-00.e90", 0xfc000, 0x2000, CRC(1ec72a66) SHA1(ed19944ae711e97d6bec34c885be04c4c3c95852)) // ROM (FC000-FDFFF) (E90) 8 K
+	ROM_DEFAULT_BIOS("040311a")
+	// printer and comm. port error messages, keyboard works, machine boots
+	ROM_SYSTEM_BIOS(0, "040311a", "Version 04.03.11A")
+	ROMX_LOAD("23-176e4-00.e89", 0xfa000, 0x2000, CRC(405e9619) SHA1(86604dccea84b46e05d705abeda25b12f7cc8c59), ROM_BIOS(0)) // ROM (FA000-FBFFF) (E89) 8 K
+	ROMX_LOAD("23-177e4-00.e90", 0xfc000, 0x2000, CRC(1ec72a66) SHA1(ed19944ae711e97d6bec34c885be04c4c3c95852), ROM_BIOS(0)) // ROM (FC000-FDFFF) (E90) 8 K
 	ROM_FILL(0xfa26d, 1, 0x00) // [0xFA000 + 0x026d] disable CRC check   [100-A ROM]
 	ROM_FILL(0xfadea, 1, 0x00) // [0xFA000 + 0x0dea] Floppy workaround: in case of Z80 RESPONSE FAILURE ($80 bit set in AL), don't block floppy access
+
+	// printer, comm. and a third error message, no keyboard, doesn't boot
+	ROM_SYSTEM_BIOS(1, "010111a", "Version 01.01.11A")
+	ROMX_LOAD("23-090e4-0_11-24.bin", 0xfa000, 0x2000, CRC(08d83c93) SHA1(ee26c3162071ccc3f7dce1c2afb9933329a287de), ROM_BIOS(1)) // ROM (FA000-FBFFF) (E89) 8 K
+	ROMX_LOAD("23-091e4-0_11-24.bin", 0xfc000, 0x2000, CRC(387c50f2) SHA1(598f04ccbdf0e34826785992a56891d6674ac47e), ROM_BIOS(1)) // ROM (FC000-FDFFF) (E90) 8 K
+
 
 	// SOCKETED LANGUAGE ROM (E91) with 1 single localization per ROM -
 	ROM_LOAD("23-092e4-00.e91", 0xfe000, 0x2000, CRC(c269175a) SHA1(e82cf69b811f1e376621277f81db28e299fe06f0))  // ROM (FE000-FFFFF) (E91) 8 K - English (?)

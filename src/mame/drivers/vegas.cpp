@@ -17,7 +17,7 @@
         * CART Fury Championship Racing [250MHz RM7000, 32MB RAM, Durango + Denver + Voodoo 3, 16MB]
 
     Known bugs:
-        * not working yet
+        * Tournament Editions not working yet
 
 ***************************************************************************
 
@@ -177,10 +177,10 @@
  4x MT48LC1M16AT RAM
  1x 93clc46b       label A-22911   config eeprom
  1x texas instruments 8CA00YF (don't know what it is)
- 1x motorolla MPC948 clock distribution chip
+ 1x motorola MPC948 clock distribution chip
  100MHz crystal
  1x CMDPCI646U2 IDE controller
- 1x 7segment LED display (cycles IOASIC if you try to load a game that doesnt match the PIC, spins during normal play)
+ 1x 7segment LED display (cycles IOASIC if you try to load a game that doesn't match the PIC, spins during normal play)
  1x 232ACBN serial port controller
  other misc 74xxx parts
  Boot ROM 1.7
@@ -291,6 +291,9 @@
 
 #include "sf2049.lh"
 
+
+namespace {
+
 /*************************************
  *
  *  Debugging constants
@@ -324,11 +327,13 @@ public:
 		m_uart1(*this, "uart1"),
 		m_uart2(*this, "uart2"),
 		m_io_analog(*this, "AN.%u", 0U),
+		m_io_8way(*this, "8WAY_P%u", 1U),
 		m_io_49way_x(*this, "49WAYX_P%u", 1U),
 		m_io_49way_y(*this, "49WAYY_P%u", 1U),
 		m_io_keypad(*this, "KEYPAD"),
 		m_io_gearshift(*this, "GEAR"),
 		m_io_system(*this, "SYSTEM"),
+		m_io_dips(*this, "DIPS"),
 		m_wheel_driver(*this, "wheel"),
 		m_lamps(*this, "lamp%u", 0U),
 		m_a2d_shift(0)
@@ -369,8 +374,14 @@ public:
 	void init_sf2049se();
 
 	DECLARE_CUSTOM_INPUT_MEMBER(i40_r);
+	DECLARE_CUSTOM_INPUT_MEMBER(gauntleg_p12_r);
+	DECLARE_CUSTOM_INPUT_MEMBER(gauntleg_p34_r);
 	DECLARE_CUSTOM_INPUT_MEMBER(keypad_r);
 	DECLARE_CUSTOM_INPUT_MEMBER(gearshift_r);
+
+protected:
+	virtual void machine_start() override;
+	virtual void machine_reset() override;
 
 private:
 	static constexpr unsigned SYSTEM_CLOCK = 100000000;
@@ -383,14 +394,21 @@ private:
 	required_device<midway_ioasic_device> m_ioasic;
 	optional_device<ns16550_device> m_uart1;
 	optional_device<ns16550_device> m_uart2;
+
 	optional_ioport_array<8> m_io_analog;
+	optional_ioport_array<4> m_io_8way;
+
 	optional_ioport_array<4> m_io_49way_x;
 	optional_ioport_array<4> m_io_49way_y;
+
 	optional_ioport m_io_keypad;
 	optional_ioport m_io_gearshift;
 	optional_ioport m_io_system;
+	optional_ioport m_io_dips;
 	output_finder<1> m_wheel_driver;
 	output_finder<16> m_lamps;
+
+	static const uint8_t translate49[7];
 
 	int m_a2d_shift;
 	int8_t m_wheel_force;
@@ -412,9 +430,6 @@ private:
 
 	DECLARE_WRITE_LINE_MEMBER(duart_irq_cb);
 	DECLARE_WRITE_LINE_MEMBER(vblank_assert);
-
-	virtual void machine_start() override;
-	virtual void machine_reset() override;
 
 	void update_sio_irqs();
 
@@ -463,7 +478,7 @@ private:
 void vegas_state::machine_start()
 {
 	/* set the fastest DRC options, but strict verification */
-	m_maincpu->mips3drc_set_options(MIPS3DRC_FASTEST_OPTIONS + MIPS3DRC_STRICT_VERIFY + MIPS3DRC_FLUSH_PC);
+	m_maincpu->mips3drc_set_options(MIPS3DRC_FASTEST_OPTIONS + MIPS3DRC_STRICT_VERIFY);
 
 	m_wheel_driver.resolve();
 	m_lamps.resolve();
@@ -499,6 +514,8 @@ void vegas_state::machine_start()
 		if (LOG_SIO)
 			logerror("Did not find dcs2 sound board\n");
 	}
+
+	m_cmos_unlocked = 0;
 }
 
 
@@ -508,7 +525,7 @@ void vegas_state::machine_reset()
 	m_dcs->reset_w(1);
 
 	// Clear CPU IO registers
-	memset(m_cpuio_data, 0, ARRAY_LENGTH(m_cpuio_data));
+	std::fill(std::begin(m_cpuio_data), std::end(m_cpuio_data), 0);
 	// Clear SIO registers
 	reset_sio();
 	m_duart_irq_state = 0;
@@ -735,26 +752,39 @@ uint8_t vegas_state::sio_r(offs_t offset)
 			break;
 		case 1:
 			// Gun 1 H High
+			// P1 magic = ~0x10;
+			// P1 fight = ~0x20;
+			result = ~m_io_8way[0]->read() & 0x30;
+			//result = 0x70;
 			break;
 		case 2:
 			// Gun 1 V Low
 			break;
 		case 3:
 			// Gun 1 V High
+			// P1 run   = 0x08
+			// P2 magic = 0x10
+			// P2 fight = 0x20
+			// P2 run   = 0x40
+			result = (((m_io_8way[0]->read() & 0x40) >> 3) | ((m_io_8way[1]->read() & 0x7000) >> 8));
+			//result = ~0x7c;
 			break;
 		case 4:
 			// Gun 2 H Low
 			break;
 		case 5:
 			// Gun 2 H High
+			result = ~m_io_8way[2]->read() & 0x30;
 			break;
 		case 6:
 			// Gun 2 V Low
 			break;
 		case 7:
 			// Gun 2 V High
+			result = (((m_io_8way[2]->read() & 0x40) >> 3) | ((m_io_8way[3]->read() & 0x7000) >> 8));
 			break;
 		}
+		logerror("%s: sio_r: offset: %08x index: %d result: %02X\n", machine().describe_context(), offset, index, result);
 		break;
 	}
 	}
@@ -1037,6 +1067,11 @@ void vegas_state::mpsreset_w(offs_t offset, uint8_t data)
 }
 
 /*************************************
+* 49 Way translation matrix
+*************************************/
+const uint8_t vegas_state::translate49[7] = { 0x8, 0xc, 0xe, 0xf, 0x3, 0x1, 0x0 };
+
+/*************************************
 * Optical 49 Way Joystick I40 Board
 *************************************/
 void vegas_state::i40_w(uint32_t data)
@@ -1048,48 +1083,86 @@ void vegas_state::i40_w(uint32_t data)
 
 CUSTOM_INPUT_MEMBER(vegas_state::i40_r)
 {
-	static const uint8_t translate49[7] = { 0x8, 0xc, 0xe, 0xf, 0x3, 0x1, 0x0 };
-	int index = m_i40_data & 0xf;
-	uint8_t data = 0;
-	switch (index) {
-	case 0:
-		data = translate49[m_io_49way_x[0]->read() >> 4];
-		break;
-	case 1:
-		data = translate49[m_io_49way_y[0]->read() >> 4];
-		break;
-	case 2:
-		data = translate49[m_io_49way_x[1]->read() >> 4];
-		break;
-	case 3:
-		data = translate49[m_io_49way_y[1]->read() >> 4];
-		break;
-	case 4:
-		data = translate49[m_io_49way_x[2]->read() >> 4];
-		break;
-	case 5:
-		data = translate49[m_io_49way_y[2]->read() >> 4];
-		break;
-	case 6:
-		data = translate49[m_io_49way_x[3]->read() >> 4];
-		break;
-	case 7:
-		data = translate49[m_io_49way_y[3]->read() >> 4];
-		break;
-	case 10:
-	case 11:
-	case 12:
-		// I40 Detection
-		data = ~index & 0xf;
-		break;
-	default:
-		//logerror("%s: i40_r: select: %x index: %d data: %x\n", machine().describe_context(), m_i40_data, index, data);
-		break;
+	if (m_io_dips->read() & 0x100) {
+		// 8 way joysticks
+		return m_io_8way[3]->read();
 	}
-	//if (m_i40_data & 0x1000)
-	//  printf("%s: i40_r: select: %x index: %d data: %x\n", machine().describe_context().c_str(), m_i40_data, index, data);
-	//m_i40_data &= ~0x1000;
-	return data;
+	else {
+		// 49 way joysticks via i40 adapter board
+		int index = m_i40_data & 0xf;
+		uint8_t data = 0;
+		switch (index) {
+		case 0:
+			data = translate49[m_io_49way_x[0]->read() >> 4];
+			break;
+		case 1:
+			data = translate49[m_io_49way_y[0]->read() >> 4];
+			break;
+		case 2:
+			data = translate49[m_io_49way_x[1]->read() >> 4];
+			break;
+		case 3:
+			data = translate49[m_io_49way_y[1]->read() >> 4];
+			break;
+		case 4:
+			data = translate49[m_io_49way_x[2]->read() >> 4];
+			break;
+		case 5:
+			data = translate49[m_io_49way_y[2]->read() >> 4];
+			break;
+		case 6:
+			data = translate49[m_io_49way_x[3]->read() >> 4];
+			break;
+		case 7:
+			data = translate49[m_io_49way_y[3]->read() >> 4];
+			break;
+		case 10:
+		case 11:
+		case 12:
+			// I40 Detection
+			data = ~index & 0xf;
+			break;
+		default:
+			//logerror("%s: i40_r: select: %x index: %d data: %x\n", machine().describe_context(), m_i40_data, index, data);
+			break;
+		}
+		//if (m_i40_data & 0x1000)
+		//  printf("%s: i40_r: select: %x index: %d data: %x\n", machine().describe_context().c_str(), m_i40_data, index, data);
+		//m_i40_data &= ~0x1000;
+		return data;
+	}
+}
+
+/*************************************
+* Gauntlet Player 1 & 2 control read
+*************************************/
+CUSTOM_INPUT_MEMBER(vegas_state::gauntleg_p12_r)
+{
+	if (m_io_dips->read() & 0x2000) {
+		// 8 way joysticks
+		return m_io_8way[1]->read() | m_io_8way[0]->read();
+	}
+	else {
+		// 49 way joysticks
+		return  (translate49[m_io_49way_x[1]->read() >> 4] << 12) | (translate49[m_io_49way_y[1]->read() >> 4] << 8) |
+				(translate49[m_io_49way_x[0]->read() >> 4] << 4) |  (translate49[m_io_49way_y[0]->read() >> 4] << 0);
+	}
+}
+
+/*************************************
+* Gauntlet Player 3 & 4 control read
+*************************************/
+CUSTOM_INPUT_MEMBER(vegas_state::gauntleg_p34_r)
+{
+	if (m_io_dips->read() & 0x2000) {
+		// 8 way joysticks
+		return m_io_8way[3]->read() | m_io_8way[2]->read();
+	}
+	else {
+		// 49 way joysticks
+		return  (translate49[m_io_49way_x[3]->read() >> 4] << 12) | (translate49[m_io_49way_y[3]->read() >> 4] << 8) |
+				(translate49[m_io_49way_x[2]->read() >> 4] << 4) |  (translate49[m_io_49way_y[2]->read() >> 4] << 0);
+	}
 }
 
 /*************************************
@@ -1229,8 +1302,8 @@ static INPUT_PORTS_START( vegas_common )
 	PORT_BIT( 0x0040, IP_ACTIVE_LOW, IPT_SERVICE1 )
 	PORT_BIT( 0x0080, IP_ACTIVE_LOW, IPT_COIN3 )
 	PORT_BIT( 0x0100, IP_ACTIVE_LOW, IPT_COIN4 )
-	PORT_BIT( 0x0200, IP_ACTIVE_LOW, IPT_UNUSED )
-	PORT_BIT( 0x0400, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x0200, IP_ACTIVE_LOW, IPT_START3 )
+	PORT_BIT( 0x0400, IP_ACTIVE_LOW, IPT_START4 )
 	PORT_BIT( 0x0800, IP_ACTIVE_LOW, IPT_VOLUME_DOWN )
 	PORT_BIT( 0x1000, IP_ACTIVE_LOW, IPT_VOLUME_UP )
 	PORT_BIT( 0x6000, IP_ACTIVE_LOW, IPT_UNUSED )
@@ -1244,7 +1317,7 @@ static INPUT_PORTS_START( vegas_common )
 	PORT_BIT( 0x0010, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_PLAYER(1)
 	PORT_BIT( 0x0020, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_PLAYER(1)
 	PORT_BIT( 0x0040, IP_ACTIVE_LOW, IPT_BUTTON3 ) PORT_PLAYER(1)
-	PORT_BIT( 0x0080, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x0080, IP_ACTIVE_LOW, IPT_BUTTON4 ) PORT_PLAYER(1)
 	PORT_BIT( 0x0100, IP_ACTIVE_LOW, IPT_JOYSTICK_UP    ) PORT_PLAYER(2) PORT_8WAY
 	PORT_BIT( 0x0200, IP_ACTIVE_LOW, IPT_JOYSTICK_DOWN  ) PORT_PLAYER(2) PORT_8WAY
 	PORT_BIT( 0x0400, IP_ACTIVE_LOW, IPT_JOYSTICK_LEFT  ) PORT_PLAYER(2) PORT_8WAY
@@ -1252,10 +1325,25 @@ static INPUT_PORTS_START( vegas_common )
 	PORT_BIT( 0x1000, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_PLAYER(2)
 	PORT_BIT( 0x2000, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_PLAYER(2)
 	PORT_BIT( 0x4000, IP_ACTIVE_LOW, IPT_BUTTON3 ) PORT_PLAYER(2)
-	PORT_BIT( 0x8000, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x8000, IP_ACTIVE_LOW, IPT_BUTTON4 ) PORT_PLAYER(2)
 
 	PORT_START("IN2")
-	PORT_BIT( 0xffff, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x0001, IP_ACTIVE_LOW, IPT_JOYSTICK_UP    ) PORT_PLAYER(3) PORT_8WAY
+	PORT_BIT( 0x0002, IP_ACTIVE_LOW, IPT_JOYSTICK_DOWN  ) PORT_PLAYER(3) PORT_8WAY
+	PORT_BIT( 0x0004, IP_ACTIVE_LOW, IPT_JOYSTICK_LEFT  ) PORT_PLAYER(3) PORT_8WAY
+	PORT_BIT( 0x0008, IP_ACTIVE_LOW, IPT_JOYSTICK_RIGHT ) PORT_PLAYER(3) PORT_8WAY
+	PORT_BIT( 0x0010, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_PLAYER(3)
+	PORT_BIT( 0x0020, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_PLAYER(3)
+	PORT_BIT( 0x0040, IP_ACTIVE_LOW, IPT_BUTTON3 ) PORT_PLAYER(3)
+	PORT_BIT( 0x0080, IP_ACTIVE_LOW, IPT_BUTTON4 ) PORT_PLAYER(3)
+	PORT_BIT( 0x0100, IP_ACTIVE_LOW, IPT_JOYSTICK_UP    ) PORT_PLAYER(4) PORT_8WAY
+	PORT_BIT( 0x0200, IP_ACTIVE_LOW, IPT_JOYSTICK_DOWN  ) PORT_PLAYER(4) PORT_8WAY
+	PORT_BIT( 0x0400, IP_ACTIVE_LOW, IPT_JOYSTICK_LEFT  ) PORT_PLAYER(4) PORT_8WAY
+	PORT_BIT( 0x0800, IP_ACTIVE_LOW, IPT_JOYSTICK_RIGHT ) PORT_PLAYER(4) PORT_8WAY
+	PORT_BIT( 0x1000, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_PLAYER(4)
+	PORT_BIT( 0x2000, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_PLAYER(4)
+	PORT_BIT( 0x4000, IP_ACTIVE_LOW, IPT_BUTTON3 ) PORT_PLAYER(4)
+	PORT_BIT( 0x8000, IP_ACTIVE_LOW, IPT_BUTTON4 ) PORT_PLAYER(4)
 
 	PORT_START("AN.0") PORT_BIT( 0xff, 0x80, IPT_CUSTOM )
 	PORT_START("AN.1") PORT_BIT( 0xff, 0x80, IPT_CUSTOM )
@@ -1266,41 +1354,29 @@ static INPUT_PORTS_START( vegas_common )
 	PORT_START("AN.6") PORT_BIT( 0xff, 0x80, IPT_CUSTOM )
 	PORT_START("AN.7") PORT_BIT( 0xff, 0x80, IPT_CUSTOM )
 
-INPUT_PORTS_END
+	PORT_START("8WAY_P1")
+	PORT_BIT( 0x00ff, IP_ACTIVE_HIGH, IPT_UNUSED )
 
-static INPUT_PORTS_START( vegas_4p )
-	PORT_INCLUDE(vegas_common)
+	PORT_START("8WAY_P2")
+	PORT_BIT( 0xff00, IP_ACTIVE_HIGH, IPT_UNUSED )
 
-	PORT_MODIFY("SYSTEM")
-	PORT_BIT( 0x0200, IP_ACTIVE_LOW, IPT_START3 )
-	PORT_BIT( 0x0400, IP_ACTIVE_LOW, IPT_START4 )
-	
-	PORT_MODIFY("IN2")
-	PORT_BIT( 0x0001, IP_ACTIVE_LOW, IPT_JOYSTICK_UP    ) PORT_PLAYER(3) PORT_8WAY
-	PORT_BIT( 0x0002, IP_ACTIVE_LOW, IPT_JOYSTICK_DOWN  ) PORT_PLAYER(3) PORT_8WAY
-	PORT_BIT( 0x0004, IP_ACTIVE_LOW, IPT_JOYSTICK_LEFT  ) PORT_PLAYER(3) PORT_8WAY
-	PORT_BIT( 0x0008, IP_ACTIVE_LOW, IPT_JOYSTICK_RIGHT ) PORT_PLAYER(3) PORT_8WAY
-	PORT_BIT( 0x0010, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_PLAYER(3)
-	PORT_BIT( 0x0020, IP_ACTIVE_LOW, IPT_BUTTON3 ) PORT_PLAYER(3)
-	PORT_BIT( 0x0040, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_PLAYER(3)
-	PORT_BIT( 0x0080, IP_ACTIVE_LOW, IPT_UNUSED )
-	PORT_BIT( 0x0100, IP_ACTIVE_LOW, IPT_JOYSTICK_UP    ) PORT_PLAYER(4) PORT_8WAY
-	PORT_BIT( 0x0200, IP_ACTIVE_LOW, IPT_JOYSTICK_DOWN  ) PORT_PLAYER(4) PORT_8WAY
-	PORT_BIT( 0x0400, IP_ACTIVE_LOW, IPT_JOYSTICK_LEFT  ) PORT_PLAYER(4) PORT_8WAY
-	PORT_BIT( 0x0800, IP_ACTIVE_LOW, IPT_JOYSTICK_RIGHT ) PORT_PLAYER(4) PORT_8WAY
-	PORT_BIT( 0x1000, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_PLAYER(4)
-	PORT_BIT( 0x2000, IP_ACTIVE_LOW, IPT_BUTTON3 ) PORT_PLAYER(4)
-	PORT_BIT( 0x4000, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_PLAYER(4)
-	PORT_BIT( 0x8000, IP_ACTIVE_LOW, IPT_UNUSED )
-	
+	PORT_START("8WAY_P3")
+	PORT_BIT( 0x00ff, IP_ACTIVE_HIGH, IPT_UNUSED )
+
+	PORT_START("8WAY_P4")
+	PORT_BIT( 0xff00, IP_ACTIVE_HIGH, IPT_UNUSED )
+
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( vegas_analog )
 	PORT_INCLUDE(vegas_common)
-	
+
 	PORT_MODIFY("SYSTEM")
 	PORT_BIT( 0x0004, IP_ACTIVE_LOW, IPT_START1 ) PORT_NAME("Start Button")
 	PORT_BIT( 0x0020, IP_ACTIVE_LOW, IPT_UNUSED )
+
+	PORT_MODIFY("IN2")
+	PORT_BIT( 0xffff, IP_ACTIVE_LOW, IPT_UNUSED  )
 
 INPUT_PORTS_END
 
@@ -1311,7 +1387,7 @@ INPUT_PORTS_END
  *************************************/
 
 static INPUT_PORTS_START( gauntleg )
-	PORT_INCLUDE(vegas_4p)
+	PORT_INCLUDE(vegas_common)
 
 	PORT_MODIFY("DIPS")
 	PORT_DIPNAME( 0x0001, 0x0001, "PM Dump" )
@@ -1341,22 +1417,76 @@ static INPUT_PORTS_START( gauntleg )
 	PORT_DIPSETTING(      0xc000, "Standard Res 512x256" )
 	PORT_DIPSETTING(      0x4000, "Medium Res 512x384" )
 	PORT_DIPSETTING(      0x0000, "VGA Res 640x480" ) //VGA res not supported for gauntleg
-	
-	PORT_MODIFY("IN1")
-	PORT_BIT( 0x0010, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_PLAYER(1) PORT_NAME("P1 Fight")
-	PORT_BIT( 0x0020, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_PLAYER(1) PORT_NAME("P1 Magic")
-	PORT_BIT( 0x0040, IP_ACTIVE_LOW, IPT_BUTTON3 ) PORT_PLAYER(1) PORT_NAME("P1 Turbo")
-	PORT_BIT( 0x1000, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_PLAYER(2) PORT_NAME("P2 Fight")
-	PORT_BIT( 0x2000, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_PLAYER(2) PORT_NAME("P2 Magic")
-	PORT_BIT( 0x4000, IP_ACTIVE_LOW, IPT_BUTTON3 ) PORT_PLAYER(2) PORT_NAME("P2 Fight")
 
-	PORT_MODIFY("IN2")	
-	PORT_BIT( 0x0010, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_PLAYER(3) PORT_NAME("P3 Fight")
-	PORT_BIT( 0x0020, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_PLAYER(3) PORT_NAME("P3 Magic")
-	PORT_BIT( 0x0040, IP_ACTIVE_LOW, IPT_BUTTON3 ) PORT_PLAYER(3) PORT_NAME("P3 Turbo")
-	PORT_BIT( 0x1000, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_PLAYER(4) PORT_NAME("P4 Fight")
-	PORT_BIT( 0x2000, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_PLAYER(4) PORT_NAME("P4 Magic")
-	PORT_BIT( 0x4000, IP_ACTIVE_LOW, IPT_BUTTON3 ) PORT_PLAYER(4) PORT_NAME("P4 Turbo")
+	PORT_MODIFY("IN1")
+	PORT_BIT( 0xffff, IP_ACTIVE_LOW, IPT_CUSTOM  ) PORT_CUSTOM_MEMBER(vegas_state, gauntleg_p12_r)
+
+	PORT_MODIFY("IN2")
+	PORT_BIT( 0xffff, IP_ACTIVE_LOW, IPT_CUSTOM  ) PORT_CUSTOM_MEMBER(vegas_state, gauntleg_p34_r)
+
+	PORT_MODIFY("8WAY_P1")
+	PORT_BIT( 0x0001, IP_ACTIVE_HIGH, IPT_JOYSTICK_UP    ) PORT_PLAYER(1) PORT_8WAY
+	PORT_BIT( 0x0002, IP_ACTIVE_HIGH, IPT_JOYSTICK_DOWN  ) PORT_PLAYER(1) PORT_8WAY
+	PORT_BIT( 0x0004, IP_ACTIVE_HIGH, IPT_JOYSTICK_LEFT  ) PORT_PLAYER(1) PORT_8WAY
+	PORT_BIT( 0x0008, IP_ACTIVE_HIGH, IPT_JOYSTICK_RIGHT ) PORT_PLAYER(1) PORT_8WAY
+	PORT_BIT( 0x0010, IP_ACTIVE_HIGH, IPT_BUTTON1 ) PORT_PLAYER(1) PORT_NAME("P1 Magic")
+	PORT_BIT( 0x0020, IP_ACTIVE_HIGH, IPT_BUTTON2 ) PORT_PLAYER(1) PORT_NAME("P1 Fight")
+	PORT_BIT( 0x0040, IP_ACTIVE_HIGH, IPT_BUTTON3 ) PORT_PLAYER(1) PORT_NAME("P1 Turbo")
+	PORT_BIT( 0x0080, IP_ACTIVE_HIGH, IPT_UNUSED )
+
+	PORT_MODIFY("8WAY_P2")
+	PORT_BIT( 0x0100, IP_ACTIVE_HIGH, IPT_JOYSTICK_UP    ) PORT_PLAYER(2) PORT_8WAY
+	PORT_BIT( 0x0200, IP_ACTIVE_HIGH, IPT_JOYSTICK_DOWN  ) PORT_PLAYER(2) PORT_8WAY
+	PORT_BIT( 0x0400, IP_ACTIVE_HIGH, IPT_JOYSTICK_LEFT  ) PORT_PLAYER(2) PORT_8WAY
+	PORT_BIT( 0x0800, IP_ACTIVE_HIGH, IPT_JOYSTICK_RIGHT ) PORT_PLAYER(2) PORT_8WAY
+	PORT_BIT( 0x1000, IP_ACTIVE_HIGH, IPT_BUTTON1 ) PORT_PLAYER(2) PORT_NAME("P2 Magic")
+	PORT_BIT( 0x2000, IP_ACTIVE_HIGH, IPT_BUTTON2 ) PORT_PLAYER(2) PORT_NAME("P2 Fight")
+	PORT_BIT( 0x4000, IP_ACTIVE_HIGH, IPT_BUTTON3 ) PORT_PLAYER(2) PORT_NAME("P2 Turbo")
+	PORT_BIT( 0x8000, IP_ACTIVE_HIGH, IPT_UNUSED )
+
+	PORT_MODIFY("8WAY_P3")
+	PORT_BIT( 0x0001, IP_ACTIVE_HIGH, IPT_JOYSTICK_UP    ) PORT_PLAYER(3) PORT_8WAY
+	PORT_BIT( 0x0002, IP_ACTIVE_HIGH, IPT_JOYSTICK_DOWN  ) PORT_PLAYER(3) PORT_8WAY
+	PORT_BIT( 0x0004, IP_ACTIVE_HIGH, IPT_JOYSTICK_LEFT  ) PORT_PLAYER(3) PORT_8WAY
+	PORT_BIT( 0x0008, IP_ACTIVE_HIGH, IPT_JOYSTICK_RIGHT ) PORT_PLAYER(3) PORT_8WAY
+	PORT_BIT( 0x0010, IP_ACTIVE_HIGH, IPT_BUTTON1 ) PORT_PLAYER(3) PORT_NAME("P3 Magic")
+	PORT_BIT( 0x0020, IP_ACTIVE_HIGH, IPT_BUTTON2 ) PORT_PLAYER(3) PORT_NAME("P3 Fight")
+	PORT_BIT( 0x0040, IP_ACTIVE_HIGH, IPT_BUTTON3 ) PORT_PLAYER(3) PORT_NAME("P3 Turbo")
+	PORT_BIT( 0x0080, IP_ACTIVE_HIGH, IPT_UNUSED )
+
+	PORT_MODIFY("8WAY_P4")
+	PORT_BIT( 0x0100, IP_ACTIVE_HIGH, IPT_JOYSTICK_UP    ) PORT_PLAYER(4) PORT_8WAY
+	PORT_BIT( 0x0200, IP_ACTIVE_HIGH, IPT_JOYSTICK_DOWN  ) PORT_PLAYER(4) PORT_8WAY
+	PORT_BIT( 0x0400, IP_ACTIVE_HIGH, IPT_JOYSTICK_LEFT  ) PORT_PLAYER(4) PORT_8WAY
+	PORT_BIT( 0x0800, IP_ACTIVE_HIGH, IPT_JOYSTICK_RIGHT ) PORT_PLAYER(4) PORT_8WAY
+	PORT_BIT( 0x1000, IP_ACTIVE_HIGH, IPT_BUTTON1 ) PORT_PLAYER(4) PORT_NAME("P4 Magic")
+	PORT_BIT( 0x2000, IP_ACTIVE_HIGH, IPT_BUTTON2 ) PORT_PLAYER(4) PORT_NAME("P4 Fight")
+	PORT_BIT( 0x4000, IP_ACTIVE_HIGH, IPT_BUTTON3 ) PORT_PLAYER(4) PORT_NAME("P4 Turbo")
+	PORT_BIT( 0x8000, IP_ACTIVE_HIGH, IPT_UNUSED )
+
+	PORT_START("49WAYX_P1")
+	PORT_BIT( 0xff, 0x38, IPT_AD_STICK_X ) PORT_MINMAX(0x00,0x6f) PORT_SENSITIVITY(100) PORT_KEYDELTA(10) PORT_PLAYER(1)
+
+	PORT_START("49WAYY_P1")
+	PORT_BIT( 0xff, 0x38, IPT_AD_STICK_Y ) PORT_MINMAX(0x00,0x6f) PORT_SENSITIVITY(100) PORT_KEYDELTA(10) PORT_PLAYER(1) PORT_REVERSE
+
+	PORT_START("49WAYX_P2")
+	PORT_BIT(0xff, 0x38, IPT_AD_STICK_X) PORT_MINMAX(0x00, 0x6f) PORT_SENSITIVITY(100) PORT_KEYDELTA(10) PORT_PLAYER(2)
+
+	PORT_START("49WAYY_P2")
+	PORT_BIT(0xff, 0x38, IPT_AD_STICK_Y) PORT_MINMAX(0x00, 0x6f) PORT_SENSITIVITY(100) PORT_KEYDELTA(10) PORT_PLAYER(2) PORT_REVERSE
+
+	PORT_START("49WAYX_P3")
+	PORT_BIT(0xff, 0x38, IPT_AD_STICK_X) PORT_MINMAX(0x00, 0x6f) PORT_SENSITIVITY(100) PORT_KEYDELTA(10) PORT_PLAYER(3)
+
+	PORT_START("49WAYY_P3")
+	PORT_BIT(0xff, 0x38, IPT_AD_STICK_Y) PORT_MINMAX(0x00, 0x6f) PORT_SENSITIVITY(100) PORT_KEYDELTA(10) PORT_PLAYER(3) PORT_REVERSE
+
+	PORT_START("49WAYX_P4")
+	PORT_BIT(0xff, 0x38, IPT_AD_STICK_X) PORT_MINMAX(0x00, 0x6f) PORT_SENSITIVITY(100) PORT_KEYDELTA(10) PORT_PLAYER(4)
+
+	PORT_START("49WAYY_P4")
+	PORT_BIT(0xff, 0x38, IPT_AD_STICK_Y) PORT_MINMAX(0x00, 0x6f) PORT_SENSITIVITY(100) PORT_KEYDELTA(10) PORT_PLAYER(4) PORT_REVERSE
 
 INPUT_PORTS_END
 
@@ -1371,17 +1501,19 @@ static INPUT_PORTS_START( tenthdeg )
 	PORT_DIPSETTING(      0xc000, "Standard Res 512x256" )
 	PORT_DIPSETTING(      0x4000, "Medium Res 512x384" )
 	PORT_DIPSETTING(      0x0000, "VGA Res 640x480" ) //VGA res not supported for this game
-	
+
 	PORT_MODIFY("SYSTEM")
 	PORT_BIT( 0x0200, IP_ACTIVE_LOW, IPT_BUTTON7 ) PORT_PLAYER(1) PORT_NAME("P1 Counter")
-	
+
 	PORT_MODIFY("IN1")
 	PORT_BIT( 0x0010, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_PLAYER(1) PORT_NAME("P1 Jab")
 	PORT_BIT( 0x0020, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_PLAYER(1) PORT_NAME("P1 Strong")
 	PORT_BIT( 0x0040, IP_ACTIVE_LOW, IPT_BUTTON4 ) PORT_PLAYER(1) PORT_NAME("P1 Short")
+	PORT_BIT( 0x0080, IP_ACTIVE_LOW, IPT_UNUSED )
 	PORT_BIT( 0x1000, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_PLAYER(2) PORT_NAME("P2 Jab")
 	PORT_BIT( 0x2000, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_PLAYER(2) PORT_NAME("P2 Strong")
 	PORT_BIT( 0x4000, IP_ACTIVE_LOW, IPT_BUTTON4 ) PORT_PLAYER(2) PORT_NAME("P2 Short")
+	PORT_BIT( 0x8000, IP_ACTIVE_LOW, IPT_UNUSED )
 
 	PORT_MODIFY("IN2")
 	PORT_BIT( 0x0001, IP_ACTIVE_LOW, IPT_BUTTON6 ) PORT_PLAYER(1) PORT_NAME("P1 Roundhouse")
@@ -1470,7 +1602,7 @@ INPUT_PORTS_END
 
 
 static INPUT_PORTS_START( nbashowt )
-	PORT_INCLUDE(vegas_4p)
+	PORT_INCLUDE(vegas_common)
 
 	PORT_MODIFY("DIPS")
 	PORT_DIPNAME( 0x0001, 0x0000, "Coinage Source" )
@@ -1493,9 +1625,9 @@ static INPUT_PORTS_START( nbashowt )
 	PORT_DIPNAME( 0x0040, 0x0040, "Select Game" )
 	PORT_DIPSETTING(      0x0040, DEF_STR(Yes))
 	PORT_DIPSETTING(      0x0000, DEF_STR(No))
-	PORT_DIPNAME( 0x0080, 0x0080, "Game Powerup" )
-	PORT_DIPSETTING(      0x0080, "NBA Showtime" )
-	PORT_DIPSETTING(      0x0000, "NFL Blitz" )
+	PORT_DIPNAME( 0x0080, 0x0000, "Game Powerup" )
+	PORT_DIPSETTING(      0x0080, "NFL Blitz" )
+	PORT_DIPSETTING(      0x0000, "NBA Showtime" )
 	PORT_DIPNAME( 0x0100, 0x0000, "Joysticks" )
 	PORT_DIPSETTING(      0x0100, "8-Way" )
 	PORT_DIPSETTING(      0x0000, "49-Way" )
@@ -1514,17 +1646,14 @@ static INPUT_PORTS_START( nbashowt )
 	PORT_DIPSETTING(      0x0000, DEF_STR( On ) )
 
 	PORT_MODIFY("IN1")
-	PORT_BIT( 0x000f, IP_ACTIVE_LOW, IPT_UNUSED) // P1 Joystick
 	PORT_BIT( 0x0010, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_PLAYER(1) PORT_NAME("P1 A")
 	PORT_BIT( 0x0020, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_PLAYER(1) PORT_NAME("P1 B")
 	PORT_BIT( 0x0040, IP_ACTIVE_LOW, IPT_BUTTON3 ) PORT_PLAYER(1) PORT_NAME("P1 Turbo")
-	PORT_BIT( 0x0f00, IP_ACTIVE_LOW, IPT_UNUSED) // P2 Joystick
 	PORT_BIT( 0x1000, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_PLAYER(2) PORT_NAME("P2 A")
 	PORT_BIT( 0x2000, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_PLAYER(2) PORT_NAME("P2 B")
 	PORT_BIT( 0x4000, IP_ACTIVE_LOW, IPT_BUTTON3 ) PORT_PLAYER(2) PORT_NAME("P2 Turbo")
 
 	PORT_MODIFY("IN2")
-	PORT_BIT( 0x000f, IP_ACTIVE_LOW, IPT_UNUSED) // P3 Joystick
 	PORT_BIT( 0x0010, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_PLAYER(3) PORT_NAME("P3 A")
 	PORT_BIT( 0x0020, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_PLAYER(3) PORT_NAME("P3 B")
 	PORT_BIT( 0x0040, IP_ACTIVE_LOW, IPT_BUTTON3 ) PORT_PLAYER(3) PORT_NAME("P3 Turbo")
@@ -1533,29 +1662,35 @@ static INPUT_PORTS_START( nbashowt )
 	PORT_BIT( 0x2000, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_PLAYER(4) PORT_NAME("P4 B")
 	PORT_BIT( 0x4000, IP_ACTIVE_LOW, IPT_BUTTON3 ) PORT_PLAYER(4) PORT_NAME("P4 Turbo")
 
+	PORT_MODIFY("8WAY_P4")
+	PORT_BIT( 0x1, IP_ACTIVE_HIGH, IPT_JOYSTICK_UP    ) PORT_PLAYER(4) PORT_8WAY
+	PORT_BIT( 0x2, IP_ACTIVE_HIGH, IPT_JOYSTICK_DOWN  ) PORT_PLAYER(4) PORT_8WAY
+	PORT_BIT( 0x4, IP_ACTIVE_HIGH, IPT_JOYSTICK_LEFT  ) PORT_PLAYER(4) PORT_8WAY
+	PORT_BIT( 0x8, IP_ACTIVE_HIGH, IPT_JOYSTICK_RIGHT ) PORT_PLAYER(4) PORT_8WAY
+
 	PORT_START("49WAYX_P1")
-	PORT_BIT( 0xff, 0x38, IPT_AD_STICK_X ) PORT_MINMAX(0x00,0x6f) PORT_SENSITIVITY(100) PORT_KEYDELTA(10) PORT_PLAYER(1)
+	PORT_BIT( 0xff, 0x38, IPT_AD_STICK_X ) PORT_MINMAX(0x00, 0x6f) PORT_SENSITIVITY(100) PORT_KEYDELTA(10) PORT_PLAYER(1)
 
 	PORT_START("49WAYY_P1")
-	PORT_BIT( 0xff, 0x38, IPT_AD_STICK_Y ) PORT_MINMAX(0x00,0x6f) PORT_SENSITIVITY(100) PORT_KEYDELTA(10) PORT_PLAYER(1)
+	PORT_BIT( 0xff, 0x38, IPT_AD_STICK_Y ) PORT_MINMAX(0x00, 0x6f) PORT_SENSITIVITY(100) PORT_KEYDELTA(10) PORT_PLAYER(1)
 
 	PORT_START("49WAYX_P2")
-	PORT_BIT(0xff, 0x38, IPT_AD_STICK_X) PORT_MINMAX(0x00, 0x6f) PORT_SENSITIVITY(100) PORT_KEYDELTA(10) PORT_PLAYER(2)
+	PORT_BIT( 0xff, 0x38, IPT_AD_STICK_X ) PORT_MINMAX(0x00, 0x6f) PORT_SENSITIVITY(100) PORT_KEYDELTA(10) PORT_PLAYER(2)
 
 	PORT_START("49WAYY_P2")
-	PORT_BIT(0xff, 0x38, IPT_AD_STICK_Y) PORT_MINMAX(0x00, 0x6f) PORT_SENSITIVITY(100) PORT_KEYDELTA(10) PORT_PLAYER(2)
+	PORT_BIT( 0xff, 0x38, IPT_AD_STICK_Y ) PORT_MINMAX(0x00, 0x6f) PORT_SENSITIVITY(100) PORT_KEYDELTA(10) PORT_PLAYER(2)
 
 	PORT_START("49WAYX_P3")
-	PORT_BIT(0xff, 0x38, IPT_AD_STICK_X) PORT_MINMAX(0x00, 0x6f) PORT_SENSITIVITY(100) PORT_KEYDELTA(10) PORT_PLAYER(3)
+	PORT_BIT( 0xff, 0x38, IPT_AD_STICK_X ) PORT_MINMAX(0x00, 0x6f) PORT_SENSITIVITY(100) PORT_KEYDELTA(10) PORT_PLAYER(3)
 
 	PORT_START("49WAYY_P3")
-	PORT_BIT(0xff, 0x38, IPT_AD_STICK_Y) PORT_MINMAX(0x00, 0x6f) PORT_SENSITIVITY(100) PORT_KEYDELTA(10) PORT_PLAYER(3)
+	PORT_BIT( 0xff, 0x38, IPT_AD_STICK_Y ) PORT_MINMAX(0x00, 0x6f) PORT_SENSITIVITY(100) PORT_KEYDELTA(10) PORT_PLAYER(3)
 
 	PORT_START("49WAYX_P4")
-	PORT_BIT(0xff, 0x38, IPT_AD_STICK_X) PORT_MINMAX(0x00, 0x6f) PORT_SENSITIVITY(100) PORT_KEYDELTA(10) PORT_PLAYER(4)
+	PORT_BIT( 0xff, 0x38, IPT_AD_STICK_X ) PORT_MINMAX(0x00, 0x6f) PORT_SENSITIVITY(100) PORT_KEYDELTA(10) PORT_PLAYER(4)
 
 	PORT_START("49WAYY_P4")
-	PORT_BIT(0xff, 0x38, IPT_AD_STICK_Y) PORT_MINMAX(0x00, 0x6f) PORT_SENSITIVITY(100) PORT_KEYDELTA(10) PORT_PLAYER(4)
+	PORT_BIT( 0xff, 0x38, IPT_AD_STICK_Y ) PORT_MINMAX(0x00, 0x6f) PORT_SENSITIVITY(100) PORT_KEYDELTA(10) PORT_PLAYER(4)
 
 INPUT_PORTS_END
 
@@ -1588,7 +1723,7 @@ static INPUT_PORTS_START( sf2049 )
 	PORT_BIT( 0x0008, IP_ACTIVE_LOW, IPT_BUTTON12 ) PORT_NAME("Music")
 	PORT_BIT( 0x0070, IP_ACTIVE_HIGH, IPT_CUSTOM) PORT_CUSTOM_MEMBER(vegas_state, keypad_r)
 	PORT_BIT( 0x0f00, IP_ACTIVE_HIGH, IPT_CUSTOM) PORT_CUSTOM_MEMBER(vegas_state, gearshift_r)
-	PORT_BIT( 0xf000, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0xf080, IP_ACTIVE_LOW, IPT_UNUSED )
 
 	PORT_START("GEAR")
 	PORT_BIT( 0x1, IP_ACTIVE_HIGH, IPT_BUTTON4 ) PORT_NAME("1st Gear")
@@ -1716,7 +1851,7 @@ void vegas_state::vegas_cs2_map(address_map &map)
 void vegas_state::vegas_cs3_map(address_map &map)
 {
 	map(0x00000000, 0x00000003).rw(FUNC(vegas_state::analog_port_r), FUNC(vegas_state::analog_port_w));
-//	map(0x00001000, 0x00001003).rw(FUNC(vegas_state::lcd_r), FUNC(vegas_state::lcd_w));
+//  map(0x00001000, 0x00001003).rw(FUNC(vegas_state::lcd_r), FUNC(vegas_state::lcd_w));
 }
 
 void vegas_state::vegas_cs4_map(address_map &map)
@@ -1741,7 +1876,7 @@ void vegas_state::vegas_cs6_map(address_map &map)
 
 void vegas_state::vegas_cs7_map(address_map &map)
 {
-//	map(0x00000000, 0x00000003).rw(FUNC(vegas_state::nss_r), FUNC(vegas_state::nss_w));
+//  map(0x00000000, 0x00000003).rw(FUNC(vegas_state::nss_r), FUNC(vegas_state::nss_w));
 	map(0x00001000, 0x0000100f).rw(FUNC(vegas_state::ethernet_r), FUNC(vegas_state::ethernet_w));
 	map(0x00005000, 0x00005003).w(m_dcs, FUNC(dcs_audio_device::dsio_idma_addr_w)); // if (m_dcs_idma_cs == 7)
 	map(0x00007000, 0x00007003).rw(m_dcs, FUNC(dcs_audio_device::dsio_idma_data_r), FUNC(dcs_audio_device::dsio_idma_data_w)); // if (m_dcs_idma_cs == 7)
@@ -1789,7 +1924,8 @@ void vegas_state::vegascore(machine_config &config)
 	voodoo_2_pci_device &voodoo(VOODOO_2_PCI(config, PCI_ID_VIDEO, 0, m_maincpu, "screen"));
 	voodoo.set_fbmem(2);
 	voodoo.set_tmumem(4, 4);
-	subdevice<voodoo_device>(PCI_ID_VIDEO":voodoo")->vblank_callback().set(FUNC(vegas_state::vblank_assert));
+	voodoo.set_status_cycles(1000); // optimization to consume extra cycles when polling status
+	subdevice<generic_voodoo_device>(PCI_ID_VIDEO":voodoo")->vblank_callback().set(FUNC(vegas_state::vblank_assert));
 
 	M48T37(config, m_timekeeper);
 	m_timekeeper->reset_cb().set(FUNC(vegas_state::watchdog_reset));
@@ -1833,7 +1969,8 @@ void vegas_state::vegasban(machine_config &config)
 	vegas32m(config);
 	voodoo_banshee_pci_device &voodoo(VOODOO_BANSHEE_PCI(config.replace(), PCI_ID_VIDEO, 0, m_maincpu, "screen"));
 	voodoo.set_fbmem(16);
-	subdevice<voodoo_device>(PCI_ID_VIDEO":voodoo")->vblank_callback().set(FUNC(vegas_state::vblank_assert));
+	voodoo.set_status_cycles(1000); // optimization to consume extra cycles when polling status
+	subdevice<generic_voodoo_device>(PCI_ID_VIDEO":voodoo")->vblank_callback().set(FUNC(vegas_state::vblank_assert));
 }
 
 
@@ -1847,7 +1984,8 @@ void vegas_state::vegasv3(machine_config &config)
 
 	voodoo_3_pci_device &voodoo(VOODOO_3_PCI(config.replace(), PCI_ID_VIDEO, 0, m_maincpu, "screen"));
 	voodoo.set_fbmem(16);
-	subdevice<voodoo_device>(PCI_ID_VIDEO":voodoo")->vblank_callback().set(FUNC(vegas_state::vblank_assert));
+	voodoo.set_status_cycles(1000); // optimization to consume extra cycles when polling status
+	subdevice<generic_voodoo_device>(PCI_ID_VIDEO":voodoo")->vblank_callback().set(FUNC(vegas_state::vblank_assert));
 }
 
 
@@ -1864,7 +2002,8 @@ void vegas_state::denver(machine_config &config)
 
 	voodoo_3_pci_device &voodoo(VOODOO_3_PCI(config.replace(), PCI_ID_VIDEO, 0, m_maincpu, "screen"));
 	voodoo.set_fbmem(16);
-	subdevice<voodoo_device>(PCI_ID_VIDEO":voodoo")->vblank_callback().set(FUNC(vegas_state::vblank_assert));
+	voodoo.set_status_cycles(1000); // optimization to consume extra cycles when polling status
+	subdevice<generic_voodoo_device>(PCI_ID_VIDEO":voodoo")->vblank_callback().set(FUNC(vegas_state::vblank_assert));
 
 	// TL16C552 UART
 	NS16550(config, m_uart1, XTAL(1'843'200));
@@ -2023,7 +2162,7 @@ void vegas_state::nbagold(machine_config &config)
 	m_ioasic->set_yearoffs(80);
 	m_ioasic->irq_handler().set(FUNC(vegas_state::ioasic_irq));
 	//m_ioasic->set_auto_ack(1)
-	 m_ioasic->aux_output_handler().set(FUNC(vegas_state::i40_w));
+	m_ioasic->aux_output_handler().set(FUNC(vegas_state::i40_w));
 }
 
 void vegas_state::sf2049(machine_config &config)
@@ -2097,7 +2236,7 @@ void vegas_state::cartfury(machine_config &config)
  *
  *************************************/
 
-	// there is a socket next to the main bios roms for updates, this is what the update region is.
+// there is a socket next to the main bios roms for updates, this is what the update region is.
 
 
 ROM_START( gauntleg )
@@ -2111,6 +2250,9 @@ ROM_START( gauntleg )
 
 	ROM_REGION16_LE( 0x10000, "dcs", 0 ) // Vegas SIO boot ROM
 	ROM_LOAD16_BYTE( "vegassio.bin", 0x000000, 0x8000, CRC(d1470e23) SHA1(f6e8405cfa604528c0224401bc374a6df9caccef) )
+
+	ROM_REGION( 0x2000, "serial_security_pic", 0 ) // security PIC (provides game ID code and serial number)
+	ROM_LOAD( "322_gauntlet.u37", 0x0000, 0x2000, CRC(0fe0bd0a) SHA1(bfd54572e2923d26392e89961d044357f551872a) )
 ROM_END
 
 
@@ -2130,12 +2272,14 @@ ROM_START( gauntleg12 )
 	ROMX_LOAD("12to16.3.bin", 0x000000, 0x100000, CRC(1027e54f) SHA1(a841f5cc5b022ddfaf70c97a64d1582f0a2ca70e), ROM_BIOS(3))
 
 
-
 	DISK_REGION( PCI_ID_IDE":ide:0:hdd:image" ) // GUTS 1.4 10/22/1998 Main 10/23/1998
 	DISK_IMAGE( "gauntl12", 0, SHA1(62917fbd692d004bc391287349041ebe669385cf) ) // compressed with -chs 4969,16,63 (which is apparently correct for a Quantum FIREBALL 2.5 GB and allows the update program to work)
 
 	ROM_REGION16_LE( 0x10000, "dcs", 0 ) // Vegas SIO boot ROM
 	ROM_LOAD16_BYTE( "vegassio.bin", 0x000000, 0x8000, CRC(d1470e23) SHA1(f6e8405cfa604528c0224401bc374a6df9caccef) )
+
+	ROM_REGION( 0x2000, "serial_security_pic", 0 ) // security PIC (provides game ID code and serial number)
+	ROM_LOAD( "322_gauntlet.u37", 0x0000, 0x2000, CRC(0fe0bd0a) SHA1(bfd54572e2923d26392e89961d044357f551872a) )
 ROM_END
 
 
@@ -2151,6 +2295,9 @@ ROM_START( gauntdl )
 
 	ROM_REGION16_LE( 0x10000, "dcs", 0 ) // Vegas SIO boot ROM
 	ROM_LOAD16_BYTE( "vegassio.bin", 0x000000, 0x8000, CRC(d1470e23) SHA1(f6e8405cfa604528c0224401bc374a6df9caccef) )
+
+	ROM_REGION( 0x2000, "serial_security_pic", 0 ) // security PIC (provides game ID code and serial number)
+	ROM_LOAD( "346_gauntlet-dl.u37", 0x0000, 0x2000, CRC(09420dd3) SHA1(9ffc62049b3e329b525469849944896163b1582b) )
 ROM_END
 
 
@@ -2166,6 +2313,9 @@ ROM_START( gauntdl24 )
 
 	ROM_REGION16_LE( 0x10000, "dcs", 0 ) // Vegas SIO boot ROM
 	ROM_LOAD16_BYTE( "vegassio.bin", 0x000000, 0x8000, CRC(d1470e23) SHA1(f6e8405cfa604528c0224401bc374a6df9caccef) )
+
+	ROM_REGION( 0x2000, "serial_security_pic", 0 ) // security PIC (provides game ID code and serial number)
+	ROM_LOAD( "346_gauntlet-dl.u37", 0x0000, 0x2000, CRC(09420dd3) SHA1(9ffc62049b3e329b525469849944896163b1582b) )
 ROM_END
 
 
@@ -2451,7 +2601,7 @@ void vegas_state::init_nbanfl()
 	// The first three bytes of the blitz00_nov30_1999.u27 ROM are FF's which breaks the reset vector.
 	// These bytes are from blitz00_sep22_1999.u27 which allows the other ROM to start.
 	// The last byte which is part of the checksum is also FF. By changing it to 0x01 the 4 byte checksum matches with the other 3 changes.
-	uint8_t *romPtr = machine().root_device().memregion(PCI_ID_NILE":rom")->base();
+	uint8_t *romPtr = memregion(PCI_ID_NILE":rom")->base();
 	romPtr[0x0] = 0xe2;
 	romPtr[0x1] = 0x00;
 	romPtr[0x2] = 0xf0;
@@ -2486,6 +2636,7 @@ void vegas_state::init_cartfury()
 {
 }
 
+} // Anonymous namespace
 
 
 /*************************************
@@ -2512,9 +2663,11 @@ GAME( 1999, roadburn,   0,         roadburn, roadburn, vegas_state, init_roadbur
 GAME( 1999, roadburn1,  roadburn,  roadburn, roadburn, vegas_state, init_roadburn, ROT0, "Atari Games",  "Road Burners (ver 1.0)", MACHINE_SUPPORTS_SAVE )
 
 // Vegas/Durango + Vegas SIO + Voodoo banshee
-GAME( 1998, nbashowt,   0,         nbashowt, nbashowt, vegas_state, init_nbashowt, ROT0, "Midway Games", "NBA Showtime: NBA on NBC (ver 2.0)", MACHINE_NOT_WORKING | MACHINE_SUPPORTS_SAVE )
-GAME( 1999, nbanfl,     0,         nbanfl,   nbashowt, vegas_state, init_nbanfl,   ROT0, "Midway Games", "NBA Showtime / NFL Blitz 2000 (ver 2.1)", MACHINE_NOT_WORKING | MACHINE_SUPPORTS_SAVE )
-GAME( 2000, nbagold ,   0,         nbagold,  nbashowt, vegas_state, init_nbagold,  ROT0, "Midway Games", "NBA Showtime Gold / NFL Blitz 2000 (ver 3.0) (SportsStation)", MACHINE_NOT_WORKING | MACHINE_SUPPORTS_SAVE )
+// missing older versions of NBA Showtime?
+GAME( 1999, nbashowt,   0,         nbashowt, nbashowt, vegas_state, init_nbashowt, ROT0, "Midway Games", "NBA Showtime NBA on NBC (ver 2.0, Apr 25 1999)", MACHINE_SUPPORTS_SAVE )
+// the game select menu shows SportStation for both of these, was there ever a standalone NBA Showtime Gold?
+GAME( 1999, nbanfl,     0,         nbanfl,   nbashowt, vegas_state, init_nbanfl,   ROT0, "Midway Games", "SportStation: NBA Showtime NBA on NBC (ver 2.1, Sep 22 1999) / NFL Blitz 2000 Gold Edition (ver 1.5, Sep 22 1999)", MACHINE_SUPPORTS_SAVE ) // NBA Showtime titlescreen still shows Version 2.0
+GAME( 2000, nbagold,    0,         nbagold,  nbashowt, vegas_state, init_nbagold,  ROT0, "Midway Games", "SportStation: NBA Showtime NBA on NBC Gold Edition (ver 3.0, Feb 18 2000) / NFL Blitz 2000 Gold Edition", MACHINE_SUPPORTS_SAVE ) // boot game dipswitch has no effect, so NFL Blitz 2000 version number not shown
 
 // Durango + Denver SIO + Voodoo 3
 GAMEL( 1999, sf2049,     0,        sf2049,   sf2049,   vegas_state, init_sf2049,   ROT0, "Atari Games",  "San Francisco Rush 2049", MACHINE_SUPPORTS_SAVE, layout_sf2049 )

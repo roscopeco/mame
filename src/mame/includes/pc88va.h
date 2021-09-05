@@ -11,7 +11,7 @@
 #ifndef MAME_INCLUDES_PC88VA_H
 #define MAME_INCLUDES_PC88VA_H
 
-#include "cpu/nec/nec.h"
+#include "cpu/nec/v5x.h"
 #include "cpu/z80/z80.h"
 #include "imagedev/floppy.h"
 #include "machine/am9517a.h"
@@ -21,7 +21,7 @@
 //#include "machine/upd71071.h"
 #include "machine/upd765.h"
 #include "machine/bankdev.h"
-#include "sound/2203intf.h"
+#include "sound/ymopn.h"
 
 #include "emupal.h"
 #include "screen.h"
@@ -101,7 +101,7 @@ private:
 	required_device<address_map_bank_device> m_sysbank;
 	required_shared_ptr<uint16_t> m_tvram;
 	required_shared_ptr<uint16_t> m_gvram;
-	uint8_t *m_kanjiram;
+	std::unique_ptr<uint8_t[]> m_kanjiram;
 	uint16_t m_bank_reg;
 	uint16_t m_screen_ctrl_reg;
 	uint8_t m_timer3_io_reg;
@@ -121,37 +121,35 @@ private:
 	uint8_t m_i8255_1_pc;
 	uint8_t m_fdc_mode;
 	uint8_t m_fdc_irq_opcode;
-	DECLARE_READ16_MEMBER(sys_mem_r);
-	DECLARE_WRITE16_MEMBER(sys_mem_w);
-	DECLARE_READ8_MEMBER(idp_status_r);
-	DECLARE_WRITE8_MEMBER(idp_command_w);
-	DECLARE_WRITE8_MEMBER(idp_param_w);
-	DECLARE_WRITE16_MEMBER(palette_ram_w);
-	DECLARE_READ16_MEMBER(sys_port4_r);
-	DECLARE_READ16_MEMBER(bios_bank_r);
-	DECLARE_WRITE16_MEMBER(bios_bank_w);
-	DECLARE_READ8_MEMBER(rom_bank_r);
-	DECLARE_READ8_MEMBER(key_r);
-	DECLARE_WRITE16_MEMBER(backupram_wp_1_w);
-	DECLARE_WRITE16_MEMBER(backupram_wp_0_w);
-	DECLARE_READ8_MEMBER(kanji_ram_r);
-	DECLARE_WRITE8_MEMBER(kanji_ram_w);
-	DECLARE_READ8_MEMBER(hdd_status_r);
+	uint8_t idp_status_r();
+	void idp_command_w(uint8_t data);
+	void idp_param_w(uint8_t data);
+	void palette_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
+	uint16_t sys_port4_r();
+	uint16_t bios_bank_r();
+	void bios_bank_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
+	uint8_t rom_bank_r();
+	uint8_t key_r(offs_t offset);
+	void backupram_wp_1_w(uint16_t data);
+	void backupram_wp_0_w(uint16_t data);
+	uint8_t kanji_ram_r(offs_t offset);
+	void kanji_ram_w(offs_t offset, uint8_t data);
+	uint8_t hdd_status_r();
 	#if TEST_SUBFDC
-	DECLARE_READ8_MEMBER(upd765_tc_r);
-	DECLARE_WRITE8_MEMBER(upd765_mc_w);
+	uint8_t upd765_tc_r();
+	void upd765_mc_w(uint8_t data);
 	#else
-	DECLARE_READ8_MEMBER(no_subfdc_r);
+	uint8_t no_subfdc_r();
 	#endif
-	DECLARE_READ8_MEMBER(pc88va_fdc_r);
-	DECLARE_WRITE8_MEMBER(pc88va_fdc_w);
-	DECLARE_READ16_MEMBER(sysop_r);
-	DECLARE_READ16_MEMBER(screen_ctrl_r);
-	DECLARE_WRITE16_MEMBER(screen_ctrl_w);
-	DECLARE_WRITE8_MEMBER(timer3_ctrl_reg_w);
-	DECLARE_WRITE16_MEMBER(video_pri_w);
-	DECLARE_READ8_MEMBER(backupram_dsw_r);
-	DECLARE_WRITE8_MEMBER(sys_port1_w);
+	uint8_t pc88va_fdc_r(offs_t offset);
+	void pc88va_fdc_w(offs_t offset, uint8_t data);
+	uint16_t sysop_r();
+	uint16_t screen_ctrl_r();
+	void screen_ctrl_w(uint16_t data);
+	void timer3_ctrl_reg_w(uint8_t data);
+	void video_pri_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
+	uint8_t backupram_dsw_r(offs_t offset);
+	void sys_port1_w(uint8_t data);
 	uint32_t screen_update_pc88va(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect);
 	INTERRUPT_GEN_MEMBER(pc88va_vrtc_irq);
 	uint8_t cpu_8255_c_r();
@@ -184,7 +182,7 @@ private:
 
 	DECLARE_WRITE_LINE_MEMBER(fdc_irq);
 	DECLARE_WRITE_LINE_MEMBER(fdc_drq);
-	DECLARE_FLOPPY_FORMATS( floppy_formats );
+	static void floppy_formats(format_registration &fr);
 	void pc88va_fdc_update_ready(floppy_image_device *, int);
 	void draw_sprites(bitmap_rgb32 &bitmap, const rectangle &cliprect);
 	uint32_t calc_kanji_rom_addr(uint8_t jis1,uint8_t jis2,int x,int y);

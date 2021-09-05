@@ -212,8 +212,6 @@ private:
 	uint32_t fpa_r();
 	uint32_t p4id_r();
 
-	DECLARE_FLOPPY_FORMATS( floppy_formats );
-
 	TIMER_DEVICE_CALLBACK_MEMBER(sun380_timer);
 
 	uint32_t bw2_update(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect);
@@ -531,27 +529,24 @@ TIMER_DEVICE_CALLBACK_MEMBER(sun3x_state::sun380_timer)
 
 uint32_t sun3x_state::bw2_update(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect)
 {
-	uint32_t *scanline;
-	int x, y;
-	uint8_t pixels;
 	static const uint32_t palette[2] = { 0, 0xffffff };
-	uint8_t *m_vram = (uint8_t *)m_bw2_vram.target();
+	uint8_t const *const m_vram = (uint8_t *)m_bw2_vram.target();
 
-	for (y = 0; y < 900; y++)
+	for (int y = 0; y < 900; y++)
 	{
-		scanline = &bitmap.pix32(y);
-		for (x = 0; x < 1152/8; x++)
+		uint32_t *scanline = &bitmap.pix(y);
+		for (int x = 0; x < 1152/8; x++)
 		{
-			pixels = m_vram[(y * (1152/8)) + (BYTE4_XOR_BE(x))];
+			uint8_t const pixels = m_vram[(y * (1152/8)) + (BYTE4_XOR_BE(x))];
 
-			*scanline++ = palette[(pixels>>7)&1];
-			*scanline++ = palette[(pixels>>6)&1];
-			*scanline++ = palette[(pixels>>5)&1];
-			*scanline++ = palette[(pixels>>4)&1];
-			*scanline++ = palette[(pixels>>3)&1];
-			*scanline++ = palette[(pixels>>2)&1];
-			*scanline++ = palette[(pixels>>1)&1];
-			*scanline++ = palette[(pixels&1)];
+			*scanline++ = palette[BIT(pixels, 7)];
+			*scanline++ = palette[BIT(pixels, 6)];
+			*scanline++ = palette[BIT(pixels, 5)];
+			*scanline++ = palette[BIT(pixels, 4)];
+			*scanline++ = palette[BIT(pixels, 3)];
+			*scanline++ = palette[BIT(pixels, 2)];
+			*scanline++ = palette[BIT(pixels, 1)];
+			*scanline++ = palette[BIT(pixels, 0)];
 		}
 	}
 
@@ -580,10 +575,6 @@ void sun3x_state::machine_reset()
 	m_memerraddr = 0;
 	m_bInBusErr = false;
 }
-
-FLOPPY_FORMATS_MEMBER( sun3x_state::floppy_formats )
-	FLOPPY_PC_FORMAT
-FLOPPY_FORMATS_END
 
 static void sun_floppies(device_slot_interface &device)
 {
@@ -626,7 +617,7 @@ void sun3x_state::sun3_80(machine_config &config)
 	NCR539X(config, ESP_TAG, 20000000/2).set_scsi_port("scsi");
 
 	N82077AA(config, m_fdc, 24000000, n82077aa_device::mode_t::PS2);
-	FLOPPY_CONNECTOR(config, "fdc:0", sun_floppies, "35hd", sun3x_state::floppy_formats);
+	FLOPPY_CONNECTOR(config, "fdc:0", sun_floppies, "35hd", floppy_image_device::default_pc_floppy_formats);
 
 	// the timekeeper has no interrupt output, so 3/80 includes a dedicated timer circuit
 	TIMER(config, "timer").configure_periodic(FUNC(sun3x_state::sun380_timer), attotime::from_hz(100));

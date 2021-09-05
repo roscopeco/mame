@@ -200,7 +200,7 @@ u32 dragngun_state::screen_update(screen_device &screen, bitmap_rgb32 &bitmap, c
 	{
 		rectangle clip(cliprect.left(), cliprect.right(), 8, 247);
 
-		m_sprgenzoom->dragngun_draw_sprites(bitmap,clip,m_spriteram->buffer(), m_sprite_layout_ram[0], m_sprite_layout_ram[1], m_sprite_lookup_ram[0], m_sprite_lookup_ram[1], m_sprite_ctrl, screen.priority(), m_temp_render_bitmap);
+		m_sprgenzoom->dragngun_draw_sprites(screen,bitmap,clip,m_spriteram->buffer(), m_sprite_layout_ram[0], m_sprite_layout_ram[1], m_sprite_lookup_ram[0], m_sprite_lookup_ram[1], m_sprite_ctrl, screen.priority(), m_temp_render_bitmap);
 
 	}
 
@@ -261,11 +261,11 @@ void nslasher_state::mix_nslasher(screen_device &screen, bitmap_rgb32 &bitmap, c
 	/* Mix sprites into main bitmap, based on priority & alpha */
 	for (int y = cliprect.top(); y <= cliprect.bottom(); y++)
 	{
-		const u16* sprite0 = &sprite0_mix_bitmap.pix16(y);
-		const u16* sprite1 = &sprite1_mix_bitmap.pix16(y);
-		const u16* alphaTilemap = &m_tilemap_alpha_bitmap->pix16(y);
-		const u8* tilemapPri = &screen.priority().pix8(y);
-		u32* destLine = &bitmap.pix32(y);
+		const u16* sprite0 = &sprite0_mix_bitmap.pix(y);
+		const u16* sprite1 = &sprite1_mix_bitmap.pix(y);
+		const u16* alphaTilemap = &m_tilemap_alpha_bitmap->pix(y);
+		const u8* tilemapPri = &screen.priority().pix(y);
+		u32* destLine = &bitmap.pix(y);
 
 		for (int x = cliprect.left(); x <= cliprect.right(); x++)
 		{
@@ -465,11 +465,11 @@ void nslasher_state::mix_tattass(screen_device &screen, bitmap_rgb32 &bitmap, co
 	/* Mix sprites into main bitmap, based on priority & alpha */
 	for (int y = cliprect.top(); y <= cliprect.bottom(); y++)
 	{
-		const u16* sprite0 = &sprite0_mix_bitmap.pix16(y);
-		const u16* sprite1 = &sprite1_mix_bitmap.pix16(y);
-		const u16* alphaTilemap = &m_tilemap_alpha_bitmap->pix16(y);
-		const u8* tilemapPri = &screen.priority().pix8(y);
-		u32* destLine = &bitmap.pix32(y);
+		const u16* sprite0 = &sprite0_mix_bitmap.pix(y);
+		const u16* sprite1 = &sprite1_mix_bitmap.pix(y);
+		const u16* alphaTilemap = &m_tilemap_alpha_bitmap->pix(y);
+		const u8* tilemapPri = &screen.priority().pix(y);
+		u32* destLine = &bitmap.pix(y);
 
 		for (int x = cliprect.left(); x <= cliprect.right(); x++)
 		{

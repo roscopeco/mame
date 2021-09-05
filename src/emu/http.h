@@ -2,9 +2,9 @@
 // copyright-holders:Miodrag Milanovic
 /***************************************************************************
 
-http.cpp
+    http.h
 
-HTTP server handling
+    HTTP server handling
 
 ***************************************************************************/
 
@@ -17,6 +17,7 @@ HTTP server handling
 #ifndef MAME_EMU_HTTP_H
 #define MAME_EMU_HTTP_H
 
+#include <mutex>
 #include <thread>
 #include <ctime>
 #include "server_http.hpp"

@@ -73,6 +73,8 @@ public:
 		DIVIDE_BY_ZERO,
 		OUT_OF_MEMORY,
 		INVALID_PARAM_COUNT,
+		TOO_FEW_PARAMS,
+		TOO_MANY_PARAMS,
 		UNBALANCED_QUOTES,
 		TOO_MANY_STRINGS,
 		INVALID_MEMORY_SIZE,
@@ -83,9 +85,10 @@ public:
 	};
 
 	// construction/destruction
-	expression_error(error_code code, int offset = 0)
+	expression_error(error_code code, int offset = 0, int num = 0)
 		: m_code(code),
-			m_offset(offset) { }
+			m_offset(offset),
+			m_num(num) { }
 
 	// operators
 	operator error_code() const { return m_code; }
@@ -93,12 +96,13 @@ public:
 	// getters
 	error_code code() const { return m_code; }
 	int offset() const { return m_offset; }
-	const char *code_string() const;
+	std::string code_string() const;
 
 private:
 	// internal state
 	error_code          m_code;
 	int                 m_offset;
+	int                 m_num;
 };
 
 
@@ -228,7 +232,7 @@ public:
 	parsed_expression &operator=(parsed_expression &&src) = default;
 
 	// getters
-	bool is_empty() const { return (m_tokenlist.count() == 0); }
+	bool is_empty() const { return m_tokenlist.empty(); }
 	const char *original_string() const { return m_original_string.c_str(); }
 	symbol_table &symbols() const { return m_symtable.get(); }
 
@@ -244,8 +248,6 @@ private:
 	// a single token
 	class parse_token
 	{
-		friend class simple_list<parse_token>;
-
 		// operator flags
 		enum
 		{
@@ -281,7 +283,6 @@ private:
 		parse_token(int offset = 0);
 
 		// getters
-		parse_token *next() const { return m_next; }
 		int offset() const { return m_offset; }
 		bool is_number() const { return (m_type == NUMBER); }
 		bool is_string() const { return (m_type == STRING); }
@@ -292,8 +293,9 @@ private:
 		bool is_lval() const { return ((m_type == SYMBOL && m_symbol->is_lval()) || m_type == MEMORY); }
 
 		u64 value() const { assert(m_type == NUMBER); return m_value; }
+		const char *string() const { assert(m_type == STRING); return m_string; }
 		u32 address() const { assert(m_type == MEMORY); return m_value; }
-		symbol_entry *symbol() const { assert(m_type == SYMBOL); return m_symbol; }
+		symbol_entry &symbol() const { assert(m_type == SYMBOL); return *m_symbol; }
 
 		u8 optype() const { assert(m_type == OPERATOR); return (m_flags & TIN_OPTYPE_MASK) >> TIN_OPTYPE_SHIFT; }
 		u8 precedence() const { assert(m_type == OPERATOR); return (m_flags & TIN_PRECEDENCE_MASK) >> TIN_PRECEDENCE_SHIFT; }
@@ -327,7 +329,6 @@ private:
 
 	private:
 		// internal state
-		parse_token *           m_next;             // next token in list
 		token_type              m_type;             // type of token
 		int                     m_offset;           // offset within the string
 		u64                     m_value;            // integral value
@@ -338,7 +339,7 @@ private:
 
 	// internal helpers
 	void copy(const parsed_expression &src);
-	void print_tokens(FILE *out);
+	void print_tokens();
 
 	// parsing helpers
 	void parse_string_into_tokens();
@@ -347,7 +348,7 @@ private:
 	void parse_quoted_char(parse_token &token, const char *&string);
 	void parse_quoted_string(parse_token &token, const char *&string);
 	void parse_memory_operator(parse_token &token, const char *string, bool disable_se);
-	void normalize_operator(parse_token *prevtoken, parse_token &thistoken);
+	void normalize_operator(parse_token &thistoken, parse_token *prevtoken, parse_token *nexttoken, const std::list<parse_token> &stack, bool was_rparen);
 	void infix_to_postfix();
 
 	// execution helpers
@@ -365,7 +366,7 @@ private:
 	std::reference_wrapper<symbol_table> m_symtable;    // symbol table
 	int                 m_default_base;                 // default base
 	std::string         m_original_string;              // original string (prior to parsing)
-	simple_list<parse_token> m_tokenlist;               // token list
+	std::list<parse_token> m_tokenlist;                 // token list
 	std::list<std::string> m_stringlist;                // string list
 	std::deque<parse_token> m_token_stack;              // token stack (used during execution)
 };

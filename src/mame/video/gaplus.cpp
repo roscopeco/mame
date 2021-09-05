@@ -215,13 +215,13 @@ void gaplus_base_state::video_start()
 
 ***************************************************************************/
 
-WRITE8_MEMBER(gaplus_base_state::videoram_w)
+void gaplus_base_state::videoram_w(offs_t offset, uint8_t data)
 {
 	m_videoram[offset] = data;
 	m_bg_tilemap->mark_tile_dirty(offset & 0x3ff);
 }
 
-WRITE8_MEMBER(gaplus_base_state::starfield_control_w)
+void gaplus_base_state::starfield_control_w(offs_t offset, uint8_t data)
 {
 	m_starfield_control[offset & 3] = data;
 }
@@ -262,7 +262,7 @@ void gaplus_base_state::starfield_render(bitmap_ind16 &bitmap)
 
 		if (x >= 0 && x < width && y >= 0 && y < height)
 		{
-			bitmap.pix16(y, x) = m_stars[i].col;
+			bitmap.pix(y, x) = m_stars[i].col;
 		}
 	}
 }
@@ -373,7 +373,7 @@ WRITE_LINE_MEMBER(gaplus_base_state::screen_vblank)/* update starfields */
 					/* scroll down (speed 2) */
 					stars[i].x += SPEED_2;
 				break;
-				
+
 				case 0x80:
 					/* scroll up (speed 1) */
 					stars[i].x -= SPEED_1;

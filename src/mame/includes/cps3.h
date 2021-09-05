@@ -38,7 +38,7 @@ public:
 				 {*this, "simm7.%u", 0U}}
 		, m_mainram(*this, "mainram")
 		, m_spriteram(*this, "spriteram")
-		, m_colourram(*this, "colourram", 0)
+		, m_colourram(*this, "colourram", 0x40000, ENDIANNESS_BIG)
 		, m_ppu_gscroll(*this, "ppu_gscroll_regs")
 		, m_tilemap_regs(*this, "ppu_tmap_regs")
 		, m_ppu_crtc_zoom(*this, "ppu_crtc_zoom")
@@ -92,7 +92,7 @@ protected:
 
 	required_shared_ptr<u32> m_mainram;
 	required_shared_ptr<u32> m_spriteram;
-	required_shared_ptr<u16> m_colourram;
+	memory_share_creator<u16> m_colourram;
 	required_shared_ptr<u32> m_ppu_gscroll;
 	required_shared_ptr<u32> m_tilemap_regs;
 	required_shared_ptr<u32> m_ppu_crtc_zoom;
@@ -118,6 +118,7 @@ private:
 	bitmap_rgb32 m_renderbuffer_bitmap;
 	rectangle m_renderbuffer_clip;
 	u8* m_user4;
+	std::unique_ptr<u8[]> m_user4_allocated;
 	u32 m_key1;
 	u32 m_key2;
 	int m_altEncryption;
@@ -138,6 +139,7 @@ private:
 	u16 m_lastb;
 	u16 m_lastb2;
 	u8* m_user5;
+	std::unique_ptr<u8[]> m_user5_allocated;
 
 	u8 ssram_r(offs_t offset);
 	void ssram_w(offs_t offset, u8 data);

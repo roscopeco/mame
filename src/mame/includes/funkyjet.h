@@ -5,11 +5,21 @@
     Funky Jet
 
 *************************************************************************/
+#ifndef MAME_INCLUDES_FUNKYJET_H
+#define MAME_INCLUDES_FUNKYJET_H
 
-#include "cpu/h6280/h6280.h"
-#include "video/decospr.h"
-#include "video/deco16ic.h"
+#pragma once
+
+// mame
 #include "machine/deco146.h"
+#include "video/deco16ic.h"
+#include "video/decospr.h"
+
+// devices
+#include "cpu/h6280/h6280.h"
+
+// emu
+#include "screen.h"
 
 
 class funkyjet_state : public driver_device
@@ -19,6 +29,7 @@ public:
 		: driver_device(mconfig, type, tag)
 		, m_spriteram(*this, "spriteram")
 		, m_pf_rowscroll(*this, "pf%u_rowscroll", 1)
+		, m_screen(*this, "screen")
 		, m_maincpu(*this, "maincpu")
 		, m_audiocpu(*this, "audiocpu")
 		, m_deco146(*this, "ioprot")
@@ -31,11 +42,12 @@ public:
 	void init_funkyjet();
 
 private:
-	/* memory pointers */
+	// memory pointers
 	required_shared_ptr<uint16_t> m_spriteram;
 	required_shared_ptr_array<uint16_t, 2> m_pf_rowscroll;
 
-	/* devices */
+	// devices
+	required_device<screen_device> m_screen;
 	required_device<cpu_device> m_maincpu;
 	required_device<h6280_device> m_audiocpu;
 	required_device<deco146_device> m_deco146;
@@ -44,8 +56,10 @@ private:
 
 	uint32_t screen_update(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect);
 
-	DECLARE_READ16_MEMBER( funkyjet_protection_region_0_146_r );
-	DECLARE_WRITE16_MEMBER( funkyjet_protection_region_0_146_w );
+	uint16_t funkyjet_protection_region_0_146_r(offs_t offset);
+	void funkyjet_protection_region_0_146_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
 	void funkyjet_map(address_map &map);
 	void sound_map(address_map &map);
 };
+
+#endif // MAME_INCLUDES_FUNKYJET_H

@@ -40,12 +40,12 @@ public:
 		, m_sub2_nmi_mask(0)
 	{ }
 
-	DECLARE_READ8_MEMBER(bosco_dsw_r);
+	uint8_t bosco_dsw_r(offs_t offset);
 	DECLARE_WRITE_LINE_MEMBER(flip_screen_w);
 	DECLARE_WRITE_LINE_MEMBER(irq1_clear_w);
 	DECLARE_WRITE_LINE_MEMBER(irq2_clear_w);
 	DECLARE_WRITE_LINE_MEMBER(nmion_w);
-	DECLARE_WRITE8_MEMBER(galaga_videoram_w);
+	void galaga_videoram_w(offs_t offset, uint8_t data);
 	DECLARE_WRITE_LINE_MEMBER(gatsbee_bank_w);
 	void out(uint8_t data);
 	DECLARE_WRITE_LINE_MEMBER(lockout);
@@ -55,7 +55,6 @@ public:
 	void init_gatsbee();
 	TILEMAP_MAPPER_MEMBER(tilemap_scan);
 	TILE_GET_INFO_MEMBER(get_tile_info);
-	DECLARE_VIDEO_START(galaga);
 	void galaga_palette(palette_device &palette) const;
 	uint32_t screen_update_galaga(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect);
 	DECLARE_WRITE_LINE_MEMBER(screen_vblank_galaga);
@@ -75,8 +74,9 @@ public:
 protected:
 	virtual void machine_start() override;
 	virtual void machine_reset() override;
+	virtual void video_start() override;
 
-	/* memory pointers */
+	/* memory pointers, devices */
 	optional_shared_ptr<uint8_t> m_videoram;
 	optional_shared_ptr<uint8_t> m_galaga_ram1;
 	optional_shared_ptr<uint8_t> m_galaga_ram2;
@@ -93,11 +93,7 @@ protected:
 	optional_device<starfield_05xx_device> m_starfield; // not present on battles, digdug, xevious
 	emu_timer *m_cpu3_interrupt_timer;
 
-	uint32_t m_galaga_gfxbank; // used by catsbee
-
-	/* devices */
-
-	/* bank support */
+	uint32_t m_galaga_gfxbank; // used by gatsbee
 
 	/* shared */
 	tilemap_t *m_fg_tilemap;

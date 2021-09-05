@@ -7,7 +7,6 @@
 
  ***********************************************************************************************************/
 
-
 #include "emu.h"
 #include "slot.h"
 
@@ -115,7 +114,7 @@ static int crvision_get_pcb_id(const char *slot)
 {
 	for (auto & elem : slot_list)
 	{
-		if (!core_stricmp(elem.slot_option, slot))
+		if (!strcmp(elem.slot_option, slot))
 			return elem.pcb_id;
 	}
 
@@ -146,7 +145,7 @@ image_init_result crvision_cart_slot_device::call_load()
 
 		if (size > 0x4800)
 		{
-			seterror(IMAGE_ERROR_UNSPECIFIED, "Image extends beyond the expected size for an APF cart");
+			seterror(image_error::INVALIDIMAGE, "Image extends beyond the expected size for an APF cart");
 			return image_init_result::FAIL;
 		}
 

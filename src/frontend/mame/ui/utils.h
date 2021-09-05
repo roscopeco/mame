@@ -12,6 +12,7 @@
 
 #pragma once
 
+#include "softlist.h"
 #include "unicode.h"
 
 #include <algorithm>
@@ -79,7 +80,7 @@ struct ui_software_info
 	std::string parentname;
 	std::string year;
 	std::string publisher;
-	uint8_t supported = 0;
+	software_support supported = software_support::SUPPORTED;
 	std::string part;
 	game_driver const *driver = nullptr;
 	std::string listname;

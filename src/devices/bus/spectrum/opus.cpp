@@ -44,9 +44,11 @@ ioport_constructor spectrum_opus_device::device_input_ports() const
 //  MACHINE_DRIVER( opus )
 //-------------------------------------------------
 
-FLOPPY_FORMATS_MEMBER( spectrum_opus_device::floppy_formats )
-	FLOPPY_OPD_FORMAT
-FLOPPY_FORMATS_END
+void spectrum_opus_device::floppy_formats(format_registration &fr)
+{
+	fr.add_mfm_containers();
+	fr.add(FLOPPY_OPD_FORMAT);
+}
 
 static void spectrum_floppies(device_slot_interface &device)
 {
@@ -139,7 +141,6 @@ void spectrum_opus_device::device_start()
 
 	save_item(NAME(m_romcs));
 	save_item(NAME(m_ram));
-	save_item(NAME(m_last_pc));
 }
 
 //-------------------------------------------------
@@ -149,7 +150,6 @@ void spectrum_opus_device::device_start()
 void spectrum_opus_device::device_reset()
 {
 	m_romcs = 0;
-	m_last_pc = 0x0000;
 }
 
 
@@ -162,13 +162,13 @@ READ_LINE_MEMBER(spectrum_opus_device::romcs)
 	return m_romcs | m_exp->romcs();
 }
 
-void spectrum_opus_device::pre_opcode_fetch(offs_t offset)
+void spectrum_opus_device::post_opcode_fetch(offs_t offset)
 {
-	m_exp->pre_opcode_fetch(offset);
+	m_exp->post_opcode_fetch(offset);
 
 	if (!machine().side_effects_disabled())
 	{
-		switch (m_last_pc)
+		switch (offset)
 		{
 		case 0x0008: case 0x0048: case 0x1708:
 			m_romcs = 1;
@@ -178,7 +178,6 @@ void spectrum_opus_device::pre_opcode_fetch(offs_t offset)
 			break;
 		}
 	}
-	m_last_pc = offset;
 }
 
 uint8_t spectrum_opus_device::iorq_r(offs_t offset)
@@ -191,11 +190,6 @@ uint8_t spectrum_opus_device::iorq_r(offs_t offset)
 		data &= m_joy->read() & 0x1f;
 	}
 	return data;
-}
-
-void spectrum_opus_device::iorq_w(offs_t offset, uint8_t data)
-{
-	m_exp->iorq_w(offset, data);
 }
 
 uint8_t spectrum_opus_device::mreq_r(offs_t offset)
@@ -274,6 +268,7 @@ void spectrum_opus_device::pia_out_a(uint8_t data)
 
 void spectrum_opus_device::pia_out_b(uint8_t data)
 {
+	m_centronics->write_data0(BIT(data, 0));
 	m_centronics->write_data1(BIT(data, 1));
 	m_centronics->write_data2(BIT(data, 2));
 	m_centronics->write_data3(BIT(data, 3));

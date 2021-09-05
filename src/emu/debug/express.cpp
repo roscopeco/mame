@@ -31,6 +31,8 @@
 
 #include "emu.h"
 #include "express.h"
+
+#include "corestr.h"
 #include <cctype>
 
 
@@ -39,7 +41,9 @@
     DEBUGGING
 ***************************************************************************/
 
-#define DEBUG_TOKENS            0
+#define LOG_OUTPUT_FUNC         osd_printf_info
+#define VERBOSE                 0
+#include "logmacro.h"
 
 
 
@@ -131,6 +135,10 @@ public:
 	// construction/destruction
 	function_symbol_entry(symbol_table &table, const char *name, int minparams, int maxparams, symbol_table::execute_func execute);
 
+	// getters
+	u16 minparams() const { return m_minparams; }
+	u16 maxparams() const { return m_maxparams; }
+
 	// symbol access
 	virtual bool is_lval() const override;
 	virtual u64 value() const override;
@@ -157,7 +165,7 @@ private:
 //  given expression error
 //-------------------------------------------------
 
-const char *expression_error::code_string() const
+std::string expression_error::code_string() const
 {
 	switch (m_code)
 	{
@@ -173,6 +181,8 @@ const char *expression_error::code_string() const
 		case DIVIDE_BY_ZERO:        return "divide by zero";
 		case OUT_OF_MEMORY:         return "out of memory";
 		case INVALID_PARAM_COUNT:   return "invalid number of parameters";
+		case TOO_FEW_PARAMS:        return util::string_format("too few parameters (at least %d required)", m_num);
+		case TOO_MANY_PARAMS:       return util::string_format("too many parameters (no more than %d accepted)", m_num);
 		case UNBALANCED_QUOTES:     return "unbalanced quotes";
 		case TOO_MANY_STRINGS:      return "too many strings";
 		case INVALID_MEMORY_SIZE:   return "invalid memory size (b/w/d/q expected)";
@@ -283,7 +293,7 @@ void integer_symbol_entry::set_value(u64 newvalue)
 	if (m_setter != nullptr)
 		m_setter(newvalue);
 	else
-		throw emu_fatalerror("Symbol '%s' is read-only", m_name.c_str());
+		throw emu_fatalerror("Symbol '%s' is read-only", m_name);
 }
 
 
@@ -321,7 +331,7 @@ bool function_symbol_entry::is_lval() const
 
 u64 function_symbol_entry::value() const
 {
-	throw emu_fatalerror("Symbol '%s' is a function and cannot be used in this context", m_name.c_str());
+	throw emu_fatalerror("Symbol '%s' is a function and cannot be used in this context", m_name);
 }
 
 
@@ -331,7 +341,7 @@ u64 function_symbol_entry::value() const
 
 void function_symbol_entry::set_value(u64 newvalue)
 {
-	throw emu_fatalerror("Symbol '%s' is a function and cannot be written", m_name.c_str());
+	throw emu_fatalerror("Symbol '%s' is a function and cannot be written", m_name);
 }
 
 
@@ -342,9 +352,9 @@ void function_symbol_entry::set_value(u64 newvalue)
 u64 function_symbol_entry::execute(int numparams, const u64 *paramlist)
 {
 	if (numparams < m_minparams)
-		throw emu_fatalerror("Function '%s' requires at least %d parameters", m_name.c_str(), m_minparams);
+		throw emu_fatalerror("Function '%s' requires at least %d parameters", m_name, m_minparams);
 	if (numparams > m_maxparams)
-		throw emu_fatalerror("Function '%s' accepts no more than %d parameters", m_name.c_str(), m_maxparams);
+		throw emu_fatalerror("Function '%s' accepts no more than %d parameters", m_name, m_maxparams);
 	return m_execute(numparams, paramlist);
 }
 
@@ -537,9 +547,7 @@ void symbol_table::write_memory(address_space &space, offs_t address, u64 data, 
 device_t *symbol_table::expression_get_device(const char *tag)
 {
 	// convert to lowercase then lookup the name (tags are enforced to be all lower case)
-	std::string fullname(tag);
-	strmakelower(fullname);
-	return m_machine.root_device().subdevice(fullname.c_str());
+	return m_machine.root_device().subdevice(strmakelower(tag));
 }
 
 
@@ -1083,7 +1091,7 @@ void parsed_expression::parse(const char *expression)
 {
 	// copy the string and reset our parsing state
 	m_original_string.assign(expression);
-	m_tokenlist.reset();
+	m_tokenlist.clear();
 	m_stringlist.clear();
 
 	// first parse the tokens into the token array in order
@@ -1113,89 +1121,72 @@ void parsed_expression::copy(const parsed_expression &src)
 //  human readable token representation
 //-------------------------------------------------
 
-void parsed_expression::print_tokens(FILE *out)
+void parsed_expression::print_tokens()
 {
-#if DEBUG_TOKENS
-	osd_printf_debug("----\n");
-	for (parse_token *token = m_tokens.first(); token != nullptr; token = token->next())
+	LOG("----\n");
+	for (parse_token &token : m_tokenlist)
 	{
-		switch (token->type)
+		if (token.is_number())
+			LOG("NUMBER: %016X\n", token.value());
+		else if (token.is_string())
+			LOG("STRING: ""%s""\n", token.string());
+		else if (token.is_symbol())
+			LOG("SYMBOL: %s%s%s\n", token.symbol().name(), token.symbol().is_function() ? "()" : "", token.symbol().is_lval() ? " &" : "");
+		else if (token.is_operator())
 		{
-			default:
-			case parse_token::INVALID:
-				fprintf(out, "INVALID\n");
-				break;
-
-			case parse_token::END:
-				fprintf(out, "END\n");
-				break;
-
-			case parse_token::NUMBER:
-				fprintf(out, "NUMBER: %08X%08X\n", (u32)(token->value.i >> 32), u32(token->value.i));
-				break;
-
-			case parse_token::STRING:
-				fprintf(out, "STRING: ""%s""\n", token->string);
-				break;
-
-			case parse_token::SYMBOL:
-				fprintf(out, "SYMBOL: %08X%08X\n", u32(token->value.i >> 32), u32(token->value.i));
-				break;
-
-			case parse_token::OPERATOR:
-				switch (token->value.i)
-				{
-					case TVL_LPAREN:        fprintf(out, "(\n");                    break;
-					case TVL_RPAREN:        fprintf(out, ")\n");                    break;
-					case TVL_PLUSPLUS:      fprintf(out, "++ (unspecified)\n");     break;
-					case TVL_MINUSMINUS:    fprintf(out, "-- (unspecified)\n");     break;
-					case TVL_PREINCREMENT:  fprintf(out, "++ (prefix)\n");          break;
-					case TVL_PREDECREMENT:  fprintf(out, "-- (prefix)\n");          break;
-					case TVL_POSTINCREMENT: fprintf(out, "++ (postfix)\n");         break;
-					case TVL_POSTDECREMENT: fprintf(out, "-- (postfix)\n");         break;
-					case TVL_COMPLEMENT:    fprintf(out, "!\n");                    break;
-					case TVL_NOT:           fprintf(out, "~\n");                    break;
-					case TVL_UPLUS:         fprintf(out, "+ (unary)\n");            break;
-					case TVL_UMINUS:        fprintf(out, "- (unary)\n");            break;
-					case TVL_MULTIPLY:      fprintf(out, "*\n");                    break;
-					case TVL_DIVIDE:        fprintf(out, "/\n");                    break;
-					case TVL_MODULO:        fprintf(out, "%%\n");                   break;
-					case TVL_ADD:           fprintf(out, "+\n");                    break;
-					case TVL_SUBTRACT:      fprintf(out, "-\n");                    break;
-					case TVL_LSHIFT:        fprintf(out, "<<\n");                   break;
-					case TVL_RSHIFT:        fprintf(out, ">>\n");                   break;
-					case TVL_LESS:          fprintf(out, "<\n");                    break;
-					case TVL_LESSOREQUAL:   fprintf(out, "<=\n");                   break;
-					case TVL_GREATER:       fprintf(out, ">\n");                    break;
-					case TVL_GREATEROREQUAL:fprintf(out, ">=\n");                   break;
-					case TVL_EQUAL:         fprintf(out, "==\n");                   break;
-					case TVL_NOTEQUAL:      fprintf(out, "!=\n");                   break;
-					case TVL_BAND:          fprintf(out, "&\n");                    break;
-					case TVL_BXOR:          fprintf(out, "^\n");                    break;
-					case TVL_BOR:           fprintf(out, "|\n");                    break;
-					case TVL_LAND:          fprintf(out, "&&\n");                   break;
-					case TVL_LOR:           fprintf(out, "||\n");                   break;
-					case TVL_ASSIGN:        fprintf(out, "=\n");                    break;
-					case TVL_ASSIGNMULTIPLY:fprintf(out, "*=\n");                   break;
-					case TVL_ASSIGNDIVIDE:  fprintf(out, "/=\n");                   break;
-					case TVL_ASSIGNMODULO:  fprintf(out, "%%=\n");                  break;
-					case TVL_ASSIGNADD:     fprintf(out, "+=\n");                   break;
-					case TVL_ASSIGNSUBTRACT:fprintf(out, "-=\n");                   break;
-					case TVL_ASSIGNLSHIFT:  fprintf(out, "<<=\n");                  break;
-					case TVL_ASSIGNRSHIFT:  fprintf(out, ">>=\n");                  break;
-					case TVL_ASSIGNBAND:    fprintf(out, "&=\n");                   break;
-					case TVL_ASSIGNBXOR:    fprintf(out, "^=\n");                   break;
-					case TVL_ASSIGNBOR:     fprintf(out, "|=\n");                   break;
-					case TVL_COMMA:         fprintf(out, ",\n");                    break;
-					case TVL_MEMORYAT:      fprintf(out, token.memory_size_effect() ? "mem!\n" : "mem@\n");break;
-					case TVL_EXECUTEFUNC:   fprintf(out, "execute\n");              break;
-					default:                fprintf(out, "INVALID OPERATOR\n");     break;
-				}
-				break;
+			switch (token.optype())
+			{
+			case TVL_LPAREN:        LOG("(\n");                    break;
+			case TVL_RPAREN:        LOG(")\n");                    break;
+			case TVL_PLUSPLUS:      LOG("++ (unspecified)\n");     break;
+			case TVL_MINUSMINUS:    LOG("-- (unspecified)\n");     break;
+			case TVL_PREINCREMENT:  LOG("++ (prefix)\n");          break;
+			case TVL_PREDECREMENT:  LOG("-- (prefix)\n");          break;
+			case TVL_POSTINCREMENT: LOG("++ (postfix)\n");         break;
+			case TVL_POSTDECREMENT: LOG("-- (postfix)\n");         break;
+			case TVL_COMPLEMENT:    LOG("!\n");                    break;
+			case TVL_NOT:           LOG("~\n");                    break;
+			case TVL_UPLUS:         LOG("+ (unary)\n");            break;
+			case TVL_UMINUS:        LOG("- (unary)\n");            break;
+			case TVL_MULTIPLY:      LOG("*\n");                    break;
+			case TVL_DIVIDE:        LOG("/\n");                    break;
+			case TVL_MODULO:        LOG("%%\n");                   break;
+			case TVL_ADD:           LOG("+\n");                    break;
+			case TVL_SUBTRACT:      LOG("-\n");                    break;
+			case TVL_LSHIFT:        LOG("<<\n");                   break;
+			case TVL_RSHIFT:        LOG(">>\n");                   break;
+			case TVL_LESS:          LOG("<\n");                    break;
+			case TVL_LESSOREQUAL:   LOG("<=\n");                   break;
+			case TVL_GREATER:       LOG(">\n");                    break;
+			case TVL_GREATEROREQUAL:LOG(">=\n");                   break;
+			case TVL_EQUAL:         LOG("==\n");                   break;
+			case TVL_NOTEQUAL:      LOG("!=\n");                   break;
+			case TVL_BAND:          LOG("&\n");                    break;
+			case TVL_BXOR:          LOG("^\n");                    break;
+			case TVL_BOR:           LOG("|\n");                    break;
+			case TVL_LAND:          LOG("&&\n");                   break;
+			case TVL_LOR:           LOG("||\n");                   break;
+			case TVL_ASSIGN:        LOG("=\n");                    break;
+			case TVL_ASSIGNMULTIPLY:LOG("*=\n");                   break;
+			case TVL_ASSIGNDIVIDE:  LOG("/=\n");                   break;
+			case TVL_ASSIGNMODULO:  LOG("%%=\n");                  break;
+			case TVL_ASSIGNADD:     LOG("+=\n");                   break;
+			case TVL_ASSIGNSUBTRACT:LOG("-=\n");                   break;
+			case TVL_ASSIGNLSHIFT:  LOG("<<=\n");                  break;
+			case TVL_ASSIGNRSHIFT:  LOG(">>=\n");                  break;
+			case TVL_ASSIGNBAND:    LOG("&=\n");                   break;
+			case TVL_ASSIGNBXOR:    LOG("^=\n");                   break;
+			case TVL_ASSIGNBOR:     LOG("|=\n");                   break;
+			case TVL_COMMA:         LOG(",\n");                    break;
+			case TVL_MEMORYAT:      LOG(token.memory_side_effects() ? "mem!\n" : "mem@\n");break;
+			case TVL_EXECUTEFUNC:   LOG("execute\n");              break;
+			default:                LOG("INVALID OPERATOR\n");     break;
+			}
 		}
+		else
+			LOG("INVALID\n");
 	}
-	osd_printf_debug("----\n");
-#endif
+	LOG("----\n");
 }
 
 
@@ -1218,7 +1209,8 @@ void parsed_expression::parse_string_into_tokens()
 			break;
 
 		// initialize the current token object
-		parse_token &token = m_tokenlist.append(*global_alloc(parse_token(string - stringstart)));
+		m_tokenlist.emplace_back(string - stringstart);
+		parse_token &token = m_tokenlist.back();
 
 		// switch off the first character
 		switch (tolower(u8(string[0])))
@@ -1477,7 +1469,7 @@ void parsed_expression::parse_symbol_or_number(parse_token &token, const char *&
 		default:
 			; // fall through
 		}
-		// fall through
+		[[fallthrough]];
 
 	default:
 		// check for a symbol match
@@ -1489,7 +1481,8 @@ void parsed_expression::parse_symbol_or_number(parse_token &token, const char *&
 			// if this is a function symbol, synthesize an execute function operator
 			if (symbol->is_function())
 			{
-				parse_token &newtoken = m_tokenlist.append(*global_alloc(parse_token(string - stringstart)));
+				m_tokenlist.emplace_back(string - stringstart);
+				parse_token &newtoken = m_tokenlist.back();
 				newtoken.configure_operator(TVL_EXECUTEFUNC, 0);
 			}
 			return;
@@ -1688,9 +1681,8 @@ void parsed_expression::parse_memory_operator(parse_token &token, const char *st
 //  ambiguities based on neighboring tokens
 //-------------------------------------------------
 
-void parsed_expression::normalize_operator(parse_token *prevtoken, parse_token &thistoken)
+void parsed_expression::normalize_operator(parse_token &thistoken, parse_token *prevtoken, parse_token *nexttoken, const std::list<parse_token> &stack, bool was_rparen)
 {
-	parse_token *nexttoken = thistoken.next();
 	switch (thistoken.optype())
 	{
 		// Determine if an open paren is part of a function or not
@@ -1724,15 +1716,15 @@ void parsed_expression::normalize_operator(parse_token *prevtoken, parse_token &
 		case TVL_SUBTRACT:
 			// Assume we're unary if we are the first token, or if the previous token is not
 			// a symbol, a number, or a right parenthesis
-			if (prevtoken == nullptr || (!prevtoken->is_symbol() && !prevtoken->is_number() && !prevtoken->is_operator(TVL_RPAREN)))
+			if (prevtoken == nullptr || (!prevtoken->is_symbol() && !prevtoken->is_number() && !was_rparen))
 				thistoken.configure_operator(thistoken.is_operator(TVL_ADD) ? TVL_UPLUS : TVL_UMINUS, 2);
 			break;
 
 		// Determine if , refers to a function parameter
 		case TVL_COMMA:
-			for (auto lookback = m_token_stack.rbegin(); lookback != m_token_stack.rend(); ++lookback)
+			for (auto lookback = stack.begin(); lookback != stack.end(); ++lookback)
 			{
-				parse_token &peek = *lookback;
+				const parse_token &peek = *lookback;
 
 				// if we hit an execute function operator, or else a left parenthesis that is
 				// already tagged, then tag us as well
@@ -1754,51 +1746,63 @@ void parsed_expression::normalize_operator(parse_token *prevtoken, parse_token &
 
 void parsed_expression::infix_to_postfix()
 {
-	simple_list<parse_token> stack;
+	std::list<parse_token> stack;
+	parse_token *prev = nullptr;
+
+	// this flag is used to avoid looking back at a closing parenthesis that was already destroyed
+	bool was_rparen = false;
 
 	// loop over all the original tokens
-	parse_token *prev = nullptr;
-	parse_token *next;
-	for (parse_token *token = m_tokenlist.detach_all(); token != nullptr; prev = token, token = next)
+	std::list<parse_token>::iterator next;
+	std::list<parse_token> origlist = std::move(m_tokenlist);
+	m_tokenlist.clear();
+	for (std::list<parse_token>::iterator token = origlist.begin(); token != origlist.end(); token = next)
 	{
 		// pre-determine our next token
-		next = token->next();
+		next = std::next(token);
 
 		// if the character is an operand, append it to the result string
 		if (token->is_number() || token->is_symbol() || token->is_string())
-			m_tokenlist.append(*token);
+		{
+			m_tokenlist.splice(m_tokenlist.end(), origlist, token);
+
+			// remember this as the previous token
+			prev = &*token;
+			was_rparen = false;
+		}
 
 		// if this is an operator, process it
 		else if (token->is_operator())
 		{
 			// normalize the operator based on neighbors
-			normalize_operator(prev, *token);
+			normalize_operator(*token, prev, next != m_tokenlist.end() ? &*next : nullptr, stack, was_rparen);
+			was_rparen = false;
 
 			// if the token is an opening parenthesis, push it onto the stack.
 			if (token->is_operator(TVL_LPAREN))
-				stack.prepend(*token);
+				stack.splice(stack.begin(), origlist, token);
 
 			// if the token is a closing parenthesis, pop all operators until we
 			// reach an opening parenthesis and append them to the result string,
-			// discaring the open parenthesis
+			// discarding the open parenthesis
 			else if (token->is_operator(TVL_RPAREN))
 			{
-				// loop until we find our matching opener
-				parse_token *popped;
-				while ((popped = stack.detach_head()) != nullptr)
-				{
-					if (popped->is_operator(TVL_LPAREN))
-						break;
-					m_tokenlist.append(*popped);
-				}
+				// find our matching opener
+				std::list<parse_token>::iterator lparen = std::find_if(stack.begin(), stack.end(),
+					[] (const parse_token &token) { return token.is_operator(TVL_LPAREN); }
+				);
 
 				// if we didn't find an open paren, it's an error
-				if (popped == nullptr)
+				if (lparen == stack.end())
 					throw expression_error(expression_error::UNBALANCED_PARENS, token->offset());
 
+				// move the stacked operators to the end of the new list
+				m_tokenlist.splice(m_tokenlist.end(), stack, stack.begin(), lparen);
+
 				// free ourself and our matching opening parenthesis
-				global_free(token);
-				global_free(popped);
+				origlist.erase(token);
+				stack.erase(lparen);
+				was_rparen = true;
 			}
 
 			// if the token is an operator, pop operators until we reach an opening parenthesis,
@@ -1809,8 +1813,8 @@ void parsed_expression::infix_to_postfix()
 				int our_precedence = token->precedence();
 
 				// loop until we can't peek at the stack anymore
-				parse_token *peek;
-				while ((peek = stack.first()) != nullptr)
+				std::list<parse_token>::iterator peek;
+				for (peek = stack.begin(); peek != stack.end(); ++peek)
 				{
 					// break if any of the above conditions are true
 					if (peek->is_operator(TVL_LPAREN))
@@ -1818,28 +1822,29 @@ void parsed_expression::infix_to_postfix()
 					int stack_precedence = peek->precedence();
 					if (stack_precedence > our_precedence || (stack_precedence == our_precedence && peek->right_to_left()))
 						break;
-
-					// pop this token
-					m_tokenlist.append(*stack.detach_head());
 				}
 
+				// move the stacked operands to the end of the new list
+				m_tokenlist.splice(m_tokenlist.end(), stack, stack.begin(), peek);
+
 				// push the new operator
-				stack.prepend(*token);
+				stack.splice(stack.begin(), origlist, token);
 			}
+
+			if (!was_rparen)
+				prev = &*token;
 		}
 	}
 
-	// finish popping the stack
-	parse_token *popped;
-	while ((popped = stack.detach_head()) != nullptr)
-	{
-		// it is an error to have a left parenthesis still on the stack
-		if (popped->is_operator(TVL_LPAREN))
-			throw expression_error(expression_error::UNBALANCED_PARENS, popped->offset());
+	// it is an error to have a left parenthesis still on the stack
+	std::list<parse_token>::iterator lparen = std::find_if(stack.begin(), stack.end(),
+		[] (const parse_token &token) { return token.is_operator(TVL_LPAREN); }
+	);
+	if (lparen != stack.end())
+		throw expression_error(expression_error::UNBALANCED_PARENS, lparen->offset());
 
-		// pop this token
-		m_tokenlist.append(*popped);
-	}
+	// pop all remaining tokens
+	m_tokenlist.splice(m_tokenlist.end(), stack, stack.begin(), stack.end());
 }
 
 
@@ -2185,8 +2190,7 @@ u64 parsed_expression::execute_tokens()
 //-------------------------------------------------
 
 parsed_expression::parse_token::parse_token(int offset)
-	: m_next(nullptr),
-		m_type(INVALID),
+	: m_type(INVALID),
 		m_offset(offset),
 		m_value(0),
 		m_flags(0),
@@ -2253,7 +2257,7 @@ void parsed_expression::execute_function(parse_token &token)
 		// if it is a function symbol, break out of the loop
 		if (peek.is_symbol())
 		{
-			symbol = peek.symbol();
+			symbol = &peek.symbol();
 			if (symbol->is_function())
 			{
 				m_token_stack.pop_back();
@@ -2271,8 +2275,14 @@ void parsed_expression::execute_function(parse_token &token)
 	if (paramcount == MAX_FUNCTION_PARAMS)
 		throw expression_error(expression_error::INVALID_PARAM_COUNT, token.offset());
 
-	// execute the function and push the result
+	// validate parameters
 	function_symbol_entry *function = downcast<function_symbol_entry *>(symbol);
+	if (paramcount < function->minparams())
+		throw expression_error(expression_error::TOO_FEW_PARAMS, token.offset(), function->minparams());
+	if (paramcount > function->maxparams())
+		throw expression_error(expression_error::TOO_MANY_PARAMS, token.offset(), function->maxparams());
+
+	// execute the function and push the result
 	parse_token result(token.offset());
 	result.configure_number(function->execute(paramcount, &funcparams[MAX_FUNCTION_PARAMS - paramcount]));
 	push_token(result);

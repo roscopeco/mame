@@ -85,20 +85,19 @@ AT-2
 
 #include "cpu/m68000/m68000.h"
 #include "cpu/z80/z80.h"
-#include "sound/2203intf.h"
-#include "sound/3526intf.h"
 #include "sound/dac.h"
-#include "sound/volt_reg.h"
+#include "sound/ymopn.h"
+#include "sound/ymopl.h"
 #include "screen.h"
 #include "speaker.h"
 
 
-WRITE16_MEMBER(terracre_state::amazon_sound_w)
+void terracre_state::amazon_sound_w(uint16_t data)
 {
 	m_soundlatch->write(((data & 0x7f) << 1) | 1);
 }
 
-READ8_MEMBER(terracre_state::soundlatch_clear_r)
+uint8_t terracre_state::soundlatch_clear_r()
 {
 	m_soundlatch->clear_w();
 	return 0;
@@ -487,9 +486,6 @@ void terracre_state::ym3526(machine_config &config)
 
 	DAC_8BIT_R2R(config, "dac1", 0).add_route(ALL_OUTPUTS, "speaker", 0.5); // unknown DAC
 	DAC_8BIT_R2R(config, "dac2", 0).add_route(ALL_OUTPUTS, "speaker", 0.5); // unknown DAC
-	voltage_regulator_device &vref(VOLTAGE_REGULATOR(config, "vref"));
-	vref.add_route(0, "dac1", 1.0, DAC_VREF_POS_INPUT); vref.add_route(0, "dac1", -1.0, DAC_VREF_NEG_INPUT);
-	vref.add_route(0, "dac2", 1.0, DAC_VREF_POS_INPUT); vref.add_route(0, "dac2", -1.0, DAC_VREF_NEG_INPUT);
 }
 
 void terracre_state::ym2203(machine_config &config)
@@ -517,7 +513,7 @@ void amazon_state::amazon_1412m2(machine_config &config)
 	amazon_base(config);
 	m_maincpu->set_addrmap(AS_PROGRAM, &amazon_state::amazon_1412m2_map);
 
-	NB1412M2(config, m_prot, XTAL(16'000'000)); // divided by 4 maybe
+	NB1412M2(config, m_prot, XTAL(16'000'000)/4); // divided by 4 maybe
 }
 
 

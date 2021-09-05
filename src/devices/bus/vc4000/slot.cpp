@@ -7,7 +7,6 @@
 
  ***********************************************************************************************************/
 
-
 #include "emu.h"
 #include "slot.h"
 
@@ -146,7 +145,7 @@ static int vc4000_get_pcb_id(const char *slot)
 {
 	for (auto & elem : slot_list)
 	{
-		if (!core_stricmp(elem.slot_option, slot))
+		if (!strcmp(elem.slot_option, slot))
 			return elem.pcb_id;
 	}
 
@@ -177,7 +176,7 @@ image_init_result vc4000_cart_slot_device::call_load()
 
 		if (size > 0x1800)
 		{
-			seterror(IMAGE_ERROR_UNSPECIFIED, "Image extends beyond the expected size for a VC4000 cart");
+			seterror(image_error::INVALIDIMAGE, "Image extends beyond the expected size for a VC4000 cart");
 			return image_init_result::FAIL;
 		}
 

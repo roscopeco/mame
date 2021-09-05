@@ -19,7 +19,7 @@ interface and paper tape reader as a single device.
 
 #include "intellec4.h"
 
-namespace bus { namespace intellec4 {
+namespace bus::intellec4 {
 
 class imm4_90_device : public device_t, public device_univ_card_interface, public device_image_interface
 {
@@ -41,10 +41,10 @@ protected:
 	virtual void device_start() override;
 
 private:
-	DECLARE_READ8_MEMBER(rom4_in) { return m_ready ? 0x07U : 0x0fU; }
-	DECLARE_READ8_MEMBER(rom6_in) { return ~m_data & 0x0fU; }
-	DECLARE_READ8_MEMBER(rom7_in) { return (~m_data >> 4) & 0x0fU; }
-	DECLARE_WRITE8_MEMBER(rom4_out) { advance(BIT(data, 3)); }
+	u8 rom4_in() { return m_ready ? 0x07U : 0x0fU; }
+	u8 rom6_in() { return ~m_data & 0x0fU; }
+	u8 rom7_in() { return (~m_data >> 4) & 0x0fU; }
+	void rom4_out(u8 data) { advance(BIT(data, 3)); }
 	DECLARE_WRITE_LINE_MEMBER(advance);
 	TIMER_CALLBACK_MEMBER(step);
 
@@ -56,7 +56,7 @@ private:
 	bool    m_stepping;
 };
 
-} } // namespace bus::intellec4
+} // namespace bus::intellec4
 
 DECLARE_DEVICE_TYPE_NS(INTELLEC4_TAPE_READER, bus::intellec4, imm4_90_device)
 

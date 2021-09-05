@@ -36,7 +36,8 @@ public:
 		m_screen(*this, "screen"),
 		m_palette(*this, "palette"),
 		m_soundlatch(*this, "soundlatch"),
-		m_palette_ptr(*this, "paletteram")
+		m_palette_ptr(*this, "paletteram"),
+		m_blit_region(*this, "blitter")
 	{ }
 
 	void NBMJDRV1_base(machine_config &config);
@@ -74,6 +75,12 @@ public:
 
 	void init_nbmj9195();
 
+protected:
+	virtual void machine_start() override;
+	virtual void machine_reset() override;
+	virtual void video_start() override;
+	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
+
 private:
 	required_device<tmpz84c011_device> m_maincpu;
 	required_device<screen_device> m_screen;
@@ -81,6 +88,8 @@ private:
 	required_device<generic_latch_8_device> m_soundlatch;
 
 	optional_shared_ptr<uint8_t> m_palette_ptr; //shabdama doesn't use it at least for now
+
+	required_region_ptr<uint8_t> m_blit_region;
 
 	int m_inputport;
 	int m_dipswbitsel;
@@ -115,7 +124,7 @@ private:
 	emu_timer *m_blitter_timer;
 
 	void soundbank_w(uint8_t data);
-	DECLARE_WRITE8_MEMBER(inputportsel_w);
+	void inputportsel_w(uint8_t data);
 	uint8_t mscoutm_dipsw_0_r();
 	uint8_t mscoutm_dipsw_1_r();
 	uint8_t mscoutm_cpu_portb_r();
@@ -124,23 +133,20 @@ private:
 	uint8_t others_cpu_portb_r();
 	uint8_t others_cpu_portc_r();
 	void soundcpu_porte_w(uint8_t data);
-	DECLARE_WRITE8_MEMBER(palette_w);
-	DECLARE_WRITE8_MEMBER(nb22090_palette_w);
-	DECLARE_WRITE8_MEMBER(blitter_0_w);
-	DECLARE_WRITE8_MEMBER(blitter_1_w);
-	DECLARE_READ8_MEMBER(blitter_0_r);
-	DECLARE_READ8_MEMBER(blitter_1_r);
-	DECLARE_WRITE8_MEMBER(clut_0_w);
-	DECLARE_WRITE8_MEMBER(clut_1_w);
+	void palette_w(offs_t offset, uint8_t data);
+	void nb22090_palette_w(offs_t offset, uint8_t data);
+	void blitter_0_w(offs_t offset, uint8_t data);
+	void blitter_1_w(offs_t offset, uint8_t data);
+	uint8_t blitter_0_r(offs_t offset);
+	uint8_t blitter_1_r(offs_t offset);
+	void clut_0_w(offs_t offset, uint8_t data);
+	void clut_1_w(offs_t offset, uint8_t data);
 	void clutsel_w(uint8_t data);
 	void gfxflag2_w(uint8_t data);
 	void outcoin_flag_w(uint8_t data);
 	void dipswbitsel_w(uint8_t data);
 	void mscoutm_inputportsel_w(uint8_t data);
 
-	virtual void machine_start() override;
-	virtual void machine_reset() override;
-	virtual void video_start() override;
 	DECLARE_VIDEO_START(_1layer);
 	DECLARE_VIDEO_START(nb22090);
 
@@ -187,8 +193,6 @@ private:
 	void sailorws_sound_map(address_map &map);
 	void yosimotm_io_map(address_map &map);
 	void yosimoto_io_map(address_map &map);
-
-	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
 };
 
 #endif // MAME_INCLUDES_NBMJ9195_H

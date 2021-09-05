@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "sound/ym2151.h"
+#include "sound/ymopm.h"
 #include "cpu/z80/z80.h"
 
 class t5182_device : public device_t
@@ -58,7 +58,7 @@ private:
 	TIMER_CALLBACK_MEMBER( setirq_callback );
 
 	void sharedram_semaphore_snd_acquire_w(uint8_t data);
-	void sharedram_semaphore_snd_release_w(uint8_t data);;
+	void sharedram_semaphore_snd_release_w(uint8_t data);
 	uint8_t sharedram_semaphore_main_r();
 	void ym2151_irq_ack_w(uint8_t data);
 	void cpu_irq_ack_w(uint8_t data);

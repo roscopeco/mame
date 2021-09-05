@@ -17,7 +17,11 @@
 #pragma once
 
 #include "imagedev/harddriv.h"
+
 #include "formats/mfm_hd.h"
+
+#include <system_error>
+
 
 class mfm_harddisk_device;
 
@@ -27,7 +31,7 @@ public:
 	bool    dirty;
 	int     cylinder;
 	int     head;
-	uint16_t* encdata;            // MFM encoding per byte
+	std::unique_ptr<uint16_t []> encdata;            // MFM encoding per byte
 	mfmhd_trackimage* next;
 };
 
@@ -94,7 +98,7 @@ public:
 	attotime        track_end_time();
 
 	// Access the tracks on the image. Used as a callback from the cache.
-	chd_error       load_track(uint16_t* data, int cylinder, int head);
+	std::error_condition load_track(uint16_t* data, int cylinder, int head);
 	void            write_track(uint16_t* data, int cylinder, int head);
 
 	// Delivers the number of heads according to the loaded image
@@ -152,7 +156,7 @@ private:
 	attotime    m_settle_time;
 	attotime    m_step_time;
 
-	mfmhd_trackimage_cache* m_cache;
+	std::unique_ptr<mfmhd_trackimage_cache> m_cache;
 	mfmhd_image_format_t*   m_format;
 
 	void        head_move();

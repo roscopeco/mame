@@ -50,7 +50,7 @@ void rosco_state::rosco_map(address_map &map)
 
 void rosco_state::cpu_space_map(address_map &map)
 {
-    map(0xfffff0, 0xffffff).m(m_maincpu, FUNC(m68000_base_device::autovectors_map));
+    map(0xfffff0, 0xffffff).m(m_maincpu, FUNC(m68010_device::autovectors_map));
     map(0xfffff9, 0xfffff9).r(m_mfp, FUNC(mc68901_device::get_vector));
 }
 
@@ -65,7 +65,6 @@ static const input_device_default terminal_defaults[] =
 {
 	DEVICE_INPUT_DEFAULTS( "RS232_RXBAUD", 0xff, RS232_BAUD_9600 )
 	DEVICE_INPUT_DEFAULTS( "RS232_TXBAUD", 0xff, RS232_BAUD_9600 )
-	DEVICE_INPUT_DEFAULTS( "RS232_STARTBITS", 0xff, RS232_STARTBITS_1 )
 	DEVICE_INPUT_DEFAULTS( "RS232_DATABITS", 0xff, RS232_DATABITS_8 )
 	DEVICE_INPUT_DEFAULTS( "RS232_PARITY", 0xff, RS232_PARITY_NONE )
 	DEVICE_INPUT_DEFAULTS( "RS232_STOPBITS", 0xff, RS232_STOPBITS_1 )
@@ -129,11 +128,11 @@ QUICKLOAD_LOAD_MEMBER(rosco_state::quickload_cb)
 */
 void rosco_state::rosco(machine_config &config)
 {
-	M68000(config, m_maincpu, 8_MHz_XTAL);
+	M68010(config, m_maincpu, 10_MHz_XTAL);
 	m_maincpu->set_addrmap(AS_PROGRAM, &rosco_state::rosco_map);
 	m_maincpu->set_addrmap(m68000_base_device::AS_CPU_SPACE, &rosco_state::cpu_space_map);
 
-	MC68901(config, m_mfp, 8_MHz_XTAL);
+	MC68901(config, m_mfp, 10_MHz_XTAL);
 	m_mfp->set_timer_clock(3.6864_MHz_XTAL);
 	m_mfp->out_so_cb().set("rs232", FUNC(rs232_port_device::write_txd));
 	m_mfp->out_tdo_cb().set(m_mfp, FUNC(mc68901_device::rc_w));
@@ -162,7 +161,7 @@ void rosco_state::rosco(machine_config &config)
 
 ROM_START( rosco )
 	ROM_REGION16_BE(0x40000, "monitor", 0)
-	ROM_LOAD( "rosco_m68k_mame.rom.bin", 0x00000, 0x10000, CRC(d94ee259) SHA1(c144c8f8fe494953a18b898395326e7e511c2f39))
+	ROM_LOAD( "rosco_m68k_mame.rom.bin", 0x00000, 0x10000, CRC(479aa782) SHA1(a769e5d6c5a3cb56ccf6017130fe69c732eeb993))
 ROM_END
 
 COMP( 2020, rosco, 0, 0, rosco, rosco, rosco_state, empty_init, "Ross Bamford", "rosco-m68k", MACHINE_IS_SKELETON )

@@ -12,8 +12,8 @@
 #pragma once
 
 #include "cpu/m6809/m6809.h"
-#include "sound/ym2151.h"
 #include "sound/hc55516.h"
+#include "sound/ymopm.h"
 
 
 class wpcsnd_device : public device_t, public device_mixer_interface
@@ -56,8 +56,8 @@ private:
 
 	DECLARE_WRITE_LINE_MEMBER(ym2151_irq_w);
 
-	void bg_speech_clock_w(uint8_t data);
-	void bg_speech_digit_w(uint8_t data);
+	void bg_cvsd_clock_set_w(uint8_t data);
+	void bg_cvsd_digit_clock_clear_w(uint8_t data);
 	void rombank_w(uint8_t data);
 	uint8_t latch_r();
 	void latch_w(uint8_t data);

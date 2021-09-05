@@ -13,6 +13,7 @@
 
 #include "ui/moptions.h"
 
+#include "corestr.h"
 #include "drivenum.h"
 #include "softlist_dev.h"
 
@@ -44,7 +45,7 @@ inifile_manager::inifile_manager(ui_options &options)
 		if (core_filename_ends_with(name, ".ini"))
 		{
 			emu_file file(m_options.categoryini_path(), OPEN_FLAG_READ);
-			if (file.open(name) == osd_file::error::NONE)
+			if (!file.open(name))
 			{
 				init_category(std::move(name), file);
 				file.close();
@@ -62,7 +63,7 @@ void inifile_manager::load_ini_category(size_t file, size_t category, std::unord
 {
 	std::string const &filename(m_ini_index[file].first);
 	emu_file fp(m_options.categoryini_path(), OPEN_FLAG_READ);
-	if (fp.open(filename) != osd_file::error::NONE)
+	if (fp.open(filename))
 	{
 		osd_printf_error("Failed to open category file %s for reading\n", filename);
 		return;
@@ -98,7 +99,7 @@ void inifile_manager::init_category(std::string &&filename, emu_file &file)
 	categoryindex index;
 	char rbuf[MAX_CHAR_INFO];
 	std::string name;
-	while (file.gets(rbuf, ARRAY_LENGTH(rbuf)))
+	while (file.gets(rbuf, std::size(rbuf)))
 	{
 		if ('[' == rbuf[0])
 		{
@@ -142,7 +143,7 @@ bool favorite_manager::favorite_compare::operator()(ui_software_info const &lhs,
 		return true;
 	}
 
-	return 0 > std::strncmp(lhs.driver->name, rhs.driver->name, ARRAY_LENGTH(lhs.driver->name));
+	return 0 > std::strncmp(lhs.driver->name, rhs.driver->name, std::size(lhs.driver->name));
 }
 
 bool favorite_manager::favorite_compare::operator()(ui_software_info const &lhs, game_driver const &rhs) const
@@ -152,7 +153,7 @@ bool favorite_manager::favorite_compare::operator()(ui_software_info const &lhs,
 	if (!lhs.startempty)
 		return false;
 	else
-		return 0 > std::strncmp(lhs.driver->name, rhs.name, ARRAY_LENGTH(rhs.name));
+		return 0 > std::strncmp(lhs.driver->name, rhs.name, std::size(rhs.name));
 }
 
 bool favorite_manager::favorite_compare::operator()(game_driver const &lhs, ui_software_info const &rhs) const
@@ -162,7 +163,7 @@ bool favorite_manager::favorite_compare::operator()(game_driver const &lhs, ui_s
 	if (!rhs.startempty)
 		return true;
 	else
-		return 0 > std::strncmp(lhs.name, rhs.driver->name, ARRAY_LENGTH(lhs.name));
+		return 0 > std::strncmp(lhs.name, rhs.driver->name, std::size(lhs.name));
 }
 
 bool favorite_manager::favorite_compare::operator()(ui_software_info const &lhs, running_software_key const &rhs) const
@@ -181,7 +182,7 @@ bool favorite_manager::favorite_compare::operator()(ui_software_info const &lhs,
 	else if (lhs.shortname > std::get<2>(rhs))
 		return false;
 	else
-		return 0 > std::strncmp(lhs.driver->name, std::get<0>(rhs).name, ARRAY_LENGTH(lhs.driver->name));
+		return 0 > std::strncmp(lhs.driver->name, std::get<0>(rhs).name, std::size(lhs.driver->name));
 }
 
 bool favorite_manager::favorite_compare::operator()(running_software_key const &lhs, ui_software_info const &rhs) const
@@ -200,7 +201,7 @@ bool favorite_manager::favorite_compare::operator()(running_software_key const &
 	else if (std::get<2>(lhs) > rhs.shortname)
 		return false;
 	else
-		return 0 > std::strncmp(std::get<0>(lhs).name, rhs.driver->name, ARRAY_LENGTH(rhs.driver->name));
+		return 0 > std::strncmp(std::get<0>(lhs).name, rhs.driver->name, std::size(rhs.driver->name));
 }
 
 
@@ -215,7 +216,7 @@ favorite_manager::favorite_manager(ui_options &options)
 	, m_need_sort(true)
 {
 	emu_file file(m_options.ui_path(), OPEN_FLAG_READ);
-	if (file.open(FAVORITE_FILENAME) == osd_file::error::NONE)
+	if (!file.open(FAVORITE_FILENAME))
 	{
 		char readbuf[1024];
 		file.gets(readbuf, 1024);
@@ -236,7 +237,7 @@ favorite_manager::favorite_manager(ui_options &options)
 			file.gets(readbuf, 1024);
 			tmpmatches.publisher = chartrimcarriage(readbuf);
 			file.gets(readbuf, 1024);
-			tmpmatches.supported = atoi(readbuf);
+			tmpmatches.supported = software_support(atoi(readbuf));
 			file.gets(readbuf, 1024);
 			tmpmatches.part = chartrimcarriage(readbuf);
 			file.gets(readbuf, 1024);
@@ -298,11 +299,11 @@ void favorite_manager::add_favorite(running_machine &machine)
 
 					// start with simple stuff that can just be copied
 					info.shortname = software->shortname();
-					info.longname = imagedev->longname();
+					info.longname = software->longname();
 					info.parentname = software->parentname();
-					info.year = imagedev->year();
-					info.publisher = imagedev->manufacturer();
-					info.supported = imagedev->supported();
+					info.year = software->year();
+					info.publisher = software->publisher();
+					info.supported = software->supported();
 					info.part = part->name();
 					info.driver = &driver;
 					info.listname = imagedev->software_list_name();
@@ -470,7 +471,7 @@ void favorite_manager::apply_running_machine(running_machine &machine, T &&actio
 	else
 	{
 		bool have_software(false);
-		for (device_image_interface &image_dev : image_interface_iterator(machine.root_device()))
+		for (device_image_interface &image_dev : image_interface_enumerator(machine.root_device()))
 		{
 			software_info const *const sw(image_dev.software_entry());
 			if (image_dev.exists() && image_dev.loaded_through_softlist() && sw)
@@ -536,7 +537,7 @@ void favorite_manager::save_favorites()
 {
 	// attempt to open the output file
 	emu_file file(m_options.ui_path(), OPEN_FLAG_WRITE | OPEN_FLAG_CREATE | OPEN_FLAG_CREATE_PATHS);
-	if (file.open(FAVORITE_FILENAME) == osd_file::error::NONE)
+	if (!file.open(FAVORITE_FILENAME))
 	{
 		if (m_favorites.empty())
 		{
@@ -558,7 +559,7 @@ void favorite_manager::save_favorites()
 				buf << info.parentname << '\n';
 				buf << info.year << '\n';
 				buf << info.publisher << '\n';
-				util::stream_format(buf, "%d\n", info.supported);
+				util::stream_format(buf, "%d\n", int(info.supported));
 				buf << info.part << '\n';
 				util::stream_format(buf, "%s\n", info.driver->name);
 				buf << info.listname << '\n';
@@ -570,8 +571,7 @@ void favorite_manager::save_favorites()
 				buf << info.devicetype << '\n';
 				util::stream_format(buf, "%d\n", info.available);
 
-				buf.put('\0');
-				file.puts(&buf.vec()[0]);
+				file.puts(util::buf_to_string_view(buf));
 			}
 		}
 		file.close();

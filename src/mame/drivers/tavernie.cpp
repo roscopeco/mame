@@ -255,19 +255,17 @@ void ivg09_state::ds_w(u8 data)
 // Attributes when high: 0 = alpha rom; 1 = flash; 2 = reverse video; 3 = highlight off
 MC6845_UPDATE_ROW( ivg09_state::crtc_update_row )
 {
-	const rgb_t *palette = m_palette->palette()->entry_list_raw();
-	u8 gfx,attr;
-	u16 mem,x;
-	u32 *p = &bitmap.pix32(y);
+	rgb_t const *const palette = m_palette->palette()->entry_list_raw();
+	u32 *p = &bitmap.pix(y);
 	m_flashcnt++;
 
-	for (x = 0; x < x_count; x++)
+	for (u16 x = 0; x < x_count; x++)
 	{
-		mem = (ma + x) & 0xfff;
-		attr = m_vram[mem] >> 8;
-		u8 inv = ((x == cursor_x) ^ (BIT(attr, 2)) ^ (BIT(attr, 1) && BIT(m_flashcnt, 6))) ? 0xff : 0;
-		gfx = m_p_chargen[((m_vram[mem] & 0x1ff)<<4) | ra] ^ inv;   // takes care of attr bit 0 too
-		u8 pen = BIT(attr, 3) ? 1 : 2;
+		u16 const mem = (ma + x) & 0xfff;
+		u8 const attr = m_vram[mem] >> 8;
+		u8 const inv = ((x == cursor_x) ^ (BIT(attr, 2)) ^ (BIT(attr, 1) && BIT(m_flashcnt, 6))) ? 0xff : 0;
+		u8 const gfx = m_p_chargen[((m_vram[mem] & 0x1ff)<<4) | ra] ^ inv;   // takes care of attr bit 0 too
+		u8 const pen = BIT(attr, 3) ? 1 : 2;
 
 		/* Display a scanline of a character */
 		*p++ = palette[BIT(gfx, 7) ? pen : 0];
@@ -391,7 +389,6 @@ void ivg09_state::kbd_put(u8 data)
 static DEVICE_INPUT_DEFAULTS_START( terminal )
 	DEVICE_INPUT_DEFAULTS( "RS232_TXBAUD", 0xff, RS232_BAUD_1200 )
 	DEVICE_INPUT_DEFAULTS( "RS232_RXBAUD", 0xff, RS232_BAUD_1200 )
-	DEVICE_INPUT_DEFAULTS( "RS232_STARTBITS", 0xff, RS232_STARTBITS_1 )
 	DEVICE_INPUT_DEFAULTS( "RS232_DATABITS", 0xff, RS232_DATABITS_8 )
 	DEVICE_INPUT_DEFAULTS( "RS232_PARITY", 0xff, RS232_PARITY_NONE )
 	DEVICE_INPUT_DEFAULTS( "RS232_STOPBITS", 0xff, RS232_STOPBITS_2 )
@@ -473,7 +470,7 @@ void ivg09_state::ivg09(machine_config &config)
 	m_pia1->cb2_handler().set(m_beep, FUNC(beep_device::set_state));
 
 	WD2795(config, m_fdc, 8_MHz_XTAL / 8);
-	FLOPPY_CONNECTOR(config, "fdc:0", ifd09_floppies, "525dd", floppy_image_device::default_floppy_formats).enable_sound(true);
+	FLOPPY_CONNECTOR(config, "fdc:0", ifd09_floppies, "525dd", floppy_image_device::default_mfm_floppy_formats).enable_sound(true);
 }
 
 /* ROM definition */

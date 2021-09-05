@@ -12,10 +12,10 @@
 /*
 /*/
 !/roms/
+!/.github/
 !/3rdparty/
 !/android-project/
 !/benchmarks/
-!/color-schemes/
 !/artwork/
 !/bgfx/
 !/docs/
@@ -34,7 +34,6 @@
 !/tests/
 !/doxygen/
 !/web/
-!/.drone.yml
 !/.gitattributes
 !/.gitignore
 !/.travis.yml

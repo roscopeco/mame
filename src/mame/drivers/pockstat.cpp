@@ -4,7 +4,7 @@
 
     Sony PocketStation
 
-    PocketStation games were dowloaded from PS1 games into flash RAM after
+    PocketStation games were downloaded from PS1 games into flash RAM after
     the unit had been inserted in the memory card slot, and so this should
     be emulated alongside the PS1.  However, as many flash dumps exist, it
     is possible to emulate the PocketStation in the meantime.
@@ -36,7 +36,6 @@
 #include "cpu/arm7/arm7.h"
 #include "cpu/arm7/arm7core.h"
 #include "sound/dac.h"
-#include "sound/volt_reg.h"
 #include "emupal.h"
 #include "screen.h"
 #include "speaker.h"
@@ -56,6 +55,9 @@
 #define VERBOSE     (0)
 #include "logmacro.h"
 
+
+namespace {
+
 class pockstat_state : public driver_device
 {
 public:
@@ -70,10 +72,11 @@ public:
 
 	DECLARE_INPUT_CHANGED_MEMBER(input_update);
 
-private:
+protected:
 	virtual void machine_start() override;
 	virtual void machine_reset() override;
 
+private:
 	void mem_map(address_map &map);
 
 	uint32_t screen_update_pockstat(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect);
@@ -881,6 +884,7 @@ void pockstat_state::machine_start()
 	{
 		m_timers[index].timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(pockstat_state::timer_tick), this));
 		m_timers[index].timer->adjust(attotime::never, index);
+		m_timers[index].count = 0;
 	}
 
 	m_rtc_regs.time = 0x01000000;
@@ -940,7 +944,7 @@ uint32_t pockstat_state::screen_update_pockstat(screen_device &screen, bitmap_rg
 {
 	for (int y = 0; y < 32; y++)
 	{
-		uint32_t *scanline = &bitmap.pix32(y);
+		uint32_t *const scanline = &bitmap.pix(y);
 		for (int x = 0; x < 32; x++)
 		{
 			if (m_lcd_control != 0) // Hack
@@ -1000,9 +1004,6 @@ void pockstat_state::pockstat(machine_config &config)
 
 	SPEAKER(config, "speaker").front_center();
 	DAC_16BIT_R2R_TWOS_COMPLEMENT(config, "dac", 0).add_route(ALL_OUTPUTS, "speaker", 0.5); // unknown DAC
-	voltage_regulator_device &vref(VOLTAGE_REGULATOR(config, "vref"));
-	vref.add_route(0, "dac", 1.0, DAC_VREF_POS_INPUT);
-	vref.add_route(0, "dac", -1.0, DAC_VREF_NEG_INPUT);
 
 	/* cartridge */
 	GENERIC_CARTSLOT(config, m_cart, generic_plain_slot, "pockstat_cart", "gme");
@@ -1016,6 +1017,9 @@ ROM_START( pockstat )
 	ROM_REGION( 0x4000, "maincpu", 0 )
 	ROM_LOAD( "kernel.bin", 0x0000, 0x4000, CRC(5fb47dd8) SHA1(6ae880493ddde880827d1e9f08e9cb2c38f9f2ec) )
 ROM_END
+
+} // Anonymous namespace
+
 
 /* Driver */
 

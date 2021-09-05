@@ -7,7 +7,6 @@
 
  ***********************************************************************************************************/
 
-
 #include "emu.h"
 #include "slot.h"
 
@@ -112,9 +111,9 @@ static const vectrex_slot slot_list[] =
 #if 0
 static int vectrex_get_pcb_id(const char *slot)
 {
-	for (int i = 0; i < ARRAY_LENGTH(slot_list); i++)
+	for (int i = 0; i < std::size(slot_list); i++)
 	{
-		if (!core_stricmp(slot_list[i].slot_option, slot))
+		if (!strcmp(slot_list[i].slot_option, slot))
 			return slot_list[i].pcb_id;
 	}
 
@@ -146,7 +145,7 @@ image_init_result vectrex_cart_slot_device::call_load()
 
 		if (size > 0x10000)
 		{
-			seterror(IMAGE_ERROR_UNSPECIFIED, "Unsupported cartridge size");
+			seterror(image_error::INVALIDIMAGE, "Unsupported cartridge size");
 			return image_init_result::FAIL;
 		}
 
@@ -161,7 +160,7 @@ image_init_result vectrex_cart_slot_device::call_load()
 		// Verify the file is accepted by the Vectrex bios
 		if (memcmp(ROM, "g GCE", 5))
 		{
-			seterror(IMAGE_ERROR_UNSPECIFIED, "Invalid image");
+			seterror(image_error::INVALIDIMAGE, "Invalid image");
 			return image_init_result::FAIL;
 		}
 

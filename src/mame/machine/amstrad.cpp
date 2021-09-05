@@ -313,7 +313,7 @@ The Amstrad Plus has a 4096 colour palette
 
 void amstrad_state::amstrad_plus_palette(palette_device &palette) const
 {
-	palette.set_pen_colors(0, amstrad_palette, ARRAY_LENGTH(amstrad_palette) / 3); // FIXME: isn't this overwritten by the loop?
+	palette.set_pen_colors(0, amstrad_palette, std::size(amstrad_palette) / 3); // FIXME: isn't this overwritten by the loop?
 	for (int i = 0; i < 0x1000; i++)
 	{
 		int const g = ( i >> 8 ) & 0x0f;
@@ -799,7 +799,7 @@ void amstrad_state::amstrad_plus_update_video_sprites()
 	else
 		horiz = m_asic.h_start;
 
-	p = &m_gate_array.bitmap->pix16(m_gate_array.y, horiz );
+	p = &m_gate_array.bitmap->pix(m_gate_array.y, horiz );
 	for ( i = 15 * 8; i >= 0; i -= 8 )
 	{
 		uint8_t   xmag = ( m_asic.ram[ 0x2000 + i + 4 ] >> 2 ) & 0x03;
@@ -852,7 +852,7 @@ WRITE_LINE_MEMBER(amstrad_state::amstrad_hsync_changed)
 		m_gate_array.line_ticks = 0;
 		if ( m_gate_array.y >= 0 && m_gate_array.y < m_gate_array.bitmap->height() )
 		{
-			m_gate_array.draw_p = &m_gate_array.bitmap->pix16(m_gate_array.y);
+			m_gate_array.draw_p = &m_gate_array.bitmap->pix(m_gate_array.y);
 		}
 		else
 		{
@@ -895,7 +895,7 @@ WRITE_LINE_MEMBER(amstrad_state::amstrad_plus_hsync_changed)
 		m_gate_array.line_ticks = 0;
 		if ( m_gate_array.y >= 0 && m_gate_array.y < m_gate_array.bitmap->height() )
 		{
-			m_gate_array.draw_p = &m_gate_array.bitmap->pix16(m_gate_array.y);
+			m_gate_array.draw_p = &m_gate_array.bitmap->pix(m_gate_array.y);
 		}
 		else
 		{
@@ -1068,12 +1068,13 @@ WRITE_LINE_MEMBER(amstrad_state::amstrad_plus_de_changed)
 }
 
 
-VIDEO_START_MEMBER(amstrad_state,amstrad)
+void amstrad_state::video_start()
 {
 	amstrad_init_lookups();
 
 	m_gate_array.bitmap = std::make_unique<bitmap_ind16>(m_screen->width(), m_screen->height() );
 	m_gate_array.hsync_after_vsync_counter = 3;
+	std::fill(std::begin(m_GateArray_render_colours), std::end(m_GateArray_render_colours), 0);
 }
 
 
@@ -2244,12 +2245,9 @@ void amstrad_state::amstrad_handle_snapshot(unsigned char *pSnapshot)
 
 	RegData = (pSnapshot[0x021] & 0x0ff) | ((pSnapshot[0x022] & 0x0ff)<<8);
 	m_maincpu->set_state_int(Z80_SP, RegData);
-	m_maincpu->set_state_int(STATE_GENSP, RegData);
 
 	RegData = (pSnapshot[0x023] & 0x0ff) | ((pSnapshot[0x024] & 0x0ff)<<8);
-
 	m_maincpu->set_state_int(Z80_PC, RegData);
-//  m_maincpu->set_state_int(REG_SP, RegData);
 
 	RegData = (pSnapshot[0x025] & 0x0ff);
 	m_maincpu->set_state_int(Z80_IM, RegData);
@@ -2698,13 +2696,28 @@ uint8_t amstrad_state::amstrad_psg_porta_read()
 		{
 			if(m_system_type != SYSTEM_GX4000)
 			{
-				if (m_io_ctrltype.read_safe(0) == 1 && (m_ppi_port_outputs[amstrad_ppi_PortC] & 0x0F) == 9)
+				if (m_io_ctrltype.read_safe(0) == 0 && (m_ppi_port_outputs[amstrad_ppi_PortC] & 0x0F) == 9)
+				{
+					return (m_io_kbrow[m_ppi_port_outputs[amstrad_ppi_PortC] & 0x0F].read_safe(0) & 0x80) | 0x7f;
+				}
+				// AMX mouse
+				if (m_io_ctrltype.read_safe(0) == 2 && (m_ppi_port_outputs[amstrad_ppi_PortC] & 0x0F) == 9)
 				{
 					return m_amx_mouse_data;
 				}
-				if (m_io_ctrltype.read_safe(0) == 2 && (m_ppi_port_outputs[amstrad_ppi_PortC] & 0x0F) == 9)
+				// Cheetah 125 Special rotational joystick
+				if (m_io_ctrltype.read_safe(0) == 4 && (m_ppi_port_outputs[amstrad_ppi_PortC] & 0x0F) == 9)
 				{
-					return (m_io_kbrow[m_ppi_port_outputs[amstrad_ppi_PortC] & 0x0F].read_safe(0) & 0x80) | 0x7f;
+					return (m_io_kbrow[m_ppi_port_outputs[amstrad_ppi_PortC] & 0x0F].read_safe(0) & 0x80) | (m_io_cheetah->read() & 0x1f) | 0x60;
+				}
+				if (m_io_ctrltype.read_safe(0) == 4 && (m_ppi_port_outputs[amstrad_ppi_PortC] & 0x0F) == 6)
+				{
+					uint8_t p = (m_io_kbrow[m_ppi_port_outputs[amstrad_ppi_PortC] & 0x0F].read_safe(0));
+					if(!(m_io_cheetah->read() & 0x20))
+						p &= ~0x04;
+					if(!(m_io_cheetah->read() & 0x40))
+						p &= ~0x08;
+					return p;
 				}
 			}
 
@@ -2743,7 +2756,7 @@ IRQ_CALLBACK_MEMBER(amstrad_state::amstrad_cpu_acknowledge_int)
 	if(m_system_type != SYSTEM_GX4000)
 		{
 			// update AMX mouse inputs (normally done every 1/300th of a second)
-			if (m_io_ctrltype.read_safe(0) == 1)
+			if (m_io_ctrltype.read_safe(0) == 2)
 			{
 				static uint8_t prev_x,prev_y;
 				uint8_t data_x, data_y;
@@ -3002,6 +3015,9 @@ void amstrad_state::amstrad_common_init()
 
 	m_aleste_mode = 0;
 
+	m_asic.enabled = 0;
+
+	m_gate_array.romdis = 0;
 	m_gate_array.mrer = 0;
 	m_gate_array.vsync = 0;
 	m_gate_array.hsync = 0;
@@ -3242,16 +3258,14 @@ MACHINE_RESET_MEMBER(amstrad_state,aleste)
 /* load snapshot */
 SNAPSHOT_LOAD_MEMBER(amstrad_state::snapshot_cb)
 {
-	std::vector<uint8_t> snapshot;
-
 	/* get file size */
-	if (snapshot_size < 8)
+	if (image.length() < 8)
 		return image_init_result::FAIL;
 
-	snapshot.resize(snapshot_size);
+	std::vector<uint8_t> snapshot(image.length());
 
 	/* read whole file */
-	image.fread(&snapshot[0], snapshot_size);
+	image.fread(&snapshot[0], image.length());
 
 	if (memcmp(&snapshot[0], "MV - SNA", 8))
 	{
@@ -3301,7 +3315,7 @@ DEVICE_IMAGE_LOAD_MEMBER(amstrad_state::amstrad_plus_cartridge)
 		logerror("IMG: raw CPC+ cartridge file\n");
 		if (size % 0x4000)
 		{
-			image.seterror(IMAGE_ERROR_UNSPECIFIED, "Attempt to load a raw binary with some block smaller than 16kB in size");
+			image.seterror(image_error::INVALIDIMAGE, "Attempt to load a raw binary with some block smaller than 16kB in size");
 			return image_init_result::FAIL;
 		}
 		else
@@ -3332,7 +3346,7 @@ DEVICE_IMAGE_LOAD_MEMBER(amstrad_state::amstrad_plus_cartridge)
 		// Is RIFF format (*.cpr)
 		if (strncmp((char*)(header + 8), "AMS!", 4) != 0)
 		{
-			image.seterror(IMAGE_ERROR_UNSPECIFIED, "Not an Amstrad CPC cartridge image (despite RIFF header)");
+			image.seterror(image_error::INVALIDIMAGE, "Not an Amstrad CPC cartridge image (despite RIFF header)");
 			return image_init_result::FAIL;
 		}
 

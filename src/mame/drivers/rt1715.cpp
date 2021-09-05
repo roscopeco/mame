@@ -43,7 +43,7 @@
 #define LOG_BANK    (1U <<  1)
 
 #define VERBOSE (LOG_GENERAL)
-//#define LOG_OUTPUT_FUNC printf
+//#define LOG_OUTPUT_FUNC osd_printf_info
 #include "logmacro.h"
 
 #define LOGBANK(format, ...)    LOGMASKED(LOG_BANK,   "%11.6f at %s: " format, machine().time().as_double(), machine().describe_context(), __VA_ARGS__)
@@ -424,7 +424,7 @@ WRITE_LINE_MEMBER(rt1715_state::crtc_drq_w)
 
 I8275_DRAW_CHARACTER_MEMBER(rt1715_state::crtc_display_pixels)
 {
-	const rgb_t *palette = m_palette->palette()->entry_list_raw();
+	rgb_t const *const palette = m_palette->palette()->entry_list_raw();
 	u8 gfx = (lten) ? 0xff : 0;
 
 	if (!vsp)
@@ -434,7 +434,7 @@ I8275_DRAW_CHARACTER_MEMBER(rt1715_state::crtc_display_pixels)
 		gfx ^= 0xff;
 
 	for (u8 i=0; i<8; i++)
-		bitmap.pix32(y, x + i) = palette[BIT(gfx, 7-i) ? (hlgt ? 2 : 1) : 0];
+		bitmap.pix(y, x + i) = palette[BIT(gfx, 7-i) ? (hlgt ? 2 : 1) : 0];
 }
 
 /* F4 Character Displayer */
@@ -597,7 +597,7 @@ static INPUT_PORTS_START( k7658 )
 	// D10 --- E10 --- B10 C10 E52 E51
 	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_KEYBOARD ) PORT_CODE(KEYCODE_P) PORT_CHAR('p') PORT_CHAR('P')
 	PORT_BIT( 0x02, IP_ACTIVE_HIGH, IPT_UNUSED )
-	PORT_BIT( 0x04, IP_ACTIVE_HIGH, IPT_KEYBOARD ) PORT_CODE(KEYCODE_0) PORT_CHAR('0') PORT_CHAR(')') 
+	PORT_BIT( 0x04, IP_ACTIVE_HIGH, IPT_KEYBOARD ) PORT_CODE(KEYCODE_0) PORT_CHAR('0') PORT_CHAR(')')
 	PORT_BIT( 0x08, IP_ACTIVE_HIGH, IPT_UNUSED )
 	PORT_BIT( 0x10, IP_ACTIVE_HIGH, IPT_KEYBOARD ) PORT_CODE(KEYCODE_SLASH) PORT_CHAR('/') PORT_CHAR('?')
 	PORT_BIT( 0x20, IP_ACTIVE_HIGH, IPT_KEYBOARD ) PORT_CODE(KEYCODE_COLON) PORT_CHAR(';') PORT_CHAR(':')
@@ -806,8 +806,8 @@ void rt1715_state::rt1715w(machine_config &config)
 	// operates in polled mode
 	I8272A(config, m_fdc, 8'000'000 / 4, false);
 	m_fdc->drq_wr_callback().set(m_dma, FUNC(z80dma_device::rdy_w)).invert();
-	FLOPPY_CONNECTOR(config, "i8272:0", rt1715w_floppies, "525qd", floppy_image_device::default_floppy_formats);
-	FLOPPY_CONNECTOR(config, "i8272:1", rt1715w_floppies, "525qd", floppy_image_device::default_floppy_formats);
+	FLOPPY_CONNECTOR(config, "i8272:0", rt1715w_floppies, "525qd", floppy_image_device::default_mfm_floppy_formats);
+	FLOPPY_CONNECTOR(config, "i8272:1", rt1715w_floppies, "525qd", floppy_image_device::default_mfm_floppy_formats);
 
 	Z80DMA(config, m_dma, 15.9744_MHz_XTAL / 4);
 	m_dma->out_busreq_callback().set(FUNC(rt1715_state::busreq_w));

@@ -432,7 +432,7 @@ tms32032_device::tms32032_device(const machine_config &mconfig, const char *tag,
 tms3203x_device::~tms3203x_device()
 {
 #if (TMS_3203X_LOG_OPCODE_USAGE)
-	for (int i = 0; i < ARRAY_LENGTH(m_hits); i++)
+	for (int i = 0; i < std::size(m_hits); i++)
 		if (m_hits[i] != 0)
 			printf("%10d - %03X.%X\n", m_hits[i], i / 4, i % 4);
 #endif
@@ -983,7 +983,7 @@ void tms3203x_device::execute_run()
 }
 
 // internal peripherals
-WRITE32_MEMBER(tms3203x_device::primary_bus_control_w)
+void tms3203x_device::primary_bus_control_w(offs_t offset, uint32_t data, uint32_t mem_mask)
 {
 	// change in internal hold state
 	if ((m_primary_bus_control ^ data) & HIZ)

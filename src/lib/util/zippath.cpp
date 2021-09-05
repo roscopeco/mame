@@ -9,14 +9,13 @@
 ***************************************************************************/
 
 #include "zippath.h"
-#include "unzip.h"
-#include "corestr.h"
-#include "osdcore.h"
 
-#include <cstdlib>
+#include "corestr.h"
+#include "unzip.h"
 
 #include <cassert>
 #include <cctype>
+#include <cstdlib>
 #include <forward_list>
 #include <new>
 
@@ -47,21 +46,18 @@ int is_path_separator(char c)
 //  is_root - tests to see if this path is the root
 // -------------------------------------------------
 
-bool is_root(std::string const &path)
+bool is_root(std::string_view path)
 {
-	// FIXME: get rid of the assumption that paths are DOS-like
-
-	std::string::size_type i = 0;
-
+#if defined(OSD_WINDOWS)
 	// skip drive letter
-	if (isalpha(path[i]) && (path[i + 1] == ':'))
-		i += 2;
+	if (path.length() >= 2 && isalpha(path[0]) && (path[1] == ':'))
+		path.remove_prefix(2);
 
 	// skip path separators
-	while (is_path_separator(path[i]))
-		i++;
-
-	return path[i] == '\0';
+	return path.find_first_not_of(PATH_SEPARATOR) == std::string_view::npos;
+#else
+	return (path.length() == 1) && (path[0] == '/');
+#endif
 }
 
 
@@ -71,10 +67,9 @@ bool is_root(std::string const &path)
 //  7-zip file
 // -------------------------------------------------
 
-bool is_7z_file(std::string const &path)
+bool is_7z_file(std::string_view path)
 {
-	auto const s = path.rfind('.');
-	return (std::string::npos != s) && !core_stricmp(path.c_str() + s, ".7z");
+	return core_filename_ends_with(path, ".7z");
 }
 
 
@@ -83,10 +78,9 @@ bool is_7z_file(std::string const &path)
 //  ZIP file
 // -------------------------------------------------
 
-bool is_zip_file(std::string const &path)
+bool is_zip_file(std::string_view path)
 {
-	auto const s = path.rfind('.');
-	return (std::string::npos != s) && !core_stricmp(path.c_str() + s, ".zip");
+	return core_filename_ends_with(path, ".zip");
 }
 
 
@@ -120,7 +114,7 @@ bool is_zip_path_separator(char c)
 //  character, normalizing separators as '/'
 // -------------------------------------------------
 
-char next_path_char(std::string const &s, std::string::size_type &pos)
+char next_path_char(std::string_view s, std::string_view::size_type &pos)
 {
 	// skip over any initial separators
 	if (pos == 0)
@@ -159,11 +153,11 @@ char next_path_char(std::string const &s, std::string::size_type &pos)
 //  type of a sub path in a zip file
 // -------------------------------------------------
 
-int zippath_find_sub_path(archive_file &zipfile, std::string const &subpath, osd::directory::entry::entry_type &type)
+int zippath_find_sub_path(archive_file &zipfile, std::string_view subpath, osd::directory::entry::entry_type &type)
 {
 	for (int header = zipfile.first_file(); header >= 0; header = zipfile.next_file())
 	{
-		std::string::size_type i = 0, j = 0;
+		std::string_view::size_type i = 0, j = 0;
 		char c1, c2;
 		do
 		{
@@ -194,57 +188,32 @@ int zippath_find_sub_path(archive_file &zipfile, std::string const &subpath, osd
 
 
 // -------------------------------------------------
-//  parse_parent_path - parses out the parent path
-// -------------------------------------------------
-
-void parse_parent_path(const std::string &path, std::string::size_type *beginpos, std::string::size_type *endpos)
-{
-	std::string::size_type length = path.length();
-	std::string::size_type pos;
-
-	// skip over trailing path separators
-	pos = length ? (length - 1) : std::string::npos;
-	while ((pos > 0) && (pos != std::string::npos) && is_path_separator(path[pos]))
-		pos--;
-
-	// return endpos
-	if (endpos != nullptr)
-		*endpos = pos;
-
-	// now skip until we find a path separator
-	while ((pos != std::string::npos) && !is_path_separator(path[pos]))
-		pos = (pos > 0) ? pos - 1 : std::string::npos;
-
-	// return beginpos
-	if (beginpos != nullptr)
-		*beginpos = pos;
-}
-
-
-// -------------------------------------------------
 //  zippath_resolve - separates a ZIP path out into
 //  true path and ZIP entry components
 // -------------------------------------------------
 
-osd_file::error zippath_resolve(const char *path, osd::directory::entry::entry_type &entry_type, archive_file::ptr &zipfile, std::string &newpath)
+std::error_condition zippath_resolve(std::string_view path, osd::directory::entry::entry_type &entry_type, archive_file::ptr &zipfile, std::string &newpath)
 {
 	newpath.clear();
 
 	// be conservative
-	entry_type = osd::directory::entry::entry_type::NONE;
 	zipfile.reset();
 
 	std::string apath(path);
 	std::string apath_trimmed;
-	osd::directory::entry::entry_type current_entry_type;
+	osd::directory::entry::entry_type current_entry_type = osd::directory::entry::entry_type::NONE;
 	bool went_up = false;
 	do
 	{
-		// trim the path of trailing path separators
-		auto i = apath.length();
-		while ((i > 1) && is_path_separator(apath[i - 1]))
-			i--;
-		apath.resize(i);
+		if (!is_root(apath))
+		{
+			// trim the path of trailing path separators
+			auto i = apath.find_last_not_of(PATH_SEPARATOR);
+			if (i == std::string::npos)
+				break;
+			apath = apath.substr(0, i + 1);
+		}
+
 		apath_trimmed = apath;
 
 		// stat the path
@@ -259,7 +228,6 @@ osd_file::error zippath_resolve(const char *path, osd::directory::entry::entry_t
 		else
 		{
 			// if we have not found the file or directory, go up
-			current_entry_type = osd::directory::entry::entry_type::NONE;
 			went_up = true;
 			apath = zippath_parent(apath);
 		}
@@ -268,68 +236,38 @@ osd_file::error zippath_resolve(const char *path, osd::directory::entry::entry_t
 
 	// if we did not find anything, then error out
 	if (current_entry_type == osd::directory::entry::entry_type::NONE)
-		return osd_file::error::NOT_FOUND;
+	{
+		entry_type = osd::directory::entry::entry_type::NONE;
+		return std::errc::no_such_file_or_directory;
+	}
 
 	// is this file a ZIP file?
 	if ((current_entry_type == osd::directory::entry::entry_type::FILE) &&
-		((is_zip_file(apath_trimmed) && (archive_file::open_zip(apath_trimmed, zipfile) == archive_file::error::NONE)) ||
-			(is_7z_file(apath_trimmed) && (archive_file::open_7z(apath_trimmed, zipfile) == archive_file::error::NONE))))
+		((is_zip_file(apath_trimmed) && !archive_file::open_zip(apath_trimmed, zipfile)) ||
+			(is_7z_file(apath_trimmed) && !archive_file::open_7z(apath_trimmed, zipfile))))
 	{
-		auto i = strlen(path + apath.length());
+		auto i = path.length() - apath.length();
 		while ((i > 0) && is_zip_path_separator(path[apath.length() + i - 1]))
 			i--;
-		newpath.assign(path + apath.length(), i);
+		newpath.assign(path, apath.length(), i);
 
 		// this was a true ZIP path - attempt to identify the type of path
 		zippath_find_sub_path(*zipfile, newpath, current_entry_type);
 		if (current_entry_type == osd::directory::entry::entry_type::NONE)
-			return osd_file::error::NOT_FOUND;
+			return std::errc::no_such_file_or_directory;
 	}
 	else
 	{
 		// this was a normal path
 		if (went_up)
-			return osd_file::error::NOT_FOUND;
+			return std::errc::no_such_file_or_directory;
 
 		newpath = path;
 	}
 
 	// success!
 	entry_type = current_entry_type;
-	return osd_file::error::NONE;
-}
-
-
-// -------------------------------------------------
-//  file_error_from_zip_error - translates a
-//  osd_file::error to a zip_error
-// -------------------------------------------------
-
-osd_file::error file_error_from_zip_error(archive_file::error ziperr)
-{
-	osd_file::error filerr;
-	switch(ziperr)
-	{
-	case archive_file::error::NONE:
-		filerr = osd_file::error::NONE;
-		break;
-	case archive_file::error::OUT_OF_MEMORY:
-		filerr = osd_file::error::OUT_OF_MEMORY;
-		break;
-	case archive_file::error::BAD_SIGNATURE:
-	case archive_file::error::DECOMPRESS_ERROR:
-	case archive_file::error::FILE_TRUNCATED:
-	case archive_file::error::FILE_CORRUPT:
-	case archive_file::error::UNSUPPORTED:
-	case archive_file::error::FILE_ERROR:
-		filerr = osd_file::error::INVALID_DATA;
-		break;
-	case archive_file::error::BUFFER_TOO_SMALL:
-	default:
-		filerr = osd_file::error::FAILURE;
-		break;
-	}
-	return filerr;
+	return std::error_condition();
 }
 
 
@@ -338,27 +276,24 @@ osd_file::error file_error_from_zip_error(archive_file::error ziperr)
 //  from a zip file entry
 // -------------------------------------------------
 
-osd_file::error create_core_file_from_zip(archive_file &zip, util::core_file::ptr &file)
+std::error_condition create_core_file_from_zip(archive_file &zip, util::core_file::ptr &file)
 {
-	osd_file::error filerr;
-	archive_file::error ziperr;
+	// TODO: would be more efficient if we could open a memory-based core_file with uninitialised contents and decompress into it
+	std::error_condition filerr;
 
 	void *ptr = malloc(zip.current_uncompressed_length());
 	if (!ptr)
 	{
-		filerr = osd_file::error::OUT_OF_MEMORY;
+		filerr = std::errc::not_enough_memory;
 		goto done;
 	}
 
-	ziperr = zip.decompress(ptr, zip.current_uncompressed_length());
-	if (ziperr != archive_file::error::NONE)
-	{
-		filerr = file_error_from_zip_error(ziperr);
+	filerr = zip.decompress(ptr, zip.current_uncompressed_length());
+	if (filerr)
 		goto done;
-	}
 
 	filerr = util::core_file::open_ram_copy(ptr, zip.current_uncompressed_length(), OPEN_FLAG_READ, file);
-	if (filerr != osd_file::error::NONE)
+	if (filerr)
 		goto done;
 
 done:
@@ -525,10 +460,10 @@ private:
 };
 
 
-class filesystem_diectory_impl : public zippath_directory_base
+class filesystem_directory_impl : public zippath_directory_base
 {
 public:
-	filesystem_diectory_impl(std::string const &path) : zippath_directory_base(!is_root(path)), m_directory(osd::directory::open(path))
+	filesystem_directory_impl(std::string_view path) : zippath_directory_base(!is_root(path)), m_directory(osd::directory::open(std::string(path)))
 	{
 	}
 
@@ -574,7 +509,7 @@ private:
 //  zippath_directory::open - opens a directory
 // -------------------------------------------------
 
-osd_file::error zippath_directory::open(std::string const &path, ptr &directory)
+std::error_condition zippath_directory::open(std::string_view path, ptr &directory)
 {
 	try
 	{
@@ -582,34 +517,34 @@ osd_file::error zippath_directory::open(std::string const &path, ptr &directory)
 		osd::directory::entry::entry_type entry_type;
 		archive_file::ptr zipfile;
 		std::string zipprefix;
-		osd_file::error const err = zippath_resolve(path.c_str(), entry_type, zipfile, zipprefix);
-		if (osd_file::error::NONE != err)
+		std::error_condition const err = zippath_resolve(path, entry_type, zipfile, zipprefix);
+		if (err)
 			return err;
 
 		// we have to be a directory
 		if (osd::directory::entry::entry_type::DIR != entry_type)
-			return osd_file::error::NOT_FOUND;
+			return std::errc::not_a_directory;
 
 		// was the result a ZIP?
 		if (zipfile)
 		{
 			directory = std::make_unique<archive_directory_impl>(std::move(zipfile), std::move(zipprefix));
-			return osd_file::error::NONE;
+			return std::error_condition();
 		}
 		else
 		{
 			// a conventional directory
-			std::unique_ptr<filesystem_diectory_impl> result(new filesystem_diectory_impl(path));
+			std::unique_ptr<filesystem_directory_impl> result(new filesystem_directory_impl(path));
 			if (!*result)
-				return osd_file::error::FAILURE;
+				return std::errc::io_error; // TODO: any way to give a better error here?
 
 			directory = std::move(result);
-			return osd_file::error::NONE;
+			return std::error_condition();
 		}
 	}
 	catch (std::bad_alloc const &)
 	{
-		return osd_file::error::OUT_OF_MEMORY;
+		return std::errc::not_enough_memory;
 	}
 }
 
@@ -628,69 +563,19 @@ zippath_directory::~zippath_directory()
 //  zippath_parent - retrieves the parent directory
 // -------------------------------------------------
 
-std::string &zippath_parent(std::string &dst, const std::string &path)
+std::string zippath_parent(std::string_view path)
 {
-	std::string::size_type pos;
-	parse_parent_path(path, &pos, nullptr);
+	// skip over trailing path separators
+	std::string_view::size_type pos = path.find_last_not_of(PATH_SEPARATOR);
 
-	if (pos != std::string::npos)
-		dst = path.substr(0, pos + 1);
+	// now skip until we find a path separator
+	while ((pos != std::string_view::npos) && !is_path_separator(path[pos]))
+		pos = (pos > 0) ? pos - 1 : std::string_view::npos;
+
+	if (pos != std::string_view::npos)
+		return std::string(path, 0, pos + 1);
 	else
-		dst.clear();
-	return dst;
-}
-
-
-
-// -------------------------------------------------
-//  zippath_parent - retrieves the parent directory
-// -------------------------------------------------
-
-std::string zippath_parent(const std::string &path)
-{
-	std::string result;
-	zippath_parent(result, path);
-	return result;
-}
-
-
-
-// -------------------------------------------------
-//  zippath_parent_basename - retrieves the parent
-//  directory basename
-// -------------------------------------------------
-
-/**
- * @fn  std::string &zippath_parent_basename(std::string &dst, const std::string &path)
- *
- * @brief   Zippath parent basename.
- *
- * @param [in,out]  dst Destination for the.
- * @param   path        Full pathname of the file.
- *
- * @return  A std::string&amp;
- */
-
-std::string &zippath_parent_basename(std::string &dst, const std::string &path)
-{
-	std::string::size_type beginpos, endpos;
-	parse_parent_path(path, &beginpos, &endpos);
-	dst.copy((char*)(path.c_str() + beginpos + 1), endpos - beginpos);
-	return dst;
-}
-
-
-
-// -------------------------------------------------
-//  zippath_parent_basename - retrieves the parent
-//  directory basename
-// -------------------------------------------------
-
-std::string zippath_parent_basename(const std::string &path)
-{
-	std::string result;
-	zippath_parent_basename(result, path);
-	return result;
+		return std::string();
 }
 
 
@@ -760,7 +645,7 @@ std::string zippath_combine(const std::string &path1, const std::string &path2)
 // -------------------------------------------------
 
 /**
- * @fn  osd_file::error zippath_fopen(const std::string &filename, uint32_t openflags, util::core_file::ptr &file, std::string &revised_path)
+ * @fn  std::error_condition zippath_fopen(std::string_view filename, uint32_t openflags, util::core_file::ptr &file, std::string &revised_path)
  *
  * @brief   Zippath fopen.
  *
@@ -772,76 +657,73 @@ std::string zippath_combine(const std::string &path1, const std::string &path2)
  * @return  A osd_file::error.
  */
 
-osd_file::error zippath_fopen(const std::string &filename, uint32_t openflags, util::core_file::ptr &file, std::string &revised_path)
+std::error_condition zippath_fopen(std::string_view filename, uint32_t openflags, util::core_file::ptr &file, std::string &revised_path)
 {
-	osd_file::error filerr = osd_file::error::NOT_FOUND;
-	archive_file::error ziperr;
+	std::error_condition filerr = std::errc::no_such_file_or_directory;
 	archive_file::ptr zip;
-	int header;
-	osd::directory::entry::entry_type entry_type;
-	int len;
 
-	/* first, set up the two types of paths */
+	// first, set up the two types of paths
 	std::string mainpath(filename);
 	std::string subpath;
 	file = nullptr;
 
-	/* loop through */
-	while((file == nullptr) && (mainpath.length() > 0)
-		&& ((openflags == OPEN_FLAG_READ) || (subpath.length() == 0)))
+	// loop through
+	while (!file && !mainpath.empty() && ((openflags == OPEN_FLAG_READ) || subpath.empty()))
 	{
-		/* is the mainpath a ZIP path? */
+		// is the mainpath a ZIP path?
 		if (is_zip_file(mainpath) || is_7z_file(mainpath))
 		{
-			/* this file might be a zip file - lets take a look */
-			ziperr = is_zip_file(mainpath) ? archive_file::open_zip(mainpath, zip) : archive_file::open_7z(mainpath, zip);
-			if (ziperr == archive_file::error::NONE)
+			// this file might be a zip file - lets take a look
+			std::error_condition const ziperr = is_zip_file(mainpath) ? archive_file::open_zip(mainpath, zip) : archive_file::open_7z(mainpath, zip);
+			if (!ziperr)
 			{
-				/* it is a zip file - error if we're not opening for reading */
+				// it is a zip file - error if we're not opening for reading
 				if (openflags != OPEN_FLAG_READ)
 				{
-					filerr = osd_file::error::ACCESS_DENIED;
+					filerr = std::errc::permission_denied;
 					goto done;
 				}
 
-				if (subpath.length() > 0)
+				osd::directory::entry::entry_type entry_type;
+				int header;
+				if (!subpath.empty())
 					header = zippath_find_sub_path(*zip, subpath, entry_type);
 				else
 					header = zip->first_file();
 
 				if (header < 0)
 				{
-					filerr = osd_file::error::NOT_FOUND;
+					filerr = std::errc::no_such_file_or_directory;
 					goto done;
 				}
 
-				/* attempt to read the file */
+				// attempt to read the file
 				filerr = create_core_file_from_zip(*zip, file);
-				if (filerr != osd_file::error::NONE)
+				if (filerr)
 					goto done;
 
-				/* update subpath, if appropriate */
-				if (subpath.length() == 0)
+				// update subpath, if appropriate
+				if (subpath.empty())
 					subpath.assign(zip->current_name());
 
-				/* we're done */
+				// we're done
 				goto done;
 			}
 		}
 
-		if (subpath.length() == 0)
-			filerr = util::core_file::open(filename, openflags, file);
+		if (subpath.empty())
+			filerr = util::core_file::open(std::string(filename), openflags, file);
 		else
-			filerr = osd_file::error::NOT_FOUND;
+			filerr = std::errc::no_such_file_or_directory;
 
-		/* if we errored, then go up a directory */
-		if (filerr != osd_file::error::NONE)
+		// if we errored, then go up a directory
+		if (filerr)
 		{
-			/* go up a directory */
+			// go up a directory
 			auto temp = zippath_parent(mainpath);
 
-			/* append to the sub path */
-			if (subpath.length() > 0)
+			// append to the sub path
+			if (!subpath.empty())
 			{
 				std::string temp2;
 				mainpath = mainpath.substr(temp.length());
@@ -853,8 +735,8 @@ osd_file::error zippath_fopen(const std::string &filename, uint32_t openflags, u
 				mainpath = mainpath.substr(temp.length());
 				subpath.assign(mainpath);
 			}
-			/* get the new main path, truncating path separators */
-			len = temp.length();
+			// get the new main path, truncating path separators
+			auto len = temp.length();
 			while (len > 0 && is_zip_file_separator(temp[len - 1]))
 				len--;
 			temp = temp.substr(0, len);
@@ -863,17 +745,17 @@ osd_file::error zippath_fopen(const std::string &filename, uint32_t openflags, u
 	}
 
 done:
-	/* store the revised path */
+	// store the revised path
 	revised_path.clear();
-	if (filerr == osd_file::error::NONE)
+	if (!filerr)
 	{
-		/* canonicalize mainpath */
+		// canonicalize mainpath
 		std::string alloc_fullpath;
 		filerr = osd_get_full_path(alloc_fullpath, mainpath);
-		if (filerr == osd_file::error::NONE)
+		if (!filerr)
 		{
 			revised_path = alloc_fullpath;
-			if (subpath.length() > 0)
+			if (!subpath.empty())
 				revised_path.append(PATH_SEPARATOR).append(subpath);
 		}
 	}

@@ -23,65 +23,68 @@
 #include "softlist_dev.h"
 #include "speaker.h"
 
+#include "corestr.h"
 #include "xmlfile.h"
 
+#include <algorithm>
 #include <cctype>
 #include <cstring>
-#include <unordered_set>
-#include <queue>
 #include <future>
+#include <queue>
+#include <type_traits>
+#include <unordered_set>
+#include <utility>
 
 
 #define XML_ROOT    "mame"
 #define XML_TOP     "machine"
 
 
+namespace {
+
 //**************************************************************************
 //  ANONYMOUS NAMESPACE PROTOTYPES
 //**************************************************************************
 
-namespace
+class device_type_compare
 {
-	class device_type_compare
-	{
-	public:
-		bool operator()(const std::add_pointer_t<device_type> &lhs, const std::add_pointer_t<device_type> &rhs) const;
-	};
-
-	typedef std::set<std::add_pointer_t<device_type>, device_type_compare> device_type_set;
-
-	std::string normalize_string(const char *string);
-
-	// internal helper
-	void output_header(std::ostream &out, bool dtd);
-	void output_footer(std::ostream &out);
-
-	void output_one(std::ostream &out, driver_enumerator &drivlist, const game_driver &driver, device_type_set *devtypes);
-	void output_sampleof(std::ostream &out, device_t &device);
-	void output_bios(std::ostream &out, device_t const &device);
-	void output_rom(std::ostream &out, driver_enumerator *drivlist, const game_driver *driver, device_t &device);
-	void output_device_refs(std::ostream &out, device_t &root);
-	void output_sample(std::ostream &out, device_t &device);
-	void output_chips(std::ostream &out, device_t &device, const char *root_tag);
-	void output_display(std::ostream &out, device_t &device, machine_flags::type const *flags, const char *root_tag);
-	void output_sound(std::ostream &out, device_t &device);
-	void output_ioport_condition(std::ostream &out, const ioport_condition &condition, unsigned indent);
-	void output_input(std::ostream &out, const ioport_list &portlist);
-	void output_switches(std::ostream &out, const ioport_list &portlist, const char *root_tag, int type, const char *outertag, const char *loctag, const char *innertag);
-	void output_ports(std::ostream &out, const ioport_list &portlist);
-	void output_adjusters(std::ostream &out, const ioport_list &portlist);
-	void output_driver(std::ostream &out, game_driver const &driver, device_t::feature_type unemulated, device_t::feature_type imperfect);
-	void output_features(std::ostream &out, device_type type, device_t::feature_type unemulated, device_t::feature_type imperfect);
-	void output_images(std::ostream &out, device_t &device, const char *root_tag);
-	void output_slots(std::ostream &out, machine_config &config, device_t &device, const char *root_tag, device_type_set *devtypes);
-	void output_software_lists(std::ostream &out, device_t &root, const char *root_tag);
-	void output_ramoptions(std::ostream &out, device_t &root);
-
-	void output_one_device(std::ostream &out, machine_config &config, device_t &device, const char *devtag);
-	void output_devices(std::ostream &out, emu_options &lookup_options, device_type_set const *filter);
-
-	const char *get_merge_name(driver_enumerator &drivlist, const game_driver &driver, util::hash_collection const &romhashes);
+public:
+	bool operator()(const std::add_pointer_t<device_type> &lhs, const std::add_pointer_t<device_type> &rhs) const;
 };
+
+typedef std::set<std::add_pointer_t<device_type>, device_type_compare> device_type_set;
+
+std::string normalize_string(const char *string);
+
+// internal helper
+void output_header(std::ostream &out, bool dtd);
+void output_footer(std::ostream &out);
+
+void output_one(std::ostream &out, driver_enumerator &drivlist, const game_driver &driver, device_type_set *devtypes);
+void output_sampleof(std::ostream &out, device_t &device);
+void output_bios(std::ostream &out, device_t const &device);
+void output_rom(std::ostream &out, driver_enumerator *drivlist, const game_driver *driver, device_t &device);
+void output_device_refs(std::ostream &out, device_t &root);
+void output_sample(std::ostream &out, device_t &device);
+void output_chips(std::ostream &out, device_t &device, const char *root_tag);
+void output_display(std::ostream &out, device_t &device, machine_flags::type const *flags, const char *root_tag);
+void output_sound(std::ostream &out, device_t &device);
+void output_ioport_condition(std::ostream &out, const ioport_condition &condition, unsigned indent);
+void output_input(std::ostream &out, const ioport_list &portlist);
+void output_switches(std::ostream &out, const ioport_list &portlist, const char *root_tag, int type, const char *outertag, const char *loctag, const char *innertag);
+void output_ports(std::ostream &out, const ioport_list &portlist);
+void output_adjusters(std::ostream &out, const ioport_list &portlist);
+void output_driver(std::ostream &out, game_driver const &driver, device_t::feature_type unemulated, device_t::feature_type imperfect);
+void output_features(std::ostream &out, device_type type, device_t::feature_type unemulated, device_t::feature_type imperfect);
+void output_images(std::ostream &out, device_t &device, const char *root_tag);
+void output_slots(std::ostream &out, machine_config &config, device_t &device, const char *root_tag, device_type_set *devtypes);
+void output_software_lists(std::ostream &out, device_t &root, const char *root_tag);
+void output_ramoptions(std::ostream &out, device_t &root);
+
+void output_one_device(std::ostream &out, machine_config &config, device_t &device, const char *devtag);
+void output_devices(std::ostream &out, emu_options &lookup_options, device_type_set const *filter);
+
+const char *get_merge_name(driver_enumerator &drivlist, const game_driver &driver, util::hash_collection const &romhashes);
 
 
 //**************************************************************************
@@ -89,169 +92,219 @@ namespace
 //**************************************************************************
 
 // DTD string describing the data
-static const char s_dtd_string[] =
-"<!DOCTYPE __XML_ROOT__ [\n"
-"<!ELEMENT __XML_ROOT__ (__XML_TOP__+)>\n"
-"\t<!ATTLIST __XML_ROOT__ build CDATA #IMPLIED>\n"
-"\t<!ATTLIST __XML_ROOT__ debug (yes|no) \"no\">\n"
-"\t<!ATTLIST __XML_ROOT__ mameconfig CDATA #REQUIRED>\n"
-"\t<!ELEMENT __XML_TOP__ (description, year?, manufacturer?, biosset*, rom*, disk*, device_ref*, sample*, chip*, display*, sound?, input?, dipswitch*, configuration*, port*, adjuster*, driver?, feature*, device*, slot*, softwarelist*, ramoption*)>\n"
-"\t\t<!ATTLIST __XML_TOP__ name CDATA #REQUIRED>\n"
-"\t\t<!ATTLIST __XML_TOP__ sourcefile CDATA #IMPLIED>\n"
-"\t\t<!ATTLIST __XML_TOP__ isbios (yes|no) \"no\">\n"
-"\t\t<!ATTLIST __XML_TOP__ isdevice (yes|no) \"no\">\n"
-"\t\t<!ATTLIST __XML_TOP__ ismechanical (yes|no) \"no\">\n"
-"\t\t<!ATTLIST __XML_TOP__ runnable (yes|no) \"yes\">\n"
-"\t\t<!ATTLIST __XML_TOP__ cloneof CDATA #IMPLIED>\n"
-"\t\t<!ATTLIST __XML_TOP__ romof CDATA #IMPLIED>\n"
-"\t\t<!ATTLIST __XML_TOP__ sampleof CDATA #IMPLIED>\n"
-"\t\t<!ELEMENT description (#PCDATA)>\n"
-"\t\t<!ELEMENT year (#PCDATA)>\n"
-"\t\t<!ELEMENT manufacturer (#PCDATA)>\n"
-"\t\t<!ELEMENT biosset EMPTY>\n"
-"\t\t\t<!ATTLIST biosset name CDATA #REQUIRED>\n"
-"\t\t\t<!ATTLIST biosset description CDATA #REQUIRED>\n"
-"\t\t\t<!ATTLIST biosset default (yes|no) \"no\">\n"
-"\t\t<!ELEMENT rom EMPTY>\n"
-"\t\t\t<!ATTLIST rom name CDATA #REQUIRED>\n"
-"\t\t\t<!ATTLIST rom bios CDATA #IMPLIED>\n"
-"\t\t\t<!ATTLIST rom size CDATA #REQUIRED>\n"
-"\t\t\t<!ATTLIST rom crc CDATA #IMPLIED>\n"
-"\t\t\t<!ATTLIST rom sha1 CDATA #IMPLIED>\n"
-"\t\t\t<!ATTLIST rom merge CDATA #IMPLIED>\n"
-"\t\t\t<!ATTLIST rom region CDATA #IMPLIED>\n"
-"\t\t\t<!ATTLIST rom offset CDATA #IMPLIED>\n"
-"\t\t\t<!ATTLIST rom status (baddump|nodump|good) \"good\">\n"
-"\t\t\t<!ATTLIST rom optional (yes|no) \"no\">\n"
-"\t\t<!ELEMENT disk EMPTY>\n"
-"\t\t\t<!ATTLIST disk name CDATA #REQUIRED>\n"
-"\t\t\t<!ATTLIST disk sha1 CDATA #IMPLIED>\n"
-"\t\t\t<!ATTLIST disk merge CDATA #IMPLIED>\n"
-"\t\t\t<!ATTLIST disk region CDATA #IMPLIED>\n"
-"\t\t\t<!ATTLIST disk index CDATA #IMPLIED>\n"
-"\t\t\t<!ATTLIST disk writable (yes|no) \"no\">\n"
-"\t\t\t<!ATTLIST disk status (baddump|nodump|good) \"good\">\n"
-"\t\t\t<!ATTLIST disk optional (yes|no) \"no\">\n"
-"\t\t<!ELEMENT device_ref EMPTY>\n"
-"\t\t\t<!ATTLIST device_ref name CDATA #REQUIRED>\n"
-"\t\t<!ELEMENT sample EMPTY>\n"
-"\t\t\t<!ATTLIST sample name CDATA #REQUIRED>\n"
-"\t\t<!ELEMENT chip EMPTY>\n"
-"\t\t\t<!ATTLIST chip name CDATA #REQUIRED>\n"
-"\t\t\t<!ATTLIST chip tag CDATA #IMPLIED>\n"
-"\t\t\t<!ATTLIST chip type (cpu|audio) #REQUIRED>\n"
-"\t\t\t<!ATTLIST chip clock CDATA #IMPLIED>\n"
-"\t\t<!ELEMENT display EMPTY>\n"
-"\t\t\t<!ATTLIST display tag CDATA #IMPLIED>\n"
-"\t\t\t<!ATTLIST display type (raster|vector|lcd|svg|unknown) #REQUIRED>\n"
-"\t\t\t<!ATTLIST display rotate (0|90|180|270) #IMPLIED>\n"
-"\t\t\t<!ATTLIST display flipx (yes|no) \"no\">\n"
-"\t\t\t<!ATTLIST display width CDATA #IMPLIED>\n"
-"\t\t\t<!ATTLIST display height CDATA #IMPLIED>\n"
-"\t\t\t<!ATTLIST display refresh CDATA #REQUIRED>\n"
-"\t\t\t<!ATTLIST display pixclock CDATA #IMPLIED>\n"
-"\t\t\t<!ATTLIST display htotal CDATA #IMPLIED>\n"
-"\t\t\t<!ATTLIST display hbend CDATA #IMPLIED>\n"
-"\t\t\t<!ATTLIST display hbstart CDATA #IMPLIED>\n"
-"\t\t\t<!ATTLIST display vtotal CDATA #IMPLIED>\n"
-"\t\t\t<!ATTLIST display vbend CDATA #IMPLIED>\n"
-"\t\t\t<!ATTLIST display vbstart CDATA #IMPLIED>\n"
-"\t\t<!ELEMENT sound EMPTY>\n"
-"\t\t\t<!ATTLIST sound channels CDATA #REQUIRED>\n"
-"\t\t<!ELEMENT condition EMPTY>\n"
-"\t\t\t<!ATTLIST condition tag CDATA #REQUIRED>\n"
-"\t\t\t<!ATTLIST condition mask CDATA #REQUIRED>\n"
-"\t\t\t<!ATTLIST condition relation (eq|ne|gt|le|lt|ge) #REQUIRED>\n"
-"\t\t\t<!ATTLIST condition value CDATA #REQUIRED>\n"
-"\t\t<!ELEMENT input (control*)>\n"
-"\t\t\t<!ATTLIST input service (yes|no) \"no\">\n"
-"\t\t\t<!ATTLIST input tilt (yes|no) \"no\">\n"
-"\t\t\t<!ATTLIST input players CDATA #REQUIRED>\n"
-"\t\t\t<!ATTLIST input coins CDATA #IMPLIED>\n"
-"\t\t\t<!ELEMENT control EMPTY>\n"
-"\t\t\t\t<!ATTLIST control type CDATA #REQUIRED>\n"
-"\t\t\t\t<!ATTLIST control player CDATA #IMPLIED>\n"
-"\t\t\t\t<!ATTLIST control buttons CDATA #IMPLIED>\n"
-"\t\t\t\t<!ATTLIST control reqbuttons CDATA #IMPLIED>\n"
-"\t\t\t\t<!ATTLIST control minimum CDATA #IMPLIED>\n"
-"\t\t\t\t<!ATTLIST control maximum CDATA #IMPLIED>\n"
-"\t\t\t\t<!ATTLIST control sensitivity CDATA #IMPLIED>\n"
-"\t\t\t\t<!ATTLIST control keydelta CDATA #IMPLIED>\n"
-"\t\t\t\t<!ATTLIST control reverse (yes|no) \"no\">\n"
-"\t\t\t\t<!ATTLIST control ways CDATA #IMPLIED>\n"
-"\t\t\t\t<!ATTLIST control ways2 CDATA #IMPLIED>\n"
-"\t\t\t\t<!ATTLIST control ways3 CDATA #IMPLIED>\n"
-"\t\t<!ELEMENT dipswitch (condition?, diplocation*, dipvalue*)>\n"
-"\t\t\t<!ATTLIST dipswitch name CDATA #REQUIRED>\n"
-"\t\t\t<!ATTLIST dipswitch tag CDATA #REQUIRED>\n"
-"\t\t\t<!ATTLIST dipswitch mask CDATA #REQUIRED>\n"
-"\t\t\t<!ELEMENT diplocation EMPTY>\n"
-"\t\t\t\t<!ATTLIST diplocation name CDATA #REQUIRED>\n"
-"\t\t\t\t<!ATTLIST diplocation number CDATA #REQUIRED>\n"
-"\t\t\t\t<!ATTLIST diplocation inverted (yes|no) \"no\">\n"
-"\t\t\t<!ELEMENT dipvalue (condition?)>\n"
-"\t\t\t\t<!ATTLIST dipvalue name CDATA #REQUIRED>\n"
-"\t\t\t\t<!ATTLIST dipvalue value CDATA #REQUIRED>\n"
-"\t\t\t\t<!ATTLIST dipvalue default (yes|no) \"no\">\n"
-"\t\t<!ELEMENT configuration (condition?, conflocation*, confsetting*)>\n"
-"\t\t\t<!ATTLIST configuration name CDATA #REQUIRED>\n"
-"\t\t\t<!ATTLIST configuration tag CDATA #REQUIRED>\n"
-"\t\t\t<!ATTLIST configuration mask CDATA #REQUIRED>\n"
-"\t\t\t<!ELEMENT conflocation EMPTY>\n"
-"\t\t\t\t<!ATTLIST conflocation name CDATA #REQUIRED>\n"
-"\t\t\t\t<!ATTLIST conflocation number CDATA #REQUIRED>\n"
-"\t\t\t\t<!ATTLIST conflocation inverted (yes|no) \"no\">\n"
-"\t\t\t<!ELEMENT confsetting (condition?)>\n"
-"\t\t\t\t<!ATTLIST confsetting name CDATA #REQUIRED>\n"
-"\t\t\t\t<!ATTLIST confsetting value CDATA #REQUIRED>\n"
-"\t\t\t\t<!ATTLIST confsetting default (yes|no) \"no\">\n"
-"\t\t<!ELEMENT port (analog*)>\n"
-"\t\t\t<!ATTLIST port tag CDATA #REQUIRED>\n"
-"\t\t\t<!ELEMENT analog EMPTY>\n"
-"\t\t\t\t<!ATTLIST analog mask CDATA #REQUIRED>\n"
-"\t\t<!ELEMENT adjuster (condition?)>\n"
-"\t\t\t<!ATTLIST adjuster name CDATA #REQUIRED>\n"
-"\t\t\t<!ATTLIST adjuster default CDATA #REQUIRED>\n"
-"\t\t<!ELEMENT driver EMPTY>\n"
-"\t\t\t<!ATTLIST driver status (good|imperfect|preliminary) #REQUIRED>\n"
-"\t\t\t<!ATTLIST driver emulation (good|imperfect|preliminary) #REQUIRED>\n"
-"\t\t\t<!ATTLIST driver cocktail (good|imperfect|preliminary) #IMPLIED>\n"
-"\t\t\t<!ATTLIST driver savestate (supported|unsupported) #REQUIRED>\n"
-"\t\t<!ELEMENT feature EMPTY>\n"
-"\t\t\t<!ATTLIST feature type (protection|timing|graphics|palette|sound|capture|camera|microphone|controls|keyboard|mouse|media|disk|printer|tape|punch|drum|rom|comms|lan|wan) #REQUIRED>\n"
-"\t\t\t<!ATTLIST feature status (unemulated|imperfect) #IMPLIED>\n"
-"\t\t\t<!ATTLIST feature overall (unemulated|imperfect) #IMPLIED>\n"
-"\t\t<!ELEMENT device (instance?, extension*)>\n"
-"\t\t\t<!ATTLIST device type CDATA #REQUIRED>\n"
-"\t\t\t<!ATTLIST device tag CDATA #IMPLIED>\n"
-"\t\t\t<!ATTLIST device fixed_image CDATA #IMPLIED>\n"
-"\t\t\t<!ATTLIST device mandatory CDATA #IMPLIED>\n"
-"\t\t\t<!ATTLIST device interface CDATA #IMPLIED>\n"
-"\t\t\t<!ELEMENT instance EMPTY>\n"
-"\t\t\t\t<!ATTLIST instance name CDATA #REQUIRED>\n"
-"\t\t\t\t<!ATTLIST instance briefname CDATA #REQUIRED>\n"
-"\t\t\t<!ELEMENT extension EMPTY>\n"
-"\t\t\t\t<!ATTLIST extension name CDATA #REQUIRED>\n"
-"\t\t<!ELEMENT slot (slotoption*)>\n"
-"\t\t\t<!ATTLIST slot name CDATA #REQUIRED>\n"
-"\t\t\t<!ELEMENT slotoption EMPTY>\n"
-"\t\t\t\t<!ATTLIST slotoption name CDATA #REQUIRED>\n"
-"\t\t\t\t<!ATTLIST slotoption devname CDATA #REQUIRED>\n"
-"\t\t\t\t<!ATTLIST slotoption default (yes|no) \"no\">\n"
-"\t\t<!ELEMENT softwarelist EMPTY>\n"
-"\t\t\t<!ATTLIST softwarelist tag CDATA #REQUIRED>\n"
-"\t\t\t<!ATTLIST softwarelist name CDATA #REQUIRED>\n"
-"\t\t\t<!ATTLIST softwarelist status (original|compatible) #REQUIRED>\n"
-"\t\t\t<!ATTLIST softwarelist filter CDATA #IMPLIED>\n"
-"\t\t<!ELEMENT ramoption (#PCDATA)>\n"
-"\t\t\t<!ATTLIST ramoption name CDATA #REQUIRED>\n"
-"\t\t\t<!ATTLIST ramoption default CDATA #IMPLIED>\n"
-"]>";
+constexpr char f_dtd_string[] =
+		"<!DOCTYPE __XML_ROOT__ [\n"
+		"<!ELEMENT __XML_ROOT__ (__XML_TOP__+)>\n"
+		"\t<!ATTLIST __XML_ROOT__ build CDATA #IMPLIED>\n"
+		"\t<!ATTLIST __XML_ROOT__ debug (yes|no) \"no\">\n"
+		"\t<!ATTLIST __XML_ROOT__ mameconfig CDATA #REQUIRED>\n"
+		"\t<!ELEMENT __XML_TOP__ (description, year?, manufacturer?, biosset*, rom*, disk*, device_ref*, sample*, chip*, display*, sound?, input?, dipswitch*, configuration*, port*, adjuster*, driver?, feature*, device*, slot*, softwarelist*, ramoption*)>\n"
+		"\t\t<!ATTLIST __XML_TOP__ name CDATA #REQUIRED>\n"
+		"\t\t<!ATTLIST __XML_TOP__ sourcefile CDATA #IMPLIED>\n"
+		"\t\t<!ATTLIST __XML_TOP__ isbios (yes|no) \"no\">\n"
+		"\t\t<!ATTLIST __XML_TOP__ isdevice (yes|no) \"no\">\n"
+		"\t\t<!ATTLIST __XML_TOP__ ismechanical (yes|no) \"no\">\n"
+		"\t\t<!ATTLIST __XML_TOP__ runnable (yes|no) \"yes\">\n"
+		"\t\t<!ATTLIST __XML_TOP__ cloneof CDATA #IMPLIED>\n"
+		"\t\t<!ATTLIST __XML_TOP__ romof CDATA #IMPLIED>\n"
+		"\t\t<!ATTLIST __XML_TOP__ sampleof CDATA #IMPLIED>\n"
+		"\t\t<!ELEMENT description (#PCDATA)>\n"
+		"\t\t<!ELEMENT year (#PCDATA)>\n"
+		"\t\t<!ELEMENT manufacturer (#PCDATA)>\n"
+		"\t\t<!ELEMENT biosset EMPTY>\n"
+		"\t\t\t<!ATTLIST biosset name CDATA #REQUIRED>\n"
+		"\t\t\t<!ATTLIST biosset description CDATA #REQUIRED>\n"
+		"\t\t\t<!ATTLIST biosset default (yes|no) \"no\">\n"
+		"\t\t<!ELEMENT rom EMPTY>\n"
+		"\t\t\t<!ATTLIST rom name CDATA #REQUIRED>\n"
+		"\t\t\t<!ATTLIST rom bios CDATA #IMPLIED>\n"
+		"\t\t\t<!ATTLIST rom size CDATA #REQUIRED>\n"
+		"\t\t\t<!ATTLIST rom crc CDATA #IMPLIED>\n"
+		"\t\t\t<!ATTLIST rom sha1 CDATA #IMPLIED>\n"
+		"\t\t\t<!ATTLIST rom merge CDATA #IMPLIED>\n"
+		"\t\t\t<!ATTLIST rom region CDATA #IMPLIED>\n"
+		"\t\t\t<!ATTLIST rom offset CDATA #IMPLIED>\n"
+		"\t\t\t<!ATTLIST rom status (baddump|nodump|good) \"good\">\n"
+		"\t\t\t<!ATTLIST rom optional (yes|no) \"no\">\n"
+		"\t\t<!ELEMENT disk EMPTY>\n"
+		"\t\t\t<!ATTLIST disk name CDATA #REQUIRED>\n"
+		"\t\t\t<!ATTLIST disk sha1 CDATA #IMPLIED>\n"
+		"\t\t\t<!ATTLIST disk merge CDATA #IMPLIED>\n"
+		"\t\t\t<!ATTLIST disk region CDATA #IMPLIED>\n"
+		"\t\t\t<!ATTLIST disk index CDATA #IMPLIED>\n"
+		"\t\t\t<!ATTLIST disk writable (yes|no) \"no\">\n"
+		"\t\t\t<!ATTLIST disk status (baddump|nodump|good) \"good\">\n"
+		"\t\t\t<!ATTLIST disk optional (yes|no) \"no\">\n"
+		"\t\t<!ELEMENT device_ref EMPTY>\n"
+		"\t\t\t<!ATTLIST device_ref name CDATA #REQUIRED>\n"
+		"\t\t<!ELEMENT sample EMPTY>\n"
+		"\t\t\t<!ATTLIST sample name CDATA #REQUIRED>\n"
+		"\t\t<!ELEMENT chip EMPTY>\n"
+		"\t\t\t<!ATTLIST chip name CDATA #REQUIRED>\n"
+		"\t\t\t<!ATTLIST chip tag CDATA #IMPLIED>\n"
+		"\t\t\t<!ATTLIST chip type (cpu|audio) #REQUIRED>\n"
+		"\t\t\t<!ATTLIST chip clock CDATA #IMPLIED>\n"
+		"\t\t<!ELEMENT display EMPTY>\n"
+		"\t\t\t<!ATTLIST display tag CDATA #IMPLIED>\n"
+		"\t\t\t<!ATTLIST display type (raster|vector|lcd|svg|unknown) #REQUIRED>\n"
+		"\t\t\t<!ATTLIST display rotate (0|90|180|270) #IMPLIED>\n"
+		"\t\t\t<!ATTLIST display flipx (yes|no) \"no\">\n"
+		"\t\t\t<!ATTLIST display width CDATA #IMPLIED>\n"
+		"\t\t\t<!ATTLIST display height CDATA #IMPLIED>\n"
+		"\t\t\t<!ATTLIST display refresh CDATA #REQUIRED>\n"
+		"\t\t\t<!ATTLIST display pixclock CDATA #IMPLIED>\n"
+		"\t\t\t<!ATTLIST display htotal CDATA #IMPLIED>\n"
+		"\t\t\t<!ATTLIST display hbend CDATA #IMPLIED>\n"
+		"\t\t\t<!ATTLIST display hbstart CDATA #IMPLIED>\n"
+		"\t\t\t<!ATTLIST display vtotal CDATA #IMPLIED>\n"
+		"\t\t\t<!ATTLIST display vbend CDATA #IMPLIED>\n"
+		"\t\t\t<!ATTLIST display vbstart CDATA #IMPLIED>\n"
+		"\t\t<!ELEMENT sound EMPTY>\n"
+		"\t\t\t<!ATTLIST sound channels CDATA #REQUIRED>\n"
+		"\t\t<!ELEMENT condition EMPTY>\n"
+		"\t\t\t<!ATTLIST condition tag CDATA #REQUIRED>\n"
+		"\t\t\t<!ATTLIST condition mask CDATA #REQUIRED>\n"
+		"\t\t\t<!ATTLIST condition relation (eq|ne|gt|le|lt|ge) #REQUIRED>\n"
+		"\t\t\t<!ATTLIST condition value CDATA #REQUIRED>\n"
+		"\t\t<!ELEMENT input (control*)>\n"
+		"\t\t\t<!ATTLIST input service (yes|no) \"no\">\n"
+		"\t\t\t<!ATTLIST input tilt (yes|no) \"no\">\n"
+		"\t\t\t<!ATTLIST input players CDATA #REQUIRED>\n"
+		"\t\t\t<!ATTLIST input coins CDATA #IMPLIED>\n"
+		"\t\t\t<!ELEMENT control EMPTY>\n"
+		"\t\t\t\t<!ATTLIST control type CDATA #REQUIRED>\n"
+		"\t\t\t\t<!ATTLIST control player CDATA #IMPLIED>\n"
+		"\t\t\t\t<!ATTLIST control buttons CDATA #IMPLIED>\n"
+		"\t\t\t\t<!ATTLIST control reqbuttons CDATA #IMPLIED>\n"
+		"\t\t\t\t<!ATTLIST control minimum CDATA #IMPLIED>\n"
+		"\t\t\t\t<!ATTLIST control maximum CDATA #IMPLIED>\n"
+		"\t\t\t\t<!ATTLIST control sensitivity CDATA #IMPLIED>\n"
+		"\t\t\t\t<!ATTLIST control keydelta CDATA #IMPLIED>\n"
+		"\t\t\t\t<!ATTLIST control reverse (yes|no) \"no\">\n"
+		"\t\t\t\t<!ATTLIST control ways CDATA #IMPLIED>\n"
+		"\t\t\t\t<!ATTLIST control ways2 CDATA #IMPLIED>\n"
+		"\t\t\t\t<!ATTLIST control ways3 CDATA #IMPLIED>\n"
+		"\t\t<!ELEMENT dipswitch (condition?, diplocation*, dipvalue*)>\n"
+		"\t\t\t<!ATTLIST dipswitch name CDATA #REQUIRED>\n"
+		"\t\t\t<!ATTLIST dipswitch tag CDATA #REQUIRED>\n"
+		"\t\t\t<!ATTLIST dipswitch mask CDATA #REQUIRED>\n"
+		"\t\t\t<!ELEMENT diplocation EMPTY>\n"
+		"\t\t\t\t<!ATTLIST diplocation name CDATA #REQUIRED>\n"
+		"\t\t\t\t<!ATTLIST diplocation number CDATA #REQUIRED>\n"
+		"\t\t\t\t<!ATTLIST diplocation inverted (yes|no) \"no\">\n"
+		"\t\t\t<!ELEMENT dipvalue (condition?)>\n"
+		"\t\t\t\t<!ATTLIST dipvalue name CDATA #REQUIRED>\n"
+		"\t\t\t\t<!ATTLIST dipvalue value CDATA #REQUIRED>\n"
+		"\t\t\t\t<!ATTLIST dipvalue default (yes|no) \"no\">\n"
+		"\t\t<!ELEMENT configuration (condition?, conflocation*, confsetting*)>\n"
+		"\t\t\t<!ATTLIST configuration name CDATA #REQUIRED>\n"
+		"\t\t\t<!ATTLIST configuration tag CDATA #REQUIRED>\n"
+		"\t\t\t<!ATTLIST configuration mask CDATA #REQUIRED>\n"
+		"\t\t\t<!ELEMENT conflocation EMPTY>\n"
+		"\t\t\t\t<!ATTLIST conflocation name CDATA #REQUIRED>\n"
+		"\t\t\t\t<!ATTLIST conflocation number CDATA #REQUIRED>\n"
+		"\t\t\t\t<!ATTLIST conflocation inverted (yes|no) \"no\">\n"
+		"\t\t\t<!ELEMENT confsetting (condition?)>\n"
+		"\t\t\t\t<!ATTLIST confsetting name CDATA #REQUIRED>\n"
+		"\t\t\t\t<!ATTLIST confsetting value CDATA #REQUIRED>\n"
+		"\t\t\t\t<!ATTLIST confsetting default (yes|no) \"no\">\n"
+		"\t\t<!ELEMENT port (analog*)>\n"
+		"\t\t\t<!ATTLIST port tag CDATA #REQUIRED>\n"
+		"\t\t\t<!ELEMENT analog EMPTY>\n"
+		"\t\t\t\t<!ATTLIST analog mask CDATA #REQUIRED>\n"
+		"\t\t<!ELEMENT adjuster (condition?)>\n"
+		"\t\t\t<!ATTLIST adjuster name CDATA #REQUIRED>\n"
+		"\t\t\t<!ATTLIST adjuster default CDATA #REQUIRED>\n"
+		"\t\t<!ELEMENT driver EMPTY>\n"
+		"\t\t\t<!ATTLIST driver status (good|imperfect|preliminary) #REQUIRED>\n"
+		"\t\t\t<!ATTLIST driver emulation (good|imperfect|preliminary) #REQUIRED>\n"
+		"\t\t\t<!ATTLIST driver cocktail (good|imperfect|preliminary) #IMPLIED>\n"
+		"\t\t\t<!ATTLIST driver savestate (supported|unsupported) #REQUIRED>\n"
+		"\t\t\t<!ATTLIST driver requiresartwork (yes|no) \"no\">\n"
+		"\t\t\t<!ATTLIST driver unofficial (yes|no) \"no\">\n"
+		"\t\t\t<!ATTLIST driver nosoundhardware (yes|no) \"no\">\n"
+		"\t\t\t<!ATTLIST driver incomplete (yes|no) \"no\">\n"
+		"\t\t<!ELEMENT feature EMPTY>\n"
+		"\t\t\t<!ATTLIST feature type (protection|timing|graphics|palette|sound|capture|camera|microphone|controls|keyboard|mouse|media|disk|printer|tape|punch|drum|rom|comms|lan|wan) #REQUIRED>\n"
+		"\t\t\t<!ATTLIST feature status (unemulated|imperfect) #IMPLIED>\n"
+		"\t\t\t<!ATTLIST feature overall (unemulated|imperfect) #IMPLIED>\n"
+		"\t\t<!ELEMENT device (instance?, extension*)>\n"
+		"\t\t\t<!ATTLIST device type CDATA #REQUIRED>\n"
+		"\t\t\t<!ATTLIST device tag CDATA #IMPLIED>\n"
+		"\t\t\t<!ATTLIST device fixed_image CDATA #IMPLIED>\n"
+		"\t\t\t<!ATTLIST device mandatory CDATA #IMPLIED>\n"
+		"\t\t\t<!ATTLIST device interface CDATA #IMPLIED>\n"
+		"\t\t\t<!ELEMENT instance EMPTY>\n"
+		"\t\t\t\t<!ATTLIST instance name CDATA #REQUIRED>\n"
+		"\t\t\t\t<!ATTLIST instance briefname CDATA #REQUIRED>\n"
+		"\t\t\t<!ELEMENT extension EMPTY>\n"
+		"\t\t\t\t<!ATTLIST extension name CDATA #REQUIRED>\n"
+		"\t\t<!ELEMENT slot (slotoption*)>\n"
+		"\t\t\t<!ATTLIST slot name CDATA #REQUIRED>\n"
+		"\t\t\t<!ELEMENT slotoption EMPTY>\n"
+		"\t\t\t\t<!ATTLIST slotoption name CDATA #REQUIRED>\n"
+		"\t\t\t\t<!ATTLIST slotoption devname CDATA #REQUIRED>\n"
+		"\t\t\t\t<!ATTLIST slotoption default (yes|no) \"no\">\n"
+		"\t\t<!ELEMENT softwarelist EMPTY>\n"
+		"\t\t\t<!ATTLIST softwarelist tag CDATA #REQUIRED>\n"
+		"\t\t\t<!ATTLIST softwarelist name CDATA #REQUIRED>\n"
+		"\t\t\t<!ATTLIST softwarelist status (original|compatible) #REQUIRED>\n"
+		"\t\t\t<!ATTLIST softwarelist filter CDATA #IMPLIED>\n"
+		"\t\t<!ELEMENT ramoption (#PCDATA)>\n"
+		"\t\t\t<!ATTLIST ramoption name CDATA #REQUIRED>\n"
+		"\t\t\t<!ATTLIST ramoption default CDATA #IMPLIED>\n"
+		"]>";
+
+
+// XML feature names
+constexpr std::pair<device_t::feature_type, char const *> f_feature_names[] = {
+		{ device_t::feature::PROTECTION,    "protection"    },
+		{ device_t::feature::TIMING,        "timing"        },
+		{ device_t::feature::GRAPHICS,      "graphics"      },
+		{ device_t::feature::PALETTE,       "palette"       },
+		{ device_t::feature::SOUND,         "sound"         },
+		{ device_t::feature::CAPTURE,       "capture"       },
+		{ device_t::feature::CAMERA,        "camera"        },
+		{ device_t::feature::MICROPHONE,    "microphone"    },
+		{ device_t::feature::CONTROLS,      "controls"      },
+		{ device_t::feature::KEYBOARD,      "keyboard"      },
+		{ device_t::feature::MOUSE,         "mouse"         },
+		{ device_t::feature::MEDIA,         "media"         },
+		{ device_t::feature::DISK,          "disk"          },
+		{ device_t::feature::PRINTER,       "printer"       },
+		{ device_t::feature::TAPE,          "tape"          },
+		{ device_t::feature::PUNCH,         "punch"         },
+		{ device_t::feature::DRUM,          "drum"          },
+		{ device_t::feature::ROM,           "rom"           },
+		{ device_t::feature::COMMS,         "comms"         },
+		{ device_t::feature::LAN,           "lan"           },
+		{ device_t::feature::WAN,           "wan"           } };
+
+} // anonymous namespace
 
 
 //**************************************************************************
 //  INFO XML CREATOR
 //**************************************************************************
+
+
+//-------------------------------------------------
+//  get_feature_name - get XML name for feature
+//-------------------------------------------------
+
+char const *info_xml_creator::feature_name(device_t::feature_type feature)
+{
+	auto const found = std::lower_bound(
+			std::begin(f_feature_names),
+			std::end(f_feature_names),
+			std::underlying_type_t<device_t::feature_type>(feature),
+			[] (auto const &a, auto const &b)
+			{
+				return std::underlying_type_t<device_t::feature_type>(a.first) < b;
+			});
+	return ((std::end(f_feature_names) != found) && (found->first == feature)) ? found->second : nullptr;
+}
+
 
 //-------------------------------------------------
 //  info_xml_creator - constructor
@@ -316,7 +369,7 @@ void info_xml_creator::output(std::ostream &out, const std::vector<std::string> 
 		if (iter != matched.end())
 		{
 			int index = iter - matched.begin();
-			throw emu_fatalerror(EMU_ERR_NO_SUCH_SYSTEM, "No matching machines found for '%s'", patterns[index].c_str());
+			throw emu_fatalerror(EMU_ERR_NO_SUCH_SYSTEM, "No matching machines found for '%s'", patterns[index]);
 		}
 	}
 }
@@ -478,7 +531,7 @@ void output_header(std::ostream &out, bool dtd)
 	{
 		// output the DTD
 		out << "<?xml version=\"1.0\"?>\n";
-		std::string dtd(s_dtd_string);
+		std::string dtd(f_dtd_string);
 		strreplace(dtd, "__XML_ROOT__", XML_ROOT);
 		strreplace(dtd, "__XML_TOP__", XML_TOP);
 
@@ -495,7 +548,7 @@ void output_header(std::ostream &out, bool dtd)
 			"\" mameconfig=\"%d\">\n",
 			XML_ROOT,
 			normalize_string(emulator_info::get_build_version()),
-			CONFIG_VERSION);
+			configuration_manager::CONFIG_VERSION);
 }
 
 
@@ -518,7 +571,7 @@ void output_footer(std::ostream &out)
 void output_one(std::ostream &out, driver_enumerator &drivlist, const game_driver &driver, device_type_set *devtypes)
 {
 	machine_config config(driver, drivlist.options());
-	device_iterator iter(config.root_device());
+	device_enumerator iter(config.root_device());
 
 	// allocate input ports and build overall emulation status
 	ioport_list portlist;
@@ -637,7 +690,7 @@ void output_one_device(std::ostream &out, machine_config &config, device_t &devi
 {
 	bool has_speaker = false, has_input = false;
 	// check if the device adds speakers to the system
-	sound_interface_iterator snditer(device);
+	sound_interface_enumerator snditer(device);
 	if (snditer.first() != nullptr)
 		has_speaker = true;
 
@@ -646,7 +699,7 @@ void output_one_device(std::ostream &out, machine_config &config, device_t &devi
 	std::string errors;
 	device_t::feature_type overall_unemulated(device.type().unemulated_features());
 	device_t::feature_type overall_imperfect(device.type().imperfect_features());
-	for (device_t &dev : device_iterator(device))
+	for (device_t &dev : device_enumerator(device))
 	{
 		portlist.append(dev, errors);
 		overall_unemulated |= dev.type().unemulated_features();
@@ -714,7 +767,7 @@ void output_devices(std::ostream &out, emu_options &lookup_options, device_type_
 				}
 
 				// notify this device and all its subdevices that they are now configured
-				for (device_t &device : device_iterator(*dev))
+				for (device_t &device : device_enumerator(*dev))
 					if (!device.configured())
 						device.config_complete();
 
@@ -743,7 +796,7 @@ void output_devices(std::ostream &out, emu_options &lookup_options, device_type_
 
 void output_device_refs(std::ostream &out, device_t &root)
 {
-	for (device_t &device : device_iterator(root))
+	for (device_t &device : device_enumerator(root))
 		if (&device != &root)
 			out << util::string_format("\t\t<device_ref name=\"%s\"/>\n", normalize_string(device.shortname()));
 }
@@ -757,7 +810,7 @@ void output_device_refs(std::ostream &out, device_t &root)
 void output_sampleof(std::ostream &out, device_t &device)
 {
 	// iterate over sample devices
-	for (samples_device &samples : samples_device_iterator(device))
+	for (samples_device &samples : samples_device_enumerator(device))
 	{
 		samples_iterator sampiter(samples);
 		if (sampiter.altbasename() != nullptr)
@@ -942,7 +995,7 @@ void output_rom(std::ostream &out, driver_enumerator *drivlist, const game_drive
 void output_sample(std::ostream &out, device_t &device)
 {
 	// iterate over sample devices
-	for (samples_device &samples : samples_device_iterator(device))
+	for (samples_device &samples : samples_device_enumerator(device))
 	{
 		samples_iterator iter(samples);
 		std::unordered_set<std::string> already_printed;
@@ -967,7 +1020,7 @@ void output_sample(std::ostream &out, device_t &device)
 void output_chips(std::ostream &out, device_t &device, const char *root_tag)
 {
 	// iterate over executable devices
-	for (device_execute_interface &exec : execute_interface_iterator(device))
+	for (device_execute_interface &exec : execute_interface_enumerator(device))
 	{
 		if (strcmp(exec.device().tag(), device.tag()))
 		{
@@ -984,7 +1037,7 @@ void output_chips(std::ostream &out, device_t &device, const char *root_tag)
 	}
 
 	// iterate over sound devices
-	for (device_sound_interface &sound : sound_interface_iterator(device))
+	for (device_sound_interface &sound : sound_interface_enumerator(device))
 	{
 		if (strcmp(sound.device().tag(), device.tag()) != 0 && sound.issound())
 		{
@@ -1011,7 +1064,7 @@ void output_chips(std::ostream &out, device_t &device, const char *root_tag)
 void output_display(std::ostream &out, device_t &device, machine_flags::type const *flags, const char *root_tag)
 {
 	// iterate over screens
-	for (const screen_device &screendev : screen_device_iterator(device))
+	for (const screen_device &screendev : screen_device_enumerator(device))
 	{
 		if (strcmp(screendev.tag(), device.tag()))
 		{
@@ -1096,11 +1149,11 @@ void output_display(std::ostream &out, device_t &device, machine_flags::type con
 
 void output_sound(std::ostream &out, device_t &device)
 {
-	speaker_device_iterator spkiter(device);
+	speaker_device_enumerator spkiter(device);
 	int speakers = spkiter.count();
 
 	// if we have no sound, zero m_output the speaker count
-	sound_interface_iterator snditer(device);
+	sound_interface_enumerator snditer(device);
 	if (snditer.first() == nullptr)
 		speakers = 0;
 
@@ -1216,7 +1269,7 @@ void output_input(std::ostream &out, const ioport_list &portlist)
 	{
 		int ctrl_type = CTRL_DIGITAL_BUTTONS;
 		bool ctrl_analog = false;
-		for (ioport_field &field : port.second->fields())
+		for (ioport_field const &field : port.second->fields())
 		{
 			// track the highest player number
 			if (nplayer < field.player() + 1)
@@ -1760,6 +1813,18 @@ void output_driver(std::ostream &out, game_driver const &driver, device_t::featu
 	else
 		out << " savestate=\"unsupported\"";
 
+	if (flags & machine_flags::REQUIRES_ARTWORK)
+		out << " requiresartwork=\"yes\"";
+
+	if (flags & machine_flags::UNOFFICIAL)
+		out << " unofficial=\"yes\"";
+
+	if (flags & machine_flags::NO_SOUND_HW)
+		out << " nosoundhardware=\"yes\"";
+
+	if (flags & machine_flags::IS_INCOMPLETE)
+		out << " incomplete=\"yes\"";
+
 	out << "/>\n";
 }
 
@@ -1771,31 +1836,8 @@ void output_driver(std::ostream &out, game_driver const &driver, device_t::featu
 
 void output_features(std::ostream &out, device_type type, device_t::feature_type unemulated, device_t::feature_type imperfect)
 {
-	static constexpr std::pair<device_t::feature_type, char const *> features[] = {
-			{ device_t::feature::PROTECTION,    "protection"    },
-			{ device_t::feature::TIMING,        "timing"        },
-			{ device_t::feature::GRAPHICS,      "graphics"      },
-			{ device_t::feature::PALETTE,       "palette"       },
-			{ device_t::feature::SOUND,         "sound"         },
-			{ device_t::feature::CAPTURE,       "capture"       },
-			{ device_t::feature::CAMERA,        "camera"        },
-			{ device_t::feature::MICROPHONE,    "microphone"    },
-			{ device_t::feature::CONTROLS,      "controls"      },
-			{ device_t::feature::KEYBOARD,      "keyboard"      },
-			{ device_t::feature::MOUSE,         "mouse"         },
-			{ device_t::feature::MEDIA,         "media"         },
-			{ device_t::feature::DISK,          "disk"          },
-			{ device_t::feature::PRINTER,       "printer"       },
-			{ device_t::feature::TAPE,          "tape"          },
-			{ device_t::feature::PUNCH,         "punch"         },
-			{ device_t::feature::DRUM,          "drum"          },
-			{ device_t::feature::ROM,           "rom"           },
-			{ device_t::feature::COMMS,         "comms"         },
-			{ device_t::feature::LAN,           "lan"           },
-			{ device_t::feature::WAN,           "wan"           } };
-
 	device_t::feature_type const flags(type.unemulated_features() | type.imperfect_features() | unemulated | imperfect);
-	for (auto const &feature : features)
+	for (auto const &feature : f_feature_names)
 	{
 		if (flags & feature.first)
 		{
@@ -1826,7 +1868,7 @@ void output_features(std::ostream &out, device_type type, device_t::feature_type
 
 void output_images(std::ostream &out, device_t &device, const char *root_tag)
 {
-	for (const device_image_interface &imagedev : image_interface_iterator(device))
+	for (const device_image_interface &imagedev : image_interface_enumerator(device))
 	{
 		if (strcmp(imagedev.device().tag(), device.tag()))
 		{
@@ -1887,7 +1929,7 @@ void output_images(std::ostream &out, device_t &device, const char *root_tag)
 
 void output_slots(std::ostream &out, machine_config &config, device_t &device, const char *root_tag, device_type_set *devtypes)
 {
-	for (device_slot_interface &slot : slot_interface_iterator(device))
+	for (device_slot_interface &slot : slot_interface_enumerator(device))
 	{
 		// shall we list fixed slots as non-configurable?
 		bool const listed(!slot.fixed() && strcmp(slot.device().tag(), device.tag()));
@@ -1911,7 +1953,7 @@ void output_slots(std::ostream &out, machine_config &config, device_t &device, c
 						dev->config_complete();
 
 					if (devtypes)
-						for (device_t &subdevice : device_iterator(*dev)) devtypes->insert(&subdevice.type());
+						for (device_t &subdevice : device_enumerator(*dev)) devtypes->insert(&subdevice.type());
 
 					if (listed && option.second->selectable())
 					{
@@ -1940,7 +1982,7 @@ void output_slots(std::ostream &out, machine_config &config, device_t &device, c
 
 void output_software_lists(std::ostream &out, device_t &root, const char *root_tag)
 {
-	for (const software_list_device &swlist : software_list_device_iterator(root))
+	for (const software_list_device &swlist : software_list_device_enumerator(root))
 	{
 		if (&static_cast<const device_t &>(swlist) == &root)
 		{
@@ -1967,7 +2009,7 @@ void output_software_lists(std::ostream &out, device_t &root, const char *root_t
 
 void output_ramoptions(std::ostream &out, device_t &root)
 {
-	for (const ram_device &ram : ram_device_iterator(root, 1))
+	for (const ram_device &ram : ram_device_enumerator(root, 1))
 	{
 		if (!std::strcmp(ram.tag(), ":" RAM_TAG))
 		{

@@ -21,10 +21,10 @@ public:
 
 private:
 
-	DECLARE_READ8_MEMBER(ide_cs0_r);
-	DECLARE_WRITE8_MEMBER(ide_cs0_w);
-	DECLARE_WRITE8_MEMBER(bank_w);
-	DECLARE_WRITE8_MEMBER(ram_w);
+    uint8_t ide_cs0_r(offs_t offset);
+    void ide_cs0_w(offs_t offset, uint8_t data);
+    void bank_w(uint8_t data);
+    void ram_w(offs_t offset, uint8_t data);
 
 	void mem_map(address_map &map);
 	void mem_io(address_map &map);
@@ -41,23 +41,23 @@ private:
 	required_memory_bank m_bank1;
 };
 
-READ8_MEMBER(rc2014_sio_state::ide_cs0_r)
+uint8_t rc2014_sio_state::ide_cs0_r(offs_t offset)
 {
 	return m_ata->cs0_r(offset);
 }
 
-WRITE8_MEMBER(rc2014_sio_state::ide_cs0_w)
+void rc2014_sio_state::ide_cs0_w(offs_t offset, uint8_t data)
 {
 	m_ata->cs0_w(offset, data);
 }
 
-WRITE8_MEMBER(rc2014_sio_state::bank_w)
+void rc2014_sio_state::bank_w(uint8_t data)
 {
 	m_bank1_status = (m_bank1_status==1) ? 0 : 1;
 	update_banks();
 }
 
-WRITE8_MEMBER(rc2014_sio_state::ram_w)
+void rc2014_sio_state::ram_w(offs_t offset, uint8_t data)
 {
 	uint8_t *mem = m_region_maincpu->base();
 	mem[offset] = data;
@@ -77,10 +77,10 @@ void rc2014_sio_state::update_banks()
 	uint8_t *mem = m_region_maincpu->base();
 
 	if (m_bank1_status==0) {
-		space.install_write_handler(0x0000, 0x3fff, write8_delegate(*this, FUNC(rc2014_sio_state::ram_w)));
+		space.install_write_handler(0x0000, 0x3fff, write8sm_delegate(*this, FUNC(rc2014_sio_state::ram_w)));
 		m_bank1->set_base(mem + 0x014000);
 	} else {
-		space.install_write_bank(0x0000, 0x3fff, "bank1");
+		space.install_write_bank(0x0000, 0x3fff, membank("bank1"));
 		m_bank1->set_base(mem + 0x0000);
 	}
 }
@@ -129,7 +129,6 @@ INPUT_PORTS_END
 static DEVICE_INPUT_DEFAULTS_START( terminal )
 	DEVICE_INPUT_DEFAULTS( "RS232_TXBAUD", 0xff, RS232_BAUD_115200 )
 	DEVICE_INPUT_DEFAULTS( "RS232_RXBAUD", 0xff, RS232_BAUD_115200 )
-	DEVICE_INPUT_DEFAULTS( "RS232_STARTBITS", 0xff, RS232_STARTBITS_1 )
 	DEVICE_INPUT_DEFAULTS( "RS232_DATABITS", 0xff, RS232_DATABITS_8 )
 	DEVICE_INPUT_DEFAULTS( "RS232_PARITY", 0xff, RS232_PARITY_NONE )
 	DEVICE_INPUT_DEFAULTS( "RS232_STOPBITS", 0xff, RS232_STOPBITS_1 )

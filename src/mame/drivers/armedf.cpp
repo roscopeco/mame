@@ -320,10 +320,8 @@ Notes:
 #include "cpu/m68000/m68000.h"
 #include "cpu/z80/z80.h"
 #include "cpu/mcs51/mcs51.h"
-#include "sound/3526intf.h"
-#include "sound/3812intf.h"
 #include "sound/dac.h"
-#include "sound/volt_reg.h"
+#include "sound/ymopl.h"
 #include "speaker.h"
 
 #define LEGION_HACK 0
@@ -349,7 +347,7 @@ Notes:
 void armedf_state::terraf_io_w(offs_t offset, u16 data, u16 mem_mask)
 {
 	if (data & 0x4000 && ((m_vreg & 0x4000) == 0)) //0 -> 1 transition
-		m_nb1414m4->exec((m_text_videoram[0] << 8) | (m_text_videoram[1] & 0xff),m_text_videoram.target(),m_fg_scrollx,m_fg_scrolly,m_tx_tilemap);
+		m_nb1414m4->exec((m_text_videoram[0] << 8)|m_text_videoram[1],m_text_videoram,m_fg_scrollx,m_fg_scrolly,m_tx_tilemap);
 
 	COMBINE_DATA(&m_vreg);
 
@@ -420,7 +418,7 @@ void armedf_state::common_map(address_map &map)
 {
 	map(0x000000, 0x05ffff).rom();
 	map(0x064000, 0x064fff).ram().w(m_palette, FUNC(palette_device::write16)).share("palette");
-	map(0x068000, 0x069fff).rw(FUNC(armedf_state::text_videoram_r), FUNC(armedf_state::text_videoram_w)).umask16(0x00ff).share("text_videoram");
+	map(0x068000, 0x069fff).rw(FUNC(armedf_state::text_videoram_r), FUNC(armedf_state::text_videoram_w)).umask16(0x00ff);
 	map(0x06a000, 0x06a9ff).ram();
 	map(0x06c000, 0x06cfff).ram().share("spr_pal_clut");
 	map(0x070000, 0x070fff).ram().w(FUNC(armedf_state::fg_videoram_w)).share("fg_videoram");
@@ -481,7 +479,7 @@ void armedf_state::cclimbr2_map(address_map &map)
 	map(0x060000, 0x060fff).ram().share("spriteram");
 	map(0x061000, 0x063fff).ram();
 	map(0x064000, 0x064fff).ram().w(m_palette, FUNC(palette_device::write16)).share("palette");
-	map(0x068000, 0x069fff).rw(FUNC(armedf_state::text_videoram_r), FUNC(armedf_state::text_videoram_w)).umask16(0x00ff).share("text_videoram");
+	map(0x068000, 0x069fff).rw(FUNC(armedf_state::text_videoram_r), FUNC(armedf_state::text_videoram_w)).umask16(0x00ff);
 	map(0x06a000, 0x06a9ff).ram();
 	map(0x06c000, 0x06cfff).ram().share("spr_pal_clut");
 	map(0x070000, 0x070fff).ram().w(FUNC(armedf_state::fg_videoram_w)).share("fg_videoram");
@@ -523,7 +521,7 @@ void armedf_state::legion_map(address_map &map)
 {
 	legion_common_map(map);
 
-	map(0x068000, 0x069fff).rw(FUNC(armedf_state::text_videoram_r), FUNC(armedf_state::text_videoram_w)).umask16(0x00ff).share("text_videoram");
+	map(0x068000, 0x069fff).rw(FUNC(armedf_state::text_videoram_r), FUNC(armedf_state::text_videoram_w)).umask16(0x00ff);
 	map(0x07c000, 0x07c001).w(FUNC(armedf_state::terraf_io_w));
 }
 
@@ -541,7 +539,7 @@ void armedf_state::legionjb_map(address_map &map)
 	legion_common_map(map);
 
 	map(0x040000, 0x04003f).w(FUNC(armedf_state::legionjb_fg_scroll_w)).umask16(0x00ff);
-	map(0x068000, 0x069fff).rw(FUNC(armedf_state::text_videoram_r), FUNC(armedf_state::text_videoram_w)).umask16(0x00ff).share("text_videoram");
+	map(0x068000, 0x069fff).rw(FUNC(armedf_state::text_videoram_r), FUNC(armedf_state::text_videoram_w)).umask16(0x00ff);
 	map(0x07c000, 0x07c001).w(FUNC(armedf_state::armedf_io_w));
 }
 
@@ -550,7 +548,7 @@ void armedf_state::legionjb2_map(address_map &map)
 	legion_common_map(map);
 
 	map(0x000000, 0x00003f).w(FUNC(armedf_state::legionjb_fg_scroll_w)).umask16(0x00ff);
-	map(0x068000, 0x069fff).rw(FUNC(armedf_state::text_videoram_r), FUNC(armedf_state::text_videoram_w)).umask16(0x00ff).share("text_videoram");
+	map(0x068000, 0x069fff).rw(FUNC(armedf_state::text_videoram_r), FUNC(armedf_state::text_videoram_w)).umask16(0x00ff);
 	map(0x07c000, 0x07c001).w(FUNC(armedf_state::armedf_io_w));
 	//also writes to 7c0010 / 70c020 / 70c030. These could possibly be the scroll registers on this bootleg and the writes to 000000 - 00003f could just be leftovers.
 }
@@ -562,7 +560,7 @@ void armedf_state::armedf_map(address_map &map)
 	map(0x061000, 0x065fff).ram();
 	map(0x066000, 0x066fff).ram().w(FUNC(armedf_state::bg_videoram_w)).share("bg_videoram");
 	map(0x067000, 0x067fff).ram().w(FUNC(armedf_state::fg_videoram_w)).share("fg_videoram");
-	map(0x068000, 0x069fff).rw(FUNC(armedf_state::text_videoram_r), FUNC(armedf_state::text_videoram_w)).umask16(0x00ff).share("text_videoram");
+	map(0x068000, 0x069fff).rw(FUNC(armedf_state::text_videoram_r), FUNC(armedf_state::text_videoram_w)).umask16(0x00ff);
 	map(0x06a000, 0x06afff).ram().w(m_palette, FUNC(palette_device::write16)).share("palette");
 	map(0x06b000, 0x06bfff).ram().share("spr_pal_clut");
 	map(0x06c000, 0x06c7ff).ram();
@@ -611,7 +609,7 @@ void bigfghtr_state::bigfghtr_map(address_map &map)
 	map(0x084000, 0x085fff).ram(); //work ram
 	map(0x086000, 0x086fff).ram().w(FUNC(bigfghtr_state::bg_videoram_w)).share("bg_videoram");
 	map(0x087000, 0x087fff).ram().w(FUNC(bigfghtr_state::fg_videoram_w)).share("fg_videoram");
-	map(0x088000, 0x089fff).rw(FUNC(bigfghtr_state::text_videoram_r), FUNC(bigfghtr_state::text_videoram_w)).umask16(0x00ff).share("text_videoram");
+	map(0x088000, 0x089fff).rw(FUNC(bigfghtr_state::text_videoram_r), FUNC(bigfghtr_state::text_videoram_w)).umask16(0x00ff);
 	map(0x08a000, 0x08afff).ram().w(m_palette, FUNC(palette_device::write16)).share("palette");
 	map(0x08b000, 0x08bfff).ram().share("spr_pal_clut");
 	map(0x08c000, 0x08c001).portr("P1");
@@ -680,7 +678,8 @@ void armedf_state::terrafjb_fg_scroll_msb_w(u8 data)
 void armedf_state::terrafjb_extraz80_map(address_map &map)
 {
 	map(0x0000, 0x3fff).rom();
-	map(0x4000, 0x5fff).ram().w(FUNC(armedf_state::blitter_txram_w)).share("text_videoram");
+	map(0x4000, 0x4fff).ram().w(FUNC(armedf_state::blitter_txram_w)).share("text_videoram");
+	map(0x5000, 0x5fff).ram();
 	map(0x8000, 0x87ff).ram();
 }
 
@@ -1032,13 +1031,13 @@ static INPUT_PORTS_START( bigfghtr )
 	PORT_DIPNAME( 0x10, 0x10, DEF_STR( Unknown ) )        PORT_DIPLOCATION("DSW1:5")
 	PORT_DIPSETTING(    0x10, DEF_STR( Off ) )
 	PORT_DIPSETTING(    0x00, DEF_STR( On ) )
-	PORT_DIPNAME( 0x20, 0x20, DEF_STR( Unknown ) )        PORT_DIPLOCATION("DSW1:6")
+	PORT_DIPNAME( 0x20, 0x20, "Debug 2 (requires Debug On) (P2 Start skip stage, Invulnerability)" ) PORT_DIPLOCATION("DSW1:6")
 	PORT_DIPSETTING(    0x20, DEF_STR( Off ) )
 	PORT_DIPSETTING(    0x00, DEF_STR( On ) )
 	PORT_DIPNAME( 0x40, 0x40, DEF_STR( Flip_Screen ) )    PORT_DIPLOCATION("DSW1:7")
 	PORT_DIPSETTING(    0x40, DEF_STR( Off ) )
 	PORT_DIPSETTING(    0x00, DEF_STR( On ) )
-	PORT_DIPNAME( 0x80, 0x80, DEF_STR( Unknown ) )        PORT_DIPLOCATION("DSW1:8")
+	PORT_DIPNAME( 0x80, 0x80, "Debug (P1 Start to pause)" ) PORT_DIPLOCATION("DSW1:8")
 	PORT_DIPSETTING(    0x80, DEF_STR( Off ) )
 	PORT_DIPSETTING(    0x00, DEF_STR( On ) )
 INPUT_PORTS_END
@@ -1120,9 +1119,6 @@ void armedf_state::sound_config(machine_config &config)
 
 	DAC_8BIT_R2R(config, "dac1", 0).add_route(ALL_OUTPUTS, "speaker", 0.8); // 10-pin SIP with 74HC374P latch
 	DAC_8BIT_R2R(config, "dac2", 0).add_route(ALL_OUTPUTS, "speaker", 0.8); // 10-pin SIP with 74HC374P latch
-	voltage_regulator_device &vref(VOLTAGE_REGULATOR(config, "vref"));
-	vref.add_route(0, "dac1", 1.0, DAC_VREF_POS_INPUT).add_route(0, "dac1", -1.0, DAC_VREF_NEG_INPUT);
-	vref.add_route(0, "dac2", 1.0, DAC_VREF_POS_INPUT).add_route(0, "dac2", -1.0, DAC_VREF_NEG_INPUT);
 }
 
 void armedf_state::terraf(machine_config &config)
@@ -1167,9 +1163,6 @@ void armedf_state::terrafjb(machine_config &config)
 
 	DAC_8BIT_R2R(config, "dac1", 0).add_route(ALL_OUTPUTS, "speaker", 0.8); // unknown DAC
 	DAC_8BIT_R2R(config, "dac2", 0).add_route(ALL_OUTPUTS, "speaker", 0.8); // unknown DAC
-	voltage_regulator_device &vref(VOLTAGE_REGULATOR(config, "vref"));
-	vref.add_route(0, "dac1", 1.0, DAC_VREF_POS_INPUT).add_route(0, "dac1", -1.0, DAC_VREF_NEG_INPUT);
-	vref.add_route(0, "dac2", 1.0, DAC_VREF_POS_INPUT).add_route(0, "dac2", -1.0, DAC_VREF_NEG_INPUT);
 }
 
 void armedf_state::terrafb(machine_config &config)
@@ -1218,9 +1211,6 @@ void armedf_state::armedf(machine_config &config)
 
 	DAC_8BIT_R2R(config, "dac1", 0).add_route(ALL_OUTPUTS, "speaker", 1.0); // unknown DAC
 	DAC_8BIT_R2R(config, "dac2", 0).add_route(ALL_OUTPUTS, "speaker", 1.0); // unknown DAC
-	voltage_regulator_device &vref(VOLTAGE_REGULATOR(config, "vref"));
-	vref.add_route(0, "dac1", 1.0, DAC_VREF_POS_INPUT).add_route(0, "dac1", -1.0, DAC_VREF_NEG_INPUT);
-	vref.add_route(0, "dac2", 1.0, DAC_VREF_POS_INPUT).add_route(0, "dac2", -1.0, DAC_VREF_NEG_INPUT);
 }
 
 void armedf_state::cclimbr2(machine_config &config)
@@ -1248,9 +1238,6 @@ void armedf_state::cclimbr2(machine_config &config)
 
 	DAC_8BIT_R2R(config, "dac1", 0).add_route(ALL_OUTPUTS, "speaker", 0.8); // unknown DAC
 	DAC_8BIT_R2R(config, "dac2", 0).add_route(ALL_OUTPUTS, "speaker", 0.8); // unknown DAC
-	voltage_regulator_device &vref(VOLTAGE_REGULATOR(config, "vref"));
-	vref.add_route(0, "dac1", 1.0, DAC_VREF_POS_INPUT).add_route(0, "dac1", -1.0, DAC_VREF_NEG_INPUT);
-	vref.add_route(0, "dac2", 1.0, DAC_VREF_POS_INPUT).add_route(0, "dac2", -1.0, DAC_VREF_NEG_INPUT);
 }
 
 void armedf_state::legion_common(machine_config &config)
@@ -1272,9 +1259,6 @@ void armedf_state::legion_common(machine_config &config)
 
 	DAC_8BIT_R2R(config, "dac1", 0).add_route(ALL_OUTPUTS, "speaker", 0.8); // 10-pin SIP with 74HC374P latch
 	DAC_8BIT_R2R(config, "dac2", 0).add_route(ALL_OUTPUTS, "speaker", 0.8); // 10-pin SIP with 74HC374P latch
-	voltage_regulator_device &vref(VOLTAGE_REGULATOR(config, "vref"));
-	vref.add_route(0, "dac1", 1.0, DAC_VREF_POS_INPUT).add_route(0, "dac1", -1.0, DAC_VREF_NEG_INPUT);
-	vref.add_route(0, "dac2", 1.0, DAC_VREF_POS_INPUT).add_route(0, "dac2", -1.0, DAC_VREF_NEG_INPUT);
 }
 
 void armedf_state::legion(machine_config &config)

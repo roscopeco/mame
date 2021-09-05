@@ -113,7 +113,7 @@ public:
 	void scudhamm_map(address_map &map);
 
 protected:
-	virtual void machine_start() override { m_leds.resolve(); }
+	virtual void machine_start() override { m_leds.resolve(); m_scudhamm_motor_command = 0; }
 	virtual void video_start() override;
 
 	optional_device_array<megasys1_tilemap_device, 3> m_tmap;
@@ -121,7 +121,6 @@ protected:
 	optional_shared_ptr_array<uint16_t,2> m_roadram;
 	optional_shared_ptr<uint16_t> m_f1gpstr2_ioready;
 
-	uint16_t *m_objectram;
 	uint16_t m_active_layers;
 
 	int m_prev;
@@ -129,7 +128,9 @@ protected:
 	int m_ip_select;
 	uint16_t m_wildplt_output;
 	uint8_t m_drawmode_table[16];
-	int m_debugsprites;
+#ifdef MAME_DEBUG
+	int m_debugsprites = 0;
+#endif
 	int m_show_unknown;
 	uint16_t *m_spriteram;
 
@@ -169,7 +170,7 @@ public:
 	void motor_command_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
 	uint8_t analog_r();
 	void output_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
-	
+
 	void armchmp2(machine_config &config);
 	void armchmp2_map(address_map &map);
 	TIMER_DEVICE_CALLBACK_MEMBER(armchamp2_scanline);

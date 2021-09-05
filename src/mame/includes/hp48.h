@@ -42,6 +42,12 @@ public:
 		, m_palette(*this, "palette")
 		, m_screen(*this, "screen")
 		, m_port(*this, "port%u", 1U)
+		, m_lshift0(*this, "lshift0")
+		, m_rshift0(*this, "rshift0")
+		, m_alpha0(*this, "alpha0")
+		, m_alert0(*this, "alert0")
+		, m_busy0(*this, "busy0")
+		, m_transmit0(*this, "transmit0")
 	{
 	}
 
@@ -66,9 +72,9 @@ public:
 
 		/* static part */
 		uint32_t off_mask;          // offset bit-mask, indicates the real size
-		read8_delegate read;
+		read8sm_delegate read;
 		const char *read_name;
-		write8_delegate write;
+		write8sm_delegate write;
 		void* data;                 // non-NULL for banks
 		int isnop;
 
@@ -94,10 +100,10 @@ private:
 	DECLARE_MACHINE_START(hp48sx);
 	DECLARE_MACHINE_START(hp48s);
 	uint32_t screen_update_hp48(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect);
-	DECLARE_WRITE8_MEMBER(io_w);
-	DECLARE_READ8_MEMBER(io_r);
-	DECLARE_READ8_MEMBER(bank_r);
-	DECLARE_WRITE8_MEMBER(hp49_bank_w);
+	void io_w(offs_t offset, uint8_t data);
+	uint8_t io_r(offs_t offset);
+	uint8_t bank_r(offs_t offset);
+	void hp49_bank_w(offs_t offset, uint8_t data);
 	TIMER_CALLBACK_MEMBER(rs232_byte_recv_cb);
 	TIMER_CALLBACK_MEMBER(rs232_byte_sent_cb);
 	TIMER_CALLBACK_MEMBER(kbd_cb);
@@ -150,6 +156,13 @@ private:
 	*/
 	optional_device_array<hp48_port_image_device, 2> m_port;
 
+	output_finder<> m_lshift0;
+	output_finder<> m_rshift0;
+	output_finder<> m_alpha0;
+	output_finder<> m_alert0;
+	output_finder<> m_busy0;
+	output_finder<> m_transmit0;
+
 	uint32_t m_bank_switch;
 	uint32_t m_io_addr;
 	uint16_t m_crc;
@@ -161,6 +174,8 @@ private:
 	emu_timer *m_1st_timer;
 	emu_timer *m_2nd_timer;
 	emu_timer *m_kbd_timer;
+	std::unique_ptr<uint8_t[]> m_allocated_ram;
+	std::unique_ptr<uint8_t[]> m_allocated_rom;
 };
 
 

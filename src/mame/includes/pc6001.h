@@ -13,7 +13,7 @@
 #include "machine/timer.h"
 #include "sound/ay8910.h"
 #include "sound/upd7752.h"
-//#include "sound/2203intf.h"
+//#include "sound/ymopn.h"
 #include "video/mc6847.h"
 
 #include "bus/generic/slot.h"
@@ -48,9 +48,9 @@ public:
 		m_palette(*this, "palette")
 	{ }
 
-	DECLARE_WRITE8_MEMBER(system_latch_w);
-	DECLARE_READ8_MEMBER(nec_ppi8255_r);
-	DECLARE_WRITE8_MEMBER(nec_ppi8255_w);
+	void system_latch_w(uint8_t data);
+	uint8_t nec_ppi8255_r(offs_t offset);
+	void nec_ppi8255_w(offs_t offset, uint8_t data);
 
 	void pc6001_palette(palette_device &palette) const;
 
@@ -117,7 +117,8 @@ protected:
 	void pc6001_screen_draw(bitmap_ind16 &bitmap,const rectangle &cliprect, int has_mc6847);
 
 	emu_timer *m_timer_irq_timer;
-	uint8_t *m_video_ram;
+	uint8_t *m_video_base;
+	std::unique_ptr<uint8_t[]> m_video_ram;
 	uint8_t m_irq_vector;
 	uint8_t m_cas_switch;
 	uint8_t m_sys_latch;
@@ -151,28 +152,28 @@ public:
 		m_bank8(*this, "bank8")
 	{ }
 
-	DECLARE_READ8_MEMBER(mk2_bank_r0_r);
-	DECLARE_READ8_MEMBER(mk2_bank_r1_r);
-	DECLARE_READ8_MEMBER(mk2_bank_w0_r);
-	DECLARE_WRITE8_MEMBER(mk2_bank_r0_w);
-	DECLARE_WRITE8_MEMBER(mk2_bank_r1_w);
-	DECLARE_WRITE8_MEMBER(mk2_bank_w0_w);
-	DECLARE_WRITE8_MEMBER(mk2_opt_bank_w);
-	DECLARE_WRITE8_MEMBER(mk2_work_ram0_w);
-	DECLARE_WRITE8_MEMBER(mk2_work_ram1_w);
-	DECLARE_WRITE8_MEMBER(mk2_work_ram2_w);
-	DECLARE_WRITE8_MEMBER(mk2_work_ram3_w);
-	DECLARE_WRITE8_MEMBER(mk2_work_ram4_w);
-	DECLARE_WRITE8_MEMBER(mk2_work_ram5_w);
-	DECLARE_WRITE8_MEMBER(mk2_work_ram6_w);
-	DECLARE_WRITE8_MEMBER(mk2_work_ram7_w);
-	DECLARE_WRITE8_MEMBER(necmk2_ppi8255_w);
-	DECLARE_WRITE8_MEMBER(mk2_system_latch_w);
-	DECLARE_WRITE8_MEMBER(mk2_vram_bank_w);
-	DECLARE_WRITE8_MEMBER(mk2_col_bank_w);
-	DECLARE_WRITE8_MEMBER(mk2_0xf3_w);
-	DECLARE_WRITE8_MEMBER(mk2_timer_adj_w);
-	DECLARE_WRITE8_MEMBER(mk2_timer_irqv_w);
+	uint8_t mk2_bank_r0_r();
+	uint8_t mk2_bank_r1_r();
+	uint8_t mk2_bank_w0_r();
+	void mk2_bank_r0_w(uint8_t data);
+	void mk2_bank_r1_w(uint8_t data);
+	void mk2_bank_w0_w(uint8_t data);
+	void mk2_opt_bank_w(uint8_t data);
+	void mk2_work_ram0_w(offs_t offset, uint8_t data);
+	void mk2_work_ram1_w(offs_t offset, uint8_t data);
+	void mk2_work_ram2_w(offs_t offset, uint8_t data);
+	void mk2_work_ram3_w(offs_t offset, uint8_t data);
+	void mk2_work_ram4_w(offs_t offset, uint8_t data);
+	void mk2_work_ram5_w(offs_t offset, uint8_t data);
+	void mk2_work_ram6_w(offs_t offset, uint8_t data);
+	void mk2_work_ram7_w(offs_t offset, uint8_t data);
+	void necmk2_ppi8255_w(offs_t offset, uint8_t data);
+	void mk2_system_latch_w(uint8_t data);
+	void mk2_vram_bank_w(uint8_t data);
+	void mk2_col_bank_w(uint8_t data);
+	void mk2_0xf3_w(uint8_t data);
+	void mk2_timer_adj_w(uint8_t data);
+	void mk2_timer_irqv_w(uint8_t data);
 
 	void pc6001mk2_palette(palette_device &palette) const;
 	void pc6001mk2(machine_config &config);
@@ -216,8 +217,8 @@ public:
 		pc6001mk2_state(mconfig, type, tag)
 	{ }
 
-	DECLARE_READ8_MEMBER(fdc_r);
-	DECLARE_WRITE8_MEMBER(fdc_w);
+	uint8_t fdc_r();
+	void fdc_w(uint8_t data);
 
 	void pc6601(machine_config &config);
 	void pc6601_io(address_map &map);
@@ -231,34 +232,8 @@ public:
 		m_sr_irq_vectors(*this, "irq_vectors")
 	{ }
 
-	DECLARE_READ8_MEMBER(hw_rev_r);
-	DECLARE_READ8_MEMBER(sr_bank_rn_r);
-	DECLARE_WRITE8_MEMBER(sr_bank_rn_w);
-	DECLARE_READ8_MEMBER(sr_bank_wn_r);
-	DECLARE_WRITE8_MEMBER(sr_bank_wn_w);
-	DECLARE_WRITE8_MEMBER(sr_work_ram0_w);
-	DECLARE_WRITE8_MEMBER(sr_work_ram1_w);
-	DECLARE_WRITE8_MEMBER(sr_work_ram2_w);
-	DECLARE_WRITE8_MEMBER(sr_work_ram3_w);
-	DECLARE_WRITE8_MEMBER(sr_work_ram4_w);
-	DECLARE_WRITE8_MEMBER(sr_work_ram5_w);
-	DECLARE_WRITE8_MEMBER(sr_work_ram6_w);
-	DECLARE_WRITE8_MEMBER(sr_work_ram7_w);
-	DECLARE_WRITE8_MEMBER(sr_mode_w);
-	DECLARE_WRITE8_MEMBER(sr_vram_bank_w);
-	DECLARE_WRITE8_MEMBER(sr_system_latch_w);
-	DECLARE_WRITE8_MEMBER(necsr_ppi8255_w);
-	DECLARE_WRITE8_MEMBER(sr_bitmap_yoffs_w);
-	DECLARE_WRITE8_MEMBER(sr_bitmap_xoffs_w);
-
-	INTERRUPT_GEN_MEMBER(sr_vrtc_irq);
-
-	uint32_t screen_update_pc6001sr(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect);
-
 	void pc6001sr(machine_config &config);
 
-	void pc6001sr_io(address_map &map);
-	void pc6001sr_map(address_map &map);
 protected:
 	virtual void video_start() override;
 	virtual void machine_reset() override;
@@ -269,7 +244,7 @@ private:
 	uint8_t m_kludge;
 	bool m_sr_text_mode;
 	uint8_t m_sr_text_rows;
-	uint8_t *m_gvram;
+	std::unique_ptr<uint8_t []> m_gvram;
 	uint8_t m_bitmap_yoffs,m_bitmap_xoffs;
 
 	enum{
@@ -284,6 +259,33 @@ private:
 	};
 
 	required_shared_ptr<uint8_t> m_sr_irq_vectors;
+
+	uint8_t hw_rev_r();
+	uint8_t sr_bank_rn_r(offs_t offset);
+	void sr_bank_rn_w(offs_t offset, uint8_t data);
+	uint8_t sr_bank_wn_r(offs_t offset);
+	void sr_bank_wn_w(offs_t offset, uint8_t data);
+	void sr_work_ram0_w(offs_t offset, uint8_t data);
+	void sr_work_ram1_w(offs_t offset, uint8_t data);
+	void sr_work_ram2_w(offs_t offset, uint8_t data);
+	void sr_work_ram3_w(offs_t offset, uint8_t data);
+	void sr_work_ram4_w(offs_t offset, uint8_t data);
+	void sr_work_ram5_w(offs_t offset, uint8_t data);
+	void sr_work_ram6_w(offs_t offset, uint8_t data);
+	void sr_work_ram7_w(offs_t offset, uint8_t data);
+	void sr_mode_w(uint8_t data);
+	void sr_vram_bank_w(uint8_t data);
+	void sr_system_latch_w(uint8_t data);
+	void necsr_ppi8255_w(offs_t offset, uint8_t data);
+	void sr_bitmap_yoffs_w(uint8_t data);
+	void sr_bitmap_xoffs_w(uint8_t data);
+
+	INTERRUPT_GEN_MEMBER(sr_vrtc_irq);
+
+	uint32_t screen_update_pc6001sr(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect);
+
+	void pc6001sr_io(address_map &map);
+	void pc6001sr_map(address_map &map);
 };
 
 #endif

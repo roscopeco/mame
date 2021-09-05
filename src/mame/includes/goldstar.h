@@ -28,6 +28,7 @@ public:
 		m_reel2_scroll(*this, "reel2_scroll"),
 		m_reel3_scroll(*this, "reel3_scroll"),
 		m_decrypted_opcodes(*this, "decrypted_opcodes"),
+		m_bgcolor(0),
 		m_maincpu(*this, "maincpu"),
 		m_ppi(*this, "ppi8255_%u", 0U),
 		m_gfxdecode(*this, "gfxdecode"),
@@ -35,18 +36,18 @@ public:
 		m_lamps(*this, "lamp%u", 0U)
 	{ }
 
-	DECLARE_WRITE8_MEMBER(protection_w);
-	DECLARE_READ8_MEMBER(protection_r);
-	DECLARE_WRITE8_MEMBER(p1_lamps_w);
-	DECLARE_WRITE8_MEMBER(p2_lamps_w);
-	DECLARE_WRITE8_MEMBER(ncb3_port81_w);
-	DECLARE_WRITE8_MEMBER(cm_coincount_w);
-	DECLARE_WRITE8_MEMBER(goldstar_fg_vidram_w);
-	DECLARE_WRITE8_MEMBER(goldstar_fg_atrram_w);
-	DECLARE_WRITE8_MEMBER(goldstar_reel1_ram_w);
-	DECLARE_WRITE8_MEMBER(goldstar_reel2_ram_w);
-	DECLARE_WRITE8_MEMBER(goldstar_reel3_ram_w);
-	DECLARE_WRITE8_MEMBER(goldstar_fa00_w);
+	void protection_w(uint8_t data);
+	uint8_t protection_r();
+	void p1_lamps_w(uint8_t data);
+	void p2_lamps_w(uint8_t data);
+	void ncb3_port81_w(uint8_t data);
+	void cm_coincount_w(uint8_t data);
+	void goldstar_fg_vidram_w(offs_t offset, uint8_t data);
+	void goldstar_fg_atrram_w(offs_t offset, uint8_t data);
+	void goldstar_reel1_ram_w(offs_t offset, uint8_t data);
+	void goldstar_reel2_ram_w(offs_t offset, uint8_t data);
+	void goldstar_reel3_ram_w(offs_t offset, uint8_t data);
+	void goldstar_fa00_w(uint8_t data);
 	void ay8910_outputa_w(uint8_t data);
 	void ay8910_outputb_w(uint8_t data);
 	void init_chryangl();
@@ -160,9 +161,9 @@ public:
 	{
 	}
 
-	DECLARE_WRITE8_MEMBER(outport0_w);
-	DECLARE_WRITE8_MEMBER(girl_scroll_w);
-	DECLARE_WRITE8_MEMBER(background_col_w);
+	void outport0_w(uint8_t data);
+	void girl_scroll_w(uint8_t data);
+	void background_col_w(uint8_t data);
 
 	void init_cm();
 	void init_cmv4();
@@ -206,12 +207,13 @@ public:
 	void amcoe2_portmap(address_map &map);
 	void cm_portmap(address_map &map);
 	void cm97_portmap(address_map &map);
+	void super7_portmap(address_map &map);
 	void chryangl_decrypted_opcodes_map(address_map &map);
 	void ss2001_portmap(address_map &map);
 
 protected:
 	// installed by various driver init handlers to get stuff to work
-	template <uint8_t V> READ8_MEMBER(fixedval_r) { return V; }
+	template <uint8_t V> uint8_t fixedval_r() { return V; }
 };
 
 
@@ -224,8 +226,8 @@ public:
 	{
 	}
 
-	DECLARE_WRITE8_MEMBER(magodds_outb850_w);
-	DECLARE_WRITE8_MEMBER(magodds_outb860_w);
+	void magodds_outb850_w(uint8_t data);
+	void magodds_outb860_w(uint8_t data);
 	void fl7w4_outc802_w(uint8_t data);
 	void system_outputa_w(uint8_t data);
 	void system_outputb_w(uint8_t data);
@@ -233,10 +235,12 @@ public:
 
 	void init_lucky8a();
 	void init_lucky8f();
+	void init_lucky8l();
 	void init_magoddsc();
 	void init_flaming7();
 	void init_flam7_tw();
 	void init_luckylad();
+	void init_nd8lines();
 	void init_super972();
 	void init_wcat3();
 
@@ -255,6 +259,7 @@ public:
 	void lucky8f(machine_config &config);
 	void lucky8k(machine_config &config);
 	void luckylad(machine_config &config);
+	void nd8lines(machine_config &config);
 	void super972(machine_config &config);
 	void wcat3(machine_config &config);
 	void magodds(machine_config &config);
@@ -266,6 +271,7 @@ public:
 
 protected:
 	TILE_GET_INFO_MEMBER(get_magical_fg_tile_info);
+	virtual void machine_start() override { goldstar_state::machine_start(); m_tile_bank = 0; }
 
 private:
 	optional_device<ds2401_device> m_fl7w4_id;
@@ -273,7 +279,9 @@ private:
 	uint8_t m_nmi_enable;
 	uint8_t m_vidreg;
 
-	int m_tile_bank;
+	uint8_t m_tile_bank;
+
+	void nd8lines_map(address_map &map);
 };
 
 
@@ -322,16 +330,16 @@ public:
 	{
 	}
 
-	DECLARE_WRITE8_MEMBER(enable_w);
-	DECLARE_WRITE8_MEMBER(coincount_w);
+	void enable_w(uint8_t data);
+	void coincount_w(uint8_t data);
 
-	DECLARE_WRITE8_MEMBER(fg_vidram_w);
-	DECLARE_WRITE8_MEMBER(fg_atrram_w);
-	DECLARE_WRITE8_MEMBER(bg_vidram_w);
-	DECLARE_WRITE8_MEMBER(bg_atrram_w);
-	DECLARE_WRITE8_MEMBER(reel1_attrram_w);
-	DECLARE_WRITE8_MEMBER(reel2_attrram_w);
-	DECLARE_WRITE8_MEMBER(reel3_attrram_w);
+	void fg_vidram_w(offs_t offset, uint8_t data);
+	void fg_atrram_w(offs_t offset, uint8_t data);
+	void bg_vidram_w(offs_t offset, uint8_t data);
+	void bg_atrram_w(offs_t offset, uint8_t data);
+	void reel1_attrram_w(offs_t offset, uint8_t data);
+	void reel2_attrram_w(offs_t offset, uint8_t data);
+	void reel3_attrram_w(offs_t offset, uint8_t data);
 
 	DECLARE_VIDEO_START(sangho);
 	uint32_t screen_update_sangho(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect);
@@ -367,13 +375,13 @@ public:
 	{
 	}
 
-	DECLARE_WRITE8_MEMBER(coincount_w);
-	DECLARE_WRITE8_MEMBER(unkcm_0x02_w);
-	DECLARE_WRITE8_MEMBER(unkcm_0x03_w);
+	void coincount_w(uint8_t data);
+	void unkcm_0x02_w(uint8_t data);
+	void unkcm_0x03_w(uint8_t data);
 
-	DECLARE_WRITE8_MEMBER(reel1_attrram_w);
-	DECLARE_WRITE8_MEMBER(reel2_attrram_w);
-	DECLARE_WRITE8_MEMBER(reel3_attrram_w);
+	void reel1_attrram_w(offs_t offset, uint8_t data);
+	void reel2_attrram_w(offs_t offset, uint8_t data);
+	void reel3_attrram_w(offs_t offset, uint8_t data);
 
 	void init_unkch1();
 	void init_unkch3();

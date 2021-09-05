@@ -73,12 +73,12 @@ TIMER_CALLBACK_MEMBER(vectrex_base_state::lightpen_trigger)
 
 *********************************************************************/
 
-READ8_MEMBER(vectrex_base_state::vectrex_via_r)
+uint8_t vectrex_base_state::vectrex_via_r(offs_t offset)
 {
 	return m_via6522_0->read(offset);
 }
 
-WRITE8_MEMBER(vectrex_base_state::vectrex_via_w)
+void vectrex_base_state::vectrex_via_w(offs_t offset, uint8_t data)
 {
 	attotime period;
 
@@ -123,8 +123,6 @@ TIMER_CALLBACK_MEMBER(vectrex_base_state::vectrex_refresh)
 
 uint32_t vectrex_base_state::screen_update_vectrex(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect)
 {
-	int i;
-
 	vectrex_configuration();
 
 	/* start black */
@@ -133,7 +131,7 @@ uint32_t vectrex_base_state::screen_update_vectrex(screen_device &screen, bitmap
 						m_points[m_display_start].col,
 						0);
 
-	for (i = m_display_start; i != m_display_end; i = (i + 1) % NVECT)
+	for (int i = m_display_start; i != m_display_end; i = (i + 1) % NVECT)
 	{
 		m_vector->add_point(m_points[i].x,
 							m_points[i].y,
@@ -245,6 +243,15 @@ void vectrex_base_state::video_start()
 	vector_add_point_function = &vectrex_base_state::vectrex_add_point;
 
 	m_refresh = timer_alloc(TIMER_VECTREX_REFRESH);
+
+	m_display_start = 0;
+	m_display_end = 0;
+	m_reset_refresh = 0;
+	m_blank = 0;
+	m_ramp = 0;
+	std::fill(std::begin(m_analog), std::end(m_analog), 0);
+	m_point_index = 0;
+	m_lightpen_down = 0;
 }
 
 void vectrex_state::video_start()
@@ -411,7 +418,7 @@ WRITE_LINE_MEMBER(vectrex_base_state::v_via_cb2_w)
 
 *****************************************************************/
 
-WRITE8_MEMBER(raaspec_state::raaspec_led_w)
+void raaspec_state::raaspec_led_w(uint8_t data)
 {
 	logerror("Spectrum I+ LED: %i%i%i%i%i%i%i%i\n",
 				(data>>7)&0x1, (data>>6)&0x1, (data>>5)&0x1, (data>>4)&0x1,

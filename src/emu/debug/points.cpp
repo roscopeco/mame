@@ -335,7 +335,7 @@ void debug_watchpoint::triggered(read_or_write type, offs_t address, u64 data, u
 		address += m_space.alignment() - size - address_offset;
 
 	// stash the value that will be written or has just been read
-	debug.cpu().set_wpinfo(address, data);
+	debug.cpu().set_wpinfo(address, data, size * unit_size);
 
 	// protect against recursion
 	debug.cpu().set_within_instruction(true);
@@ -379,9 +379,10 @@ void debug_watchpoint::triggered(read_or_write type, offs_t address, u64 data, u
 							   data,
 							   address);
 
-		if (debug.cpu().live_cpu() == &m_debugInterface->device())
+		const device_state_interface *state;
+		if (debug.cpu().live_cpu() == &m_debugInterface->device() && m_debugInterface->device().interface(state))
 		{
-			offs_t pc = m_debugInterface->device().state().pcbase();
+			offs_t pc = state->pcbase();
 			debug.console().printf("%s (PC=%X)\n", buffer, pc);
 			m_debugInterface->compute_debug_flags();
 		}

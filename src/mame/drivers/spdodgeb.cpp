@@ -28,11 +28,11 @@ Notes:
 #include "cpu/m6502/m6502.h"
 #include "cpu/m6800/m6801.h"
 #include "cpu/m6809/m6809.h"
-#include "sound/3812intf.h"
+#include "sound/ymopl.h"
 #include "speaker.h"
 
 
-WRITE8_MEMBER(spdodgeb_state::spd_adpcm_w)
+void spdodgeb_state::spd_adpcm_w(offs_t offset, uint8_t data)
 {
 	int chip = offset & 1;
 	msm5205_device *adpcm = chip ? m_msm2 : m_msm1;
@@ -90,7 +90,7 @@ WRITE_LINE_MEMBER(spdodgeb_state::spd_adpcm_int_2)
 	spd_adpcm_int(m_msm2, 1);
 }
 
-READ8_MEMBER(spdodgeb_state::mcu63701_r)
+uint8_t spdodgeb_state::mcu63701_r(offs_t offset)
 {
 //  logerror("CPU #0 PC %04x: read from port %02x of 63701 data address 3801\n",m_maincpu->pc(),offset);
 

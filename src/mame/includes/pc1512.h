@@ -75,7 +75,6 @@ public:
 		m_nden(1),
 		m_dint(0),
 		m_ddrq(0),
-		m_dreset(1),
 		m_fdc_dsr(0),
 		m_neop(0),
 		m_ack_int_enable(1),
@@ -135,7 +134,6 @@ public:
 	DECLARE_WRITE_LINE_MEMBER( dack1_w );
 	DECLARE_WRITE_LINE_MEMBER( dack2_w );
 	DECLARE_WRITE_LINE_MEMBER( dack3_w );
-	DECLARE_FLOPPY_FORMATS( floppy_formats );
 	DECLARE_WRITE_LINE_MEMBER( fdc_int_w );
 	DECLARE_WRITE_LINE_MEMBER( fdc_drq_w );
 	void drive_select_w(uint8_t data);
@@ -178,7 +176,6 @@ public:
 	int m_nden;
 	int m_dint;
 	int m_ddrq;
-	int m_dreset;
 	uint8_t m_fdc_dsr;
 	int m_neop;
 

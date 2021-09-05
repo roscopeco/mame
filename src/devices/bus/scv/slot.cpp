@@ -7,7 +7,6 @@
 
  ***********************************************************************************************************/
 
-
 #include "emu.h"
 #include "slot.h"
 
@@ -125,7 +124,7 @@ static int scv_get_pcb_id(const char *slot)
 {
 	for (auto & elem : slot_list)
 	{
-		if (!core_stricmp(elem.slot_option, slot))
+		if (!strcmp(elem.slot_option, slot))
 			return elem.pcb_id;
 	}
 
@@ -158,7 +157,7 @@ image_init_result scv_cart_slot_device::call_load()
 
 		if (len > 0x20000)
 		{
-			seterror(IMAGE_ERROR_UNSPECIFIED, "Unsupported cartridge size");
+			seterror(image_error::INVALIDIMAGE, "Unsupported cartridge size");
 			return image_init_result::FAIL;
 		}
 

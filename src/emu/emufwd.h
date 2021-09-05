@@ -52,11 +52,8 @@ class chd_file;
 // declared in unzip.h
 namespace util { class archive_file; }
 
-// declared in wavwrite.h
-struct wav_file;
-
 // declared in xmlfile.h
-namespace util { namespace xml { class data_node; } }
+namespace util::xml { class data_node; class file; }
 
 
 
@@ -72,7 +69,8 @@ class address_map_entry;
 class bookkeeping_manager;
 
 // declared in config.h
-enum class config_type;
+enum class config_type : int;
+enum class config_level : int;
 class configuration_manager;
 
 // declared in crsshair.h
@@ -81,7 +79,7 @@ class crosshair_manager;
 // declared in debug/debugcmd.h
 class debugger_commands;
 
-// declared in debug/debugcmd.h
+// declared in debug/debugcon.h
 class debugger_console;
 
 // declared in debug/debugcpu.h
@@ -146,10 +144,10 @@ class driver_device;
 // declared in emumem.h
 class address_space;
 class memory_bank;
-class memory_block;
 class memory_manager;
 class memory_region;
 class memory_share;
+class memory_view;
 
 // declared in emuopts.h
 class emu_options;
@@ -182,7 +180,7 @@ struct ioport_port_live;
 class running_machine;
 
 // declared in mconfig.h
-namespace emu { namespace detail { class machine_config_replace; } }
+namespace emu::detail { class machine_config_replace; }
 class machine_config;
 
 // declared in natkeyboard.h
@@ -197,6 +195,7 @@ class output_manager;
 // declared in render.h
 class layout_element;
 class layout_view;
+class layout_file;
 class render_container;
 class render_manager;
 class render_target;

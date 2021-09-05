@@ -204,11 +204,12 @@ static void pc_hd_floppies(device_slot_interface &device)
 	device.option_add("35dd", FLOPPY_35_DD);
 }
 
-FLOPPY_FORMATS_MEMBER( omti8621_device::floppy_formats )
-	FLOPPY_APOLLO_FORMAT,
-	FLOPPY_PC_FORMAT,
-	FLOPPY_NASLITE_FORMAT
-FLOPPY_FORMATS_END
+void omti8621_device::floppy_formats(format_registration &fr)
+{
+	fr.add_pc_formats();
+	fr.add(FLOPPY_APOLLO_FORMAT);
+	fr.add(FLOPPY_NASLITE_FORMAT);
+}
 
 // this card has two EPROMs: a program for the on-board Z8 CPU,
 // and a PC BIOS to make the card bootable on a PC.
@@ -253,8 +254,15 @@ void omti8621_device::device_add_mconfig(machine_config &config)
 	m_fdc->intrq_wr_callback().set(FUNC(omti8621_device::fdc_irq_w));
 	m_fdc->drq_wr_callback().set(FUNC(omti8621_device::fdc_drq_w));
 	FLOPPY_CONNECTOR(config, m_floppy[0], pc_hd_floppies, "525hd", omti8621_device::floppy_formats);
-// Apollo workstations never have more then 1 floppy drive
-//  FLOPPY_CONNECTOR(config, m_floppy[1], pc_hd_floppies, nullptr, omti8621_device::floppy_formats);
+	FLOPPY_CONNECTOR(config, m_floppy[1], pc_hd_floppies, nullptr, omti8621_device::floppy_formats);
+}
+
+void omti8621_apollo_device::device_add_mconfig(machine_config &config)
+{
+	omti8621_device::device_add_mconfig(config);
+
+	// Apollo workstations never have more then 1 floppy drive
+	config.device_remove(OMTI_FDC_TAG":1");
 }
 
 const tiny_rom_entry *omti8621_device::device_rom_region() const
@@ -1326,8 +1334,7 @@ void omti8621_device::fd_moten_w(uint8_t data)
 
 	m_moten = data;
 
-	if (!BIT(data, 2))
-		m_fdc->soft_reset();
+	m_fdc->reset_w(!BIT(data, 2));
 
 	for (int i = 0; i < 2; i++)
 	{
@@ -1342,8 +1349,11 @@ void omti8621_device::fd_moten_w(uint8_t data)
 
 void omti8621_device::fd_rate_w(uint8_t data)
 {
-	// Bit 1 = FD_MINI (TODO)
-	// Bit 0 = FD_RATE (TODO)
+	// Bit 1 = FD_MINI (connects to pin 3 of FDC9239)
+	// Bit 0 = FD_RATE (inverted output connects to pin 4 of 74F163)
+	u32 fdc_clk = (48_MHz_XTAL / (BIT(data, 0) ? 5 : 3) / (BIT(data, 1) ? 4 : 2)).value();
+	m_fdc->set_unscaled_clock(fdc_clk);
+	m_fdc->set_rate(fdc_clk / 16);
 }
 
 void omti8621_device::fd_extra_w(uint8_t data)

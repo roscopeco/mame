@@ -206,8 +206,8 @@ void hp9825_state::device_reset()
 
 	// Then, set r/w handlers of all installed I/O cards
 	int sc;
-	read16_delegate rhandler(*this);
-	write16_delegate whandler(*this);
+	read16m_delegate rhandler(*this);
+	write16m_delegate whandler(*this);
 	for (unsigned i = 0; i < 3; i++) {
 		if ((sc = m_io_slot[ i ]->get_rw_handlers(rhandler , whandler)) >= 0) {
 			logerror("Install R/W handlers for slot %u @ SC = %d\n", i, sc);
@@ -558,7 +558,7 @@ TIMER_DEVICE_CALLBACK_MEMBER(hp9825_state::kb_scan)
 void hp9825_state::kb_scan_ioport(ioport_value pressed , ioport_port &port , unsigned idx_base , int& max_seq_len , unsigned& max_seq_idx)
 {
 	while (pressed) {
-		unsigned bit_no = 31 - count_leading_zeros(pressed);
+		unsigned bit_no = 31 - count_leading_zeros_32(pressed);
 		ioport_value mask = BIT_MASK<ioport_value>(bit_no);
 		int seq_len = port.field(mask)->seq().length();
 		if (seq_len > max_seq_len) {

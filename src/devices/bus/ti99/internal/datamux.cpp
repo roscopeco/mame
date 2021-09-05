@@ -84,15 +84,15 @@
 
 DEFINE_DEVICE_TYPE_NS(TI99_DATAMUX, bus::ti99::internal, datamux_device, "ti99_datamux", "TI-99 Databus multiplexer")
 
-namespace bus { namespace ti99 { namespace internal {
+namespace bus::ti99::internal {
 
 /*
     Constructor
 */
 datamux_device::datamux_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
 	: device_t(mconfig, TI99_DATAMUX, tag, owner, clock),
-	m_video(*owner, TI_VDP_TAG),
-	m_sound(*owner, TI_SOUNDCHIP_TAG),
+	m_video(*owner, TI99_VDP_TAG),
+	m_sound(*owner, TI99_SOUNDCHIP_TAG),
 	m_ioport(*owner, TI99_IOPORT_TAG),
 	m_gromport(*owner, TI99_GROMPORT_TAG),
 	m_ram16b(*owner, TI99_EXPRAM_TAG),
@@ -312,14 +312,14 @@ void datamux_device::debugger_write(uint16_t addr, uint16_t data)
 			if ((addrb & 0xe000)==0x6000)
 			{
 				m_gromport->romgq_line(ASSERT_LINE);
-				m_gromport->write(addr+1, data & 0xff);
-				m_gromport->write(addr, (data>>8) & 0xff);
+				m_gromport->write(addrb+1, data & 0xff);
+				m_gromport->write(addrb, (data>>8) & 0xff);
 				m_gromport->romgq_line(m_romgq_state);  // reset to previous state
 			}
 
 			m_ioport->memen_in(ASSERT_LINE);
-			m_ioport->write(addr+1, data & 0xff);
-			m_ioport->write(addr,  (data>>8) & 0xff);
+			m_ioport->write(addrb+1, data & 0xff);
+			m_ioport->write(addrb,  (data>>8) & 0xff);
 			m_ioport->memen_in(m_memen_state);   // reset to previous state
 		}
 	}
@@ -632,5 +632,4 @@ ioport_constructor datamux_device::device_input_ports() const
 	return INPUT_PORTS_NAME(datamux);
 }
 
-} } } // end namespace bus::ti99::internal
-
+} // end namespace bus::ti99::internal
