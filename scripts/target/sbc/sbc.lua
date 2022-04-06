@@ -60,6 +60,7 @@ files{
 	MAME_DIR .. "src/sbc/drivers/rc2014_sio.cpp",
 	MAME_DIR .. "src/sbc/drivers/rc2014_wbw.cpp",
 	MAME_DIR .. "src/sbc/drivers/rosco.cpp",
+    MAME_DIR .. "src/sbc/drivers/rosco_classicv2.cpp",
 	MAME_DIR .. "src/sbc/drivers/grantz80.cpp",
 	MAME_DIR .. "src/sbc/drivers/grant6809.cpp",
 	MAME_DIR .. "src/sbc/drivers/grant6502.cpp",

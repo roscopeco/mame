@@ -3742,7 +3742,7 @@ namespace bimg
 		_imageContainer.m_pvr3        = false;
 		_imageContainer.m_srgb        = srgb;
 
-		return true;
+		return total > 0;
 	}
 
 	ImageContainer* imageParseDds(bx::AllocatorI* _allocator, const void* _src, uint32_t _size, bx::Error* _err)
