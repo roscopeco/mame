@@ -23,8 +23,7 @@ public:
 	void rc2014(machine_config &config);
 
 private:
-	DECLARE_WRITE_LINE_MEMBER( acia_irq_w );
-
+    void acia_irq_w(int state);
     uint8_t ide_cs0_r(offs_t offset);
     void ide_cs0_w(offs_t offset, uint8_t data);
     void bank_w(offs_t offset, uint8_t data);
@@ -51,7 +50,7 @@ private:
 };
 
 
-WRITE_LINE_MEMBER( rc2014_wbw_state::acia_irq_w )
+void rc2014_wbw_state::acia_irq_w(int state)
 {
 	m_maincpu->set_input_line(0, state);
 }

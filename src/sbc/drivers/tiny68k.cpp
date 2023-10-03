@@ -24,7 +24,7 @@ private:
 	virtual void machine_reset() override;
 
 	void duart_output(uint8_t data);
-	DECLARE_WRITE_LINE_MEMBER(duart_irq_handler);
+	void duart_irq_handler(int state);
 
 	void cpu_space_map(address_map &map);
 
@@ -89,7 +89,7 @@ void tiny68k_state::duart_output(uint8_t data)
 //	printf("duart_output : %02x\n",data);
 }
 
-WRITE_LINE_MEMBER(tiny68k_state::duart_irq_handler)
+void tiny68k_state::duart_irq_handler(int state)
 {
 	m_maincpu->set_input_line(M68K_IRQ_3, state);
 }
