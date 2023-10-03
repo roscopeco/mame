@@ -1,10 +1,12 @@
 #include "emu.h"
 #include "bus/rs232/rs232.h"
 #include "cpu/m68000/m68000.h"
+#include "cpu/m68000/m68010.h"
 #include "machine/mc68901.h"
 #include "imagedev/snapquik.h"
 #include "formats/imageutl.h"
 #include "video/v9938.h"
+#include "multibyte.h"
 
 
 class rosco_state : public driver_device
@@ -98,13 +100,14 @@ QUICKLOAD_LOAD_MEMBER(rosco_state::quickload_cb)
 	temp_copy.resize(quick_length);
 	read_ = image.fread(&temp_copy[0], quick_length);
 	if (read_ != quick_length) {
-		return image_init_result::FAIL;
+                return std::make_pair(image_error::INVALIDLENGTH, std::string());
 	}
 
 	uint16_t *ROM16 = (uint16_t *) m_ram + 0x40000/2;
 	for (int i = 0; i < quick_length; i += 2)
-		ROM16[i / 2] = pick_integer_be(&temp_copy[0], i, 2);
-	return image_init_result::PASS;
+                ROM16[i / 2] = get_u16be(&temp_copy[i]); //pick_integer_be(&temp_copy[0], i, 2);
+        return std::make_pair(std::error_condition(), std::string());
+	
 }
 
 /*QUICKLOAD_LOAD_MEMBER(rosco_state::quickload_rom_cb)
@@ -161,7 +164,7 @@ void rosco_state::rosco(machine_config &config)
 
 ROM_START( rosco )
 	ROM_REGION16_BE(0x40000, "monitor", 0)
-	ROM_LOAD( "rosco_m68k_mame.rom.bin", 0x00000, 0x10000, CRC(d108ff1e) SHA1(f4ffc5cbad2d5cf20dc078a05d1d9271d7021d8d))
+	ROM_LOAD( "rosco_m68k_mame.rom.bin", 0x00000, 0x10000, CRC(479aa782) SHA1(a769e5d6c5a3cb56ccf6017130fe69c732eeb993))
 ROM_END
 
 COMP( 2020, rosco, 0, 0, rosco, rosco, rosco_state, empty_init, "Ross Bamford", "rosco-m68k", MACHINE_IS_SKELETON )

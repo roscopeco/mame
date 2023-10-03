@@ -9,6 +9,7 @@
 ****************************************************************************/
 
 #include "emu.h"
+#include "main.h"
 
 #define APPNAME                 "MAMESBC"
 #define APPNAME_LOWER           "mamesbc"
