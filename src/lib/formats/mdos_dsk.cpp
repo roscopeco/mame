@@ -53,6 +53,7 @@
 #include "imageutl.h"
 
 #include "ioprocs.h"
+#include "multibyte.h"
 
 
 mdos_format::mdos_format() : wd177x_format(formats)
@@ -74,17 +75,17 @@ const char *mdos_format::extensions() const
 	return "dsk";
 }
 
-int mdos_format::identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants)
+int mdos_format::identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants) const
 {
 	int type = find_size(io, form_factor, variants);
 
 	if (type != -1)
-		return 75;
+		return FIFID_SIZE;
 
 	return 0;
 }
 
-bool mdos_format::check_ascii(uint8_t *str, size_t len, const char* name)
+bool mdos_format::check_ascii(const uint8_t *str, size_t len, const char* name)
 {
 	LOG_FORMATS(" %s: \"", name);
 	for (int i = 0; i < len; i++) {
@@ -101,7 +102,7 @@ bool mdos_format::check_ascii(uint8_t *str, size_t len, const char* name)
 	return 1;
 }
 
-int mdos_format::parse_date_field(uint8_t *str)
+int mdos_format::parse_date_field(const uint8_t *str)
 {
 	uint8_t high = str[0];
 	uint8_t low = str[1];
@@ -112,13 +113,14 @@ int mdos_format::parse_date_field(uint8_t *str)
 	return (high - 0x30) * 10 + (low - 0x30);
 }
 
-int mdos_format::find_size(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants)
+int mdos_format::find_size(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants) const
 {
 	size_t actual;
 	uint64_t size;
 	if (io.length(size))
 		return -1;
 
+	disk_id_sector info;
 	// Look at the disk id sector.
 	io.read_at(0, &info, sizeof(struct disk_id_sector), actual);
 
@@ -157,9 +159,7 @@ int mdos_format::find_size(util::random_read &io, uint32_t form_factor, const st
 	// 10 words. The area beyond the zero word is not always zero filled,
 	// and is ignored here. Check that it is consistent with this.
 	for (int i = 0; i < 10; i++) {
-		uint8_t high = info.rib_addr[i * 2];
-		uint8_t low = info.rib_addr[i * 2 + 1];
-		uint16_t cluster = (high << 8) | low;
+		uint16_t cluster = get_u16be(&info.rib_addr[i * 2]);
 
 		if (cluster == 0)
 			break;
@@ -227,7 +227,7 @@ int mdos_format::find_size(util::random_read &io, uint32_t form_factor, const st
 	return -1;
 }
 
-const wd177x_format::format &mdos_format::get_track_format(const format &f, int head, int track)
+const wd177x_format::format &mdos_format::get_track_format(const format &f, int head, int track) const
 {
 	int n = -1;
 
@@ -287,4 +287,4 @@ const mdos_format::format mdos_format::formats_head1[] = {
 	{}
 };
 
-const floppy_format_type FLOPPY_MDOS_FORMAT = &floppy_image_format_creator<mdos_format>;
+const mdos_format FLOPPY_MDOS_FORMAT;

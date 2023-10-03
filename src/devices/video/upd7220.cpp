@@ -427,6 +427,7 @@ inline void upd7220_device::reset_figs_param()
 	m_figs.m_dm = 0xffff;
 	m_figs.m_gd = 0;
 	m_figs.m_figure_type = 0;
+	m_pattern = 0xffff;
 }
 
 
@@ -664,18 +665,13 @@ upd7220_device::upd7220_device(const machine_config &mconfig, const char *tag, d
 void upd7220_device::device_start()
 {
 	// resolve callbacks
-	m_display_cb.resolve();
-	m_draw_text_cb.resolve();
-
-	m_write_drq.resolve_safe();
-	m_write_hsync.resolve_safe();
-	m_write_vsync.resolve_safe();
-	m_write_blank.resolve_safe();
+	m_display_cb.resolve_safe();
+	m_draw_text_cb.resolve_safe();
 
 	// allocate timers
-	m_vsync_timer = timer_alloc(TIMER_VSYNC);
-	m_hsync_timer = timer_alloc(TIMER_HSYNC);
-	m_blank_timer = timer_alloc(TIMER_BLANK);
+	m_vsync_timer = timer_alloc(FUNC(upd7220_device::vsync_update), this);
+	m_hsync_timer = timer_alloc(FUNC(upd7220_device::hsync_update), this);
+	m_blank_timer = timer_alloc(FUNC(upd7220_device::blank_update), this);
 
 	// register for state saving
 	save_item(NAME(m_ra));
@@ -735,58 +731,55 @@ void upd7220_device::device_reset()
 
 
 //-------------------------------------------------
-//  device_timer - handler timer events
+//  timer events
 //-------------------------------------------------
 
-void upd7220_device::device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr)
+TIMER_CALLBACK_MEMBER(upd7220_device::hsync_update)
 {
-	switch (id)
+	if (param)
 	{
-	case TIMER_HSYNC:
-		if (param)
-		{
-			m_sr |= UPD7220_SR_HBLANK_ACTIVE;
-		}
-		else
-		{
-			m_sr &= ~UPD7220_SR_HBLANK_ACTIVE;
-		}
-
-		m_write_hsync(param);
-
-		update_hsync_timer(param);
-		break;
-
-	case TIMER_VSYNC:
-		if (param)
-		{
-			m_sr |= UPD7220_SR_VSYNC_ACTIVE;
-		}
-		else
-		{
-			m_sr &= ~UPD7220_SR_VSYNC_ACTIVE;
-		}
-
-		m_write_vsync(param);
-
-		update_vsync_timer(param);
-		break;
-
-	case TIMER_BLANK:
-		if (param)
-		{
-			m_sr |= UPD7220_SR_HBLANK_ACTIVE;
-		}
-		else
-		{
-			m_sr &= ~UPD7220_SR_HBLANK_ACTIVE;
-		}
-
-		m_write_blank(param);
-
-		update_blank_timer(param);
-		break;
+		m_sr |= UPD7220_SR_HBLANK_ACTIVE;
 	}
+	else
+	{
+		m_sr &= ~UPD7220_SR_HBLANK_ACTIVE;
+	}
+
+	m_write_hsync(param);
+
+	update_hsync_timer(param);
+}
+
+TIMER_CALLBACK_MEMBER(upd7220_device::vsync_update)
+{
+	if (param)
+	{
+		m_sr |= UPD7220_SR_VSYNC_ACTIVE;
+	}
+	else
+	{
+		m_sr &= ~UPD7220_SR_VSYNC_ACTIVE;
+	}
+
+	m_write_vsync(param);
+
+	update_vsync_timer(param);
+}
+
+TIMER_CALLBACK_MEMBER(upd7220_device::blank_update)
+{
+	if (param)
+	{
+		m_sr |= UPD7220_SR_HBLANK_ACTIVE;
+	}
+	else
+	{
+		m_sr &= ~UPD7220_SR_HBLANK_ACTIVE;
+	}
+
+	m_write_blank(param);
+
+	update_blank_timer(param);
 }
 
 
@@ -813,9 +806,9 @@ void upd7220_device::draw_pixel()
 
 void upd7220_device::draw_line()
 {
-	int d = (m_figs.m_d & 0x2000) ? (int16_t)(m_figs.m_d | 0xe000) : m_figs.m_d;
-	int d1 = (m_figs.m_d1 & 0x2000) ? (int16_t)(m_figs.m_d1 | 0xe000) : m_figs.m_d1;
-	int d2 = (m_figs.m_d2 & 0x2000) ? (int16_t)(m_figs.m_d2 | 0xe000) : m_figs.m_d2;
+	int d = util::sext(m_figs.m_d, 14);
+	int d1 = util::sext(m_figs.m_d1, 14);
+	int d2 = util::sext(m_figs.m_d2, 14);
 	const uint8_t octant = m_figs.m_dir;
 
 	LOG("uPD7220 line check: %08x %04x %02x %02x %d %d %d %d\n", m_ead, m_mask, m_bitmap_mod, m_figs.m_dir, m_figs.m_dc, d, d1, d2);
@@ -1655,7 +1648,7 @@ void upd7220_device::stop_dma()
 //  ext_sync_w -
 //-------------------------------------------------
 
-WRITE_LINE_MEMBER( upd7220_device::ext_sync_w )
+void upd7220_device::ext_sync_w(int state)
 {
 	//LOG("uPD7220 External Synchronization: %u\n", state);
 
@@ -1674,7 +1667,7 @@ WRITE_LINE_MEMBER( upd7220_device::ext_sync_w )
 //  ext_sync_w -
 //-------------------------------------------------
 
-WRITE_LINE_MEMBER( upd7220_device::lpen_w )
+void upd7220_device::lpen_w(int state)
 {
 	/* only if 2 rising edges on the lpen input occur at the same
 	   point during successive video fields are the pulses accepted */
@@ -1709,9 +1702,7 @@ void upd7220_device::update_text(bitmap_rgb32 &bitmap, const rectangle &cliprect
 		for (y = sy; y < sy + len; y++)
 		{
 			uint32_t const addr = sad + (y * m_pitch);
-
-			if (!m_draw_text_cb.isnull())
-				m_draw_text_cb(bitmap, addr, (y * m_lr) + m_vbp, wd, m_pitch, m_lr, m_dc, m_ead);
+			m_draw_text_cb(bitmap, addr, (y * m_lr) + m_vbp, wd, m_pitch, m_lr, m_dc, m_ead);
 		}
 
 		sy = y + 1;
@@ -1723,16 +1714,16 @@ void upd7220_device::update_text(bitmap_rgb32 &bitmap, const rectangle &cliprect
 //  draw_graphics_line -
 //-------------------------------------------------
 
-void upd7220_device::draw_graphics_line(bitmap_rgb32 &bitmap, uint32_t addr, int y, int wd, int pitch)
+void upd7220_device::draw_graphics_line(bitmap_rgb32 &bitmap, uint32_t addr, int y, int wd, int mixed)
 {
 	int al = bitmap.cliprect().height();
+	int aw = m_aw >> mixed;
+	int pitch = m_pitch >> mixed;
 
-	for (int sx = 0; sx < pitch; sx++)
+	for (int sx = 0; sx < aw; sx++)
 	{
 		if((sx << 4) < m_aw * 16 && y < al)
-			m_display_cb(bitmap, y, sx << 4, addr);
-
-		addr+= (wd + 1);
+			m_display_cb(bitmap, y, sx << 4, addr + (wd + 1) * (sx % pitch));
 	}
 }
 
@@ -1747,7 +1738,7 @@ void upd7220_device::update_graphics(bitmap_rgb32 &bitmap, const rectangle &clip
 	uint16_t len;
 	int im, wd;
 	int y = 0, tsy = 0, bsy = 0;
-	bool mixed = ((m_mode & UPD7220_MODE_DISPLAY_MASK) == UPD7220_MODE_DISPLAY_MIXED);
+	int mixed = ((m_mode & UPD7220_MODE_DISPLAY_MASK) == UPD7220_MODE_DISPLAY_MIXED) ? 1 : 0;
 	uint8_t interlace = ((m_mode & UPD7220_MODE_INTERLACE_MASK) == UPD7220_MODE_INTERLACE_ON) ? 0 : 1;
 	uint8_t zoom = m_disp + 1;
 
@@ -1780,12 +1771,12 @@ void upd7220_device::update_graphics(bitmap_rgb32 &bitmap, const rectangle &clip
 				// pc98 quarth doesn't seem to use pitch here and it definitely wants bsy to be /2 to make scrolling to work.
 				// pc98 xevious wants the pitch to be fixed at 80, and wants bsy to be /1
 				// pc98 dbuster contradicts with Xevious with regards of the pitch tho ...
-				uint32_t const addr = (sad & 0x3ffff) + ((y / (mixed ? 1 : m_lr)) * (m_pitch >> (mixed ? 1 : 0)));
+				uint32_t const addr = (sad & 0x3ffff) + ((y / (mixed ? 1 : m_lr)) * (m_pitch >> mixed));
 				for(int z = 0; z <= m_disp; ++z)
 				{
 					int yval = (y*zoom)+z + (bsy + m_vbp);
-					if(!m_display_cb.isnull() && yval <= cliprect.bottom())
-						draw_graphics_line(bitmap, addr, yval, wd, (m_pitch >> (mixed ? 1 : 0)));
+					if(yval <= cliprect.bottom())
+						draw_graphics_line(bitmap, addr, yval, wd, mixed);
 				}
 			}
 		}
@@ -1797,8 +1788,7 @@ void upd7220_device::update_graphics(bitmap_rgb32 &bitmap, const rectangle &clip
 				{
 					uint32_t const addr = (sad & 0x3ffff) + ((y / m_lr) * m_pitch);
 					int yval = y * zoom + (tsy + m_vbp);
-					if (!m_draw_text_cb.isnull() && yval <= cliprect.bottom())
-						m_draw_text_cb(bitmap, addr, yval, wd, m_pitch, m_lr, m_dc, m_ead);
+					m_draw_text_cb(bitmap, addr, yval, wd, m_pitch, m_lr, m_dc, m_ead);
 				}
 			}
 		}

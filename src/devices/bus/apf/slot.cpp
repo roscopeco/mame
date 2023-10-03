@@ -44,11 +44,11 @@ device_apf_cart_interface::~device_apf_cart_interface()
 //  rom_alloc - alloc the space for the cart
 //-------------------------------------------------
 
-void device_apf_cart_interface::rom_alloc(uint32_t size, const char *tag)
+void device_apf_cart_interface::rom_alloc(uint32_t size)
 {
 	if (m_rom == nullptr)
 	{
-		m_rom = device().machine().memory().region_alloc(std::string(tag).append(APFSLOT_ROM_REGION_TAG).c_str(), size, 1, ENDIANNESS_LITTLE)->base();
+		m_rom = device().machine().memory().region_alloc(device().subtag("^cart:rom"), size, 1, ENDIANNESS_LITTLE)->base();
 		m_rom_size = size;
 	}
 }
@@ -73,7 +73,7 @@ void device_apf_cart_interface::ram_alloc(uint32_t size)
 //-------------------------------------------------
 apf_cart_slot_device::apf_cart_slot_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
 	device_t(mconfig, APF_CART_SLOT, tag, owner, clock),
-	device_image_interface(mconfig, *this),
+	device_cartrom_image_interface(mconfig, *this),
 	device_single_card_slot_interface<device_apf_cart_interface>(mconfig, *this),
 	m_type(APF_STD),
 	m_cart(nullptr)
@@ -144,19 +144,16 @@ static const char *apf_get_slot(int type)
  call load
  -------------------------------------------------*/
 
-image_init_result apf_cart_slot_device::call_load()
+std::pair<std::error_condition, std::string> apf_cart_slot_device::call_load()
 {
 	if (m_cart)
 	{
-		uint32_t size = !loaded_through_softlist() ? length() : get_software_region_length("rom");
+		uint32_t const size = !loaded_through_softlist() ? length() : get_software_region_length("rom");
 
 		if (size > 0x3800)
-		{
-			seterror(image_error::INVALIDIMAGE, "Image extends beyond the expected size for an APF cart");
-			return image_init_result::FAIL;
-		}
+			return std::make_pair(image_error::INVALIDLENGTH, "Image exceeds the expected size for an APF cartridge (14K)");
 
-		m_cart->rom_alloc(size, tag());
+		m_cart->rom_alloc(size);
 
 		if (!loaded_through_softlist())
 			fread(m_cart->get_rom_base(), size);
@@ -186,11 +183,9 @@ image_init_result apf_cart_slot_device::call_load()
 		}
 
 		//printf("Type: %s\n", apf_get_slot(m_type));
-
-		return image_init_result::PASS;
 	}
 
-	return image_init_result::PASS;
+	return std::make_pair(std::error_condition(), std::string());
 }
 
 
@@ -202,17 +197,17 @@ std::string apf_cart_slot_device::get_default_card_software(get_default_card_sof
 {
 	if (hook.image_file())
 	{
-		const char *slot_string;
-		uint32_t size = hook.image_file()->size();
-		int type = APF_STD;
+		uint64_t size;
+		hook.image_file()->length(size); // FIXME: check error return
 
 		// attempt to identify Space Destroyer, which needs 1K of additional RAM
+		int type = APF_STD;
 		if (size == 0x1800)
 			type = APF_SPACEDST;
 		if (size > 0x2000)
 			type = APF_BASIC;
 
-		slot_string = apf_get_slot(type);
+		char const *const slot_string = apf_get_slot(type);
 
 		//printf("type: %s\n", slot_string);
 

@@ -211,7 +211,7 @@ void spectrum_d40base_device::device_reset()
 //  IMPLEMENTATION  spectrum_d40base_device
 //**************************************************************************
 
-READ_LINE_MEMBER(spectrum_d40base_device::romcs)
+int spectrum_d40base_device::romcs()
 {
 	return m_romcs;
 }
@@ -246,7 +246,7 @@ void spectrum_d40base_device::pre_opcode_fetch(offs_t offset)
 
 uint8_t spectrum_d40base_device::iorq_r(offs_t offset)
 {
-	uint8_t data = 0xff;
+	uint8_t data = offset & 1 ? m_slot->fb_r() : 0xff;
 
 	switch (offset & 0xf9)
 	{

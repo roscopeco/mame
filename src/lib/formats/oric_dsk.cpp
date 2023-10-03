@@ -11,6 +11,9 @@
 #include "oric_dsk.h"
 
 #include "ioprocs.h"
+#include "multibyte.h"
+
+#include <cstring>
 
 
 const char *oric_dsk_format::name() const
@@ -33,7 +36,7 @@ bool oric_dsk_format::supports_save() const
 	return true;
 }
 
-int oric_dsk_format::identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants)
+int oric_dsk_format::identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants) const
 {
 	uint8_t h[256];
 	size_t actual;
@@ -42,9 +45,9 @@ int oric_dsk_format::identify(util::random_read &io, uint32_t form_factor, const
 	if(memcmp(h, "MFM_DISK", 8))
 		return 0;
 
-	int sides  = (h[11] << 24) | (h[10] << 16) | (h[ 9] << 8) | h[ 8];
-	int tracks = (h[15] << 24) | (h[14] << 16) | (h[13] << 8) | h[12];
-	int geom   = (h[19] << 24) | (h[18] << 16) | (h[17] << 8) | h[16];
+	int sides  = get_u32le(&h[ 8]);
+	int tracks = get_u32le(&h[12]);
+	int geom   = get_u32le(&h[16]);
 
 	uint64_t size;
 	if(io.length(size))
@@ -52,10 +55,10 @@ int oric_dsk_format::identify(util::random_read &io, uint32_t form_factor, const
 	if(sides < 0 || sides > 2 || geom != 1 || size != 256+6400*sides*tracks)
 		return 0;
 
-	return 100;
+	return FIFID_SIGN|FIFID_SIZE|FIFID_STRUCT;
 }
 
-bool oric_dsk_format::load(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants, floppy_image *image)
+bool oric_dsk_format::load(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants, floppy_image *image) const
 {
 	size_t actual;
 	uint8_t h[256];
@@ -64,8 +67,8 @@ bool oric_dsk_format::load(util::random_read &io, uint32_t form_factor, const st
 	t[6250] = t[6251] = t[6252] = 0;
 	io.read_at(0, h, 256, actual);
 
-	int sides  = (h[11] << 24) | (h[10] << 16) | (h[ 9] << 8) | h[ 8];
-	int tracks = (h[15] << 24) | (h[14] << 16) | (h[13] << 8) | h[12];
+	int sides  = get_u32le(&h[ 8]);
+	int tracks = get_u32le(&h[12]);
 
 	for(int side=0; side<sides; side++)
 		for(int track=0; track<tracks; track++) {
@@ -105,13 +108,7 @@ bool oric_dsk_format::load(util::random_read &io, uint32_t form_factor, const st
 	return true;
 }
 
-bool oric_dsk_format::save(util::random_read_write &io, const std::vector<uint32_t> &variants, floppy_image *image)
-{
-	// FIXME: surely this should return false, since it does't actually save anything?
-	return true;
-}
-
-const floppy_format_type FLOPPY_ORIC_DSK_FORMAT = &floppy_image_format_creator<oric_dsk_format>;
+const oric_dsk_format FLOPPY_ORIC_DSK_FORMAT;
 
 
 const char *oric_jasmin_format::name() const
@@ -134,7 +131,7 @@ bool oric_jasmin_format::supports_save() const
 	return true;
 }
 
-int oric_jasmin_format::identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants)
+int oric_jasmin_format::identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants) const
 {
 	uint64_t size;
 	if(io.length(size))
@@ -142,12 +139,12 @@ int oric_jasmin_format::identify(util::random_read &io, uint32_t form_factor, co
 
 	bool const can_ds = variants.empty() || has_variant(variants, floppy_image::DSDD);
 	if(size == 41*17*256 || (can_ds && size == 41*17*256*2))
-		return 50;
+		return FIFID_SIZE;
 
 	return 0;
 }
 
-bool oric_jasmin_format::load(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants, floppy_image *image)
+bool oric_jasmin_format::load(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants, floppy_image *image) const
 {
 	uint64_t size;
 	if(io.length(size))
@@ -187,7 +184,7 @@ bool oric_jasmin_format::load(util::random_read &io, uint32_t form_factor, const
 	return true;
 }
 
-bool oric_jasmin_format::save(util::random_read_write &io, const std::vector<uint32_t> &variants, floppy_image *image)
+bool oric_jasmin_format::save(util::random_read_write &io, const std::vector<uint32_t> &variants, floppy_image *image) const
 {
 	int tracks, heads;
 	image->get_actual_geometry(tracks, heads);
@@ -213,4 +210,4 @@ bool oric_jasmin_format::save(util::random_read_write &io, const std::vector<uin
 	return true;
 }
 
-const floppy_format_type FLOPPY_ORIC_JASMIN_FORMAT = &floppy_image_format_creator<oric_jasmin_format>;
+const oric_jasmin_format FLOPPY_ORIC_JASMIN_FORMAT;

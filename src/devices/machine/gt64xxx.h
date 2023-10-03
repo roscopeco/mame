@@ -29,11 +29,11 @@ public:
 	void set_autoconfig(int autoconfig) { m_autoconfig = autoconfig; }
 	void set_irq_num(int irq_num) { m_irq_num = irq_num; }
 	virtual void config_map(address_map &map) override;
-	void set_simm_size(int index, int size) { m_simm_size[index] = size; };
-	void set_simm0_size(int size) { m_simm_size[0] = size; };
-	void set_simm1_size(int size) { m_simm_size[1] = size; };
+	void set_simm_size(int index, int size) { m_simm_size[index] = size; }
+	void set_simm0_size(int size) { m_simm_size[0] = size; }
+	void set_simm1_size(int size) { m_simm_size[1] = size; }
 
-	DECLARE_WRITE_LINE_MEMBER(pci_stall);
+	void pci_stall(int state);
 
 	// pci bus
 	uint32_t pci_config_r(offs_t offset, uint32_t mem_mask = ~0);
@@ -104,6 +104,8 @@ private:
 	int m_irq_num;
 	int m_simm_size[4];
 
+	int m_irq_state;
+	uint32_t m_irq_pending;
 	int m_pci_stall_state;
 	int m_retry_count;
 	int m_pci_cpu_stalled;

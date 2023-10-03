@@ -96,7 +96,7 @@ public:
 
 	void set_pla(uint8_t *pla) { m_PLA = pla; }
 
-	DECLARE_WRITE_LINE_MEMBER( clock_w );
+	void clock_w(int state);
 
 	void data_4bit(address_map &map);
 	void data_5bit(address_map &map);
@@ -192,7 +192,6 @@ private:
 	void update_pio_enable( uint8_t newpio );
 	void increment_timer();
 	void update_pio( int cycles );
-
 };
 
 

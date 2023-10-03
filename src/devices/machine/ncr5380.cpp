@@ -15,7 +15,6 @@
 #include "emu.h"
 #include "ncr5380.h"
 
-#define LOG_GENERAL  (1U << 0)
 #define LOG_REGW     (1U << 1)
 #define LOG_REGR     (1U << 2)
 #define LOG_SCSI     (1U << 3)
@@ -69,10 +68,12 @@ void ncr5380_device::map(address_map &map)
 
 void ncr5380_device::device_start()
 {
-	m_irq_handler.resolve_safe();
-	m_drq_handler.resolve_safe();
+	// Need to be cleared here so that set_irq/drq called from reset
+	// does not compare with uninitialized
+	m_irq_state = false;
+	m_drq_state = false;
 
-	m_state_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(ncr5380_device::state_timer), this));
+	m_state_timer = timer_alloc(FUNC(ncr5380_device::state_timer), this);
 
 	save_item(NAME(m_state));
 
@@ -410,7 +411,7 @@ void ncr5380_device::sdir_w(u8 data)
 	}
 }
 
-void ncr5380_device::state_timer(void *ptr, s32 param)
+void ncr5380_device::state_timer(s32 param)
 {
 	// step state machine
 	int const delay = state_step();

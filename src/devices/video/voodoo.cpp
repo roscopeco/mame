@@ -685,10 +685,6 @@ generic_voodoo_device::generic_voodoo_device(const machine_config &mconfig, devi
 
 void generic_voodoo_device::device_start()
 {
-	// resolve callbacks
-	m_vblank_cb.resolve();
-	m_stall_cb.resolve();
-	m_pciint_cb.resolve();
 }
 
 
@@ -924,8 +920,8 @@ void voodoo_1_device::device_start()
 	m_stall_trigger = 51324 + index;
 
 	// allocate timers for VBLANK
-	m_vsync_stop_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(voodoo_1_device::vblank_stop), this), this);
-	m_vsync_start_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(voodoo_1_device::vblank_start),this), this);
+	m_vsync_stop_timer = timer_alloc(FUNC(voodoo_1_device::vblank_stop), this);
+	m_vsync_start_timer = timer_alloc(FUNC(voodoo_1_device::vblank_start),this);
 
 	// add TMUs to the chipmask if memory is specified (later chips leave
 	// the tmumem values at 0 and set the chipmask directly to indicate
@@ -1011,7 +1007,7 @@ void voodoo_1_device::device_start()
 	// set up the PCI FIFO
 	m_pci_fifo.configure(m_pci_fifo_mem, 64*2);
 	m_stall_state = NOT_STALLED;
-	m_stall_resume_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(voodoo_1_device::stall_resume_callback), this));
+	m_stall_resume_timer = timer_alloc(FUNC(voodoo_1_device::stall_resume_callback), this);
 
 	// initialize registers
 	m_init_enable = 0;
@@ -2542,7 +2538,7 @@ void voodoo_1_device::adjust_vblank_start_timer()
 //  of VBLANK
 //-------------------------------------------------
 
-void voodoo_1_device::vblank_start(void *ptr, s32 param)
+void voodoo_1_device::vblank_start(s32 param)
 {
 	if (LOG_VBLANK_SWAP)
 		logerror("--- vblank start\n");
@@ -2579,8 +2575,7 @@ void voodoo_1_device::vblank_start(void *ptr, s32 param)
 	m_vblank = true;
 
 	// notify external VBLANK handler on all models
-	if (!m_vblank_cb.isnull())
-		m_vblank_cb(true);
+	m_vblank_cb(true);
 }
 
 
@@ -2589,7 +2584,7 @@ void voodoo_1_device::vblank_start(void *ptr, s32 param)
 //  VBLANK
 //-------------------------------------------------
 
-void voodoo_1_device::vblank_stop(void *ptr, s32 param)
+void voodoo_1_device::vblank_stop(s32 param)
 {
 	if (LOG_VBLANK_SWAP)
 		logerror("--- vblank end\n");
@@ -2598,8 +2593,7 @@ void voodoo_1_device::vblank_stop(void *ptr, s32 param)
 	m_vblank = false;
 
 	// notify external VBLANK handler on all models
-	if (!m_vblank_cb.isnull())
-		m_vblank_cb(false);
+	m_vblank_cb(false);
 
 	// go to the end of the next frame
 	adjust_vblank_start_timer();
@@ -2794,7 +2788,7 @@ void voodoo_1_device::recompute_video_timing(u32 hsyncon, u32 hsyncoff, u32 hvis
 	m_xoffs = hbp;
 	m_yoffs = vbp;
 	m_vsyncstart = vsyncoff;
-	m_vsyncstop = vsyncon;
+	m_vsyncstop = 0;
 	logerror("yoffs: %d vsyncstart: %d vsyncstop: %d\n", vbp, m_vsyncstart, m_vsyncstop);
 
 	adjust_vblank_start_timer();
@@ -2889,7 +2883,7 @@ void voodoo_1_device::recompute_video_memory_common(u32 config, u32 rowpixels)
 
 s32 voodoo_1_device::triangle()
 {
-	g_profiler.start(PROFILER_USER2);
+	auto profile = g_profiler.start(PROFILER_USER2);
 
 	// allocate polygon information now
 	auto &poly = m_renderer->alloc_poly();
@@ -3021,7 +3015,7 @@ s32 voodoo_1_device::triangle()
 	if (DEBUG_STATS)
 		m_stats.m_triangles++;
 
-	g_profiler.stop();
+	profile.stop();
 
 	if (LOG_REGISTERS)
 		logerror("cycles = %d\n", TRIANGLE_SETUP_CLOCKS + pixels);
@@ -3137,7 +3131,7 @@ void voodoo_1_device::check_stalled_cpu(attotime current_time)
 		m_stall_state = NOT_STALLED;
 
 		// either call the callback, or trigger the trigger
-		if (!m_stall_cb.isnull())
+		if (!m_stall_cb.isunset())
 			m_stall_cb(false);
 		else
 			machine().scheduler().trigger(m_stall_trigger);
@@ -3165,7 +3159,7 @@ void voodoo_1_device::stall_cpu(stall_state state)
 		m_stats.m_stalls++;
 
 	// either call the callback, or spin the CPU
-	if (!m_stall_cb.isnull())
+	if (!m_stall_cb.isunset())
 		m_stall_cb(true);
 	else
 		m_cpu->spin_until_trigger(m_stall_trigger);
@@ -3180,7 +3174,7 @@ void voodoo_1_device::stall_cpu(stall_state state)
 //  check the stall state for our CPU
 //-------------------------------------------------
 
-void voodoo_1_device::stall_resume_callback(void *ptr, s32 param)
+void voodoo_1_device::stall_resume_callback(s32 param)
 {
 	check_stalled_cpu(machine().time());
 }

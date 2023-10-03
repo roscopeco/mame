@@ -235,9 +235,9 @@ void sega_scu_device::device_start()
 
 	m_hostspace = &m_hostcpu->space(AS_PROGRAM);
 
-	m_dma_timer[0] = timer_alloc(DMALV0_ID);
-	m_dma_timer[1] = timer_alloc(DMALV1_ID);
-	m_dma_timer[2] = timer_alloc(DMALV2_ID);
+	m_dma_timer[0] = timer_alloc(FUNC(sega_scu_device::dma_tick<DMALV0_ID>), this);
+	m_dma_timer[1] = timer_alloc(FUNC(sega_scu_device::dma_tick<DMALV1_ID>), this);
+	m_dma_timer[2] = timer_alloc(FUNC(sega_scu_device::dma_tick<DMALV2_ID>), this);
 }
 
 
@@ -269,32 +269,20 @@ void sega_scu_device::device_reset_after_children()
 	m_scudsp->set_input_line(INPUT_LINE_RESET, ASSERT_LINE);
 }
 
-
-void sega_scu_device::device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr)
+template <int Level>
+TIMER_CALLBACK_MEMBER(sega_scu_device::dma_tick)
 {
+	const int irqlevel = Level == 0 ? 5 : 6;
+	const int irqvector = 0x4b - Level;
+	const uint16_t irqmask = 1 << (11 - Level);
 
-	switch(id)
-	{
-		case DMALV0_ID:
-		case DMALV1_ID:
-		case DMALV2_ID:
-		{
-			const int irqlevel = id == 0 ? 5 : 6;
-			const int irqvector = 0x4b - id;
-			const uint16_t irqmask = 1 << (11-id);
+	if(!(m_ism & irqmask))
+		m_hostcpu->set_input_line_and_vector(irqlevel, HOLD_LINE, irqvector); // SH2
+	else
+		m_ist |= (irqmask);
 
-			if(!(m_ism & irqmask))
-				m_hostcpu->set_input_line_and_vector(irqlevel, HOLD_LINE, irqvector); // SH2
-			else
-				m_ist |= (irqmask);
-
-			update_dma_status(id,false);
-			machine().scheduler().synchronize(); // force resync
-			break;
-		}
-		default:
-			break;
-	}
+	update_dma_status((uint8_t)Level,false);
+	machine().scheduler().synchronize(); // force resync
 }
 
 //**************************************************************************
@@ -700,7 +688,7 @@ void sega_scu_device::test_pending_irqs()
 	}
 }
 
-WRITE_LINE_MEMBER(sega_scu_device::vblank_out_w)
+void sega_scu_device::vblank_out_w(int state)
 {
 	if(!state)
 		return;
@@ -714,7 +702,7 @@ WRITE_LINE_MEMBER(sega_scu_device::vblank_out_w)
 		m_ist |= (IRQ_VBLANK_OUT);
 }
 
-WRITE_LINE_MEMBER(sega_scu_device::vblank_in_w)
+void sega_scu_device::vblank_in_w(int state)
 {
 	if(!state)
 		return;
@@ -728,7 +716,7 @@ WRITE_LINE_MEMBER(sega_scu_device::vblank_in_w)
 		m_ist |= (IRQ_VBLANK_IN);
 }
 
-WRITE_LINE_MEMBER(sega_scu_device::hblank_in_w)
+void sega_scu_device::hblank_in_w(int state)
 {
 	if(!state)
 		return;
@@ -742,7 +730,7 @@ WRITE_LINE_MEMBER(sega_scu_device::hblank_in_w)
 		m_ist |= (IRQ_HBLANK_IN);
 }
 
-WRITE_LINE_MEMBER(sega_scu_device::vdp1_end_w)
+void sega_scu_device::vdp1_end_w(int state)
 {
 	if(!state)
 		return;
@@ -756,7 +744,7 @@ WRITE_LINE_MEMBER(sega_scu_device::vdp1_end_w)
 		m_ist |= (IRQ_VDP1_END);
 }
 
-WRITE_LINE_MEMBER(sega_scu_device::sound_req_w)
+void sega_scu_device::sound_req_w(int state)
 {
 	if(!state)
 		return;
@@ -770,7 +758,7 @@ WRITE_LINE_MEMBER(sega_scu_device::sound_req_w)
 		m_ist |= (IRQ_SOUND_REQ);
 }
 
-WRITE_LINE_MEMBER(sega_scu_device::smpc_irq_w)
+void sega_scu_device::smpc_irq_w(int state)
 {
 	if(!state)
 		return;
@@ -781,7 +769,7 @@ WRITE_LINE_MEMBER(sega_scu_device::smpc_irq_w)
 		m_ist |= (IRQ_SMPC);
 }
 
-WRITE_LINE_MEMBER(sega_scu_device::scudsp_end_w)
+void sega_scu_device::scudsp_end_w(int state)
 {
 	if(!state)
 		return;

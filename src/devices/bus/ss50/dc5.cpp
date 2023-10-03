@@ -31,6 +31,8 @@
 #include "dc5.h"
 #include "machine/wd_fdc.h"
 #include "imagedev/floppy.h"
+#include "formats/cp68_dsk.h"
+#include "formats/fdos_dsk.h"
 #include "formats/flex_dsk.h"
 #include "formats/os9_dsk.h"
 #include "formats/uniflex_dsk.h"
@@ -72,9 +74,9 @@ protected:
 	virtual void register_write(offs_t offset, uint8_t data) override;
 
 private:
-	DECLARE_WRITE_LINE_MEMBER( fdc_intrq_w );
-	DECLARE_WRITE_LINE_MEMBER( fdc_drq_w );
-	DECLARE_WRITE_LINE_MEMBER( fdc_sso_w );
+	void fdc_intrq_w(int state);
+	void fdc_drq_w(int state);
+	void fdc_sso_w(int state);
 
 	static void floppy_formats(format_registration &fr);
 	uint8_t m_fdc_status;              // for floppy controller
@@ -240,6 +242,8 @@ void ss50_dc5_device::floppy_formats(format_registration &fr)
 {
 	fr.add_mfm_containers();
 	fr.add(FLOPPY_FLEX_FORMAT);
+	fr.add(FLOPPY_CP68_FORMAT);
+	fr.add(FLOPPY_FDOS_FORMAT);
 	fr.add(FLOPPY_OS9_FORMAT);
 	fr.add(FLOPPY_UNIFLEX_FORMAT);
 }
@@ -292,7 +296,7 @@ void ss50_dc5_device::device_start()
 	m_fdc_status = 0;
 	m_control_register = 0;
 	m_fdc_side = 0;
-	m_floppy_motor_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(ss50_dc5_device::floppy_motor_callback),this));
+	m_floppy_motor_timer = timer_alloc(FUNC(ss50_dc5_device::floppy_motor_callback), this);
 	m_motor_timer_out = 0;
 	m_fdc->set_force_ready(0);
 	m_fdc_prog_clock_div = 12;
@@ -499,7 +503,7 @@ uint8_t ss50_dc5_device::validate_fdc_sector_size(uint8_t cmd)
 	return cmd;
 }
 
-WRITE_LINE_MEMBER( ss50_dc5_device::fdc_intrq_w )
+void ss50_dc5_device::fdc_intrq_w(int state)
 {
 	if (state)
 		m_fdc_status |= 0x40;
@@ -514,7 +518,7 @@ WRITE_LINE_MEMBER( ss50_dc5_device::fdc_intrq_w )
 		write_firq(state);
 }
 
-WRITE_LINE_MEMBER( ss50_dc5_device::fdc_drq_w )
+void ss50_dc5_device::fdc_drq_w(int state)
 {
 	if (state)
 		m_fdc_status |= 0x80;
@@ -522,7 +526,7 @@ WRITE_LINE_MEMBER( ss50_dc5_device::fdc_drq_w )
 		m_fdc_status &= 0x7f;
 }
 
-WRITE_LINE_MEMBER( ss50_dc5_device::fdc_sso_w )
+void ss50_dc5_device::fdc_sso_w(int state)
 {
 	// The DC4 and DC5 invert the SSO output and wire it to the DDEN input
 	// to allow selection of single or double density.

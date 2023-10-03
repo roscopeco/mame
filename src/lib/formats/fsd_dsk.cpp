@@ -9,8 +9,11 @@
 ***************************************************************************/
 
 #include "fsd_dsk.h"
+#include "imageutl.h"
 
 #include "ioprocs.h"
+
+#include <cstring>
 
 
 /*********************************************************************
@@ -85,20 +88,20 @@ bool fsd_format::supports_save() const
 	return false;
 }
 
-int fsd_format::identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants)
+int fsd_format::identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants) const
 {
 	uint8_t h[3];
 
 	size_t actual;
 	io.read_at(0, h, 3, actual);
 	if (memcmp(h, "FSD", 3) == 0) {
-		return 100;
+		return FIFID_SIGN;
 	}
 	LOG_FORMATS("fsd: no match\n");
 	return 0;
 }
 
-bool fsd_format::load(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants, floppy_image *image)
+bool fsd_format::load(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants, floppy_image *image) const
 {
 	const char* result[255];
 	result[0x00] = "OK";
@@ -187,4 +190,4 @@ bool fsd_format::load(util::random_read &io, uint32_t form_factor, const std::ve
 	return true;
 }
 
-const floppy_format_type FLOPPY_FSD_FORMAT = &floppy_image_format_creator<fsd_format>;
+const fsd_format FLOPPY_FSD_FORMAT;

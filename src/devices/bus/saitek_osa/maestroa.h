@@ -1,10 +1,10 @@
 // license:BSD-3-Clause
 // copyright-holders:hap
-/***************************************************************************
+/*******************************************************************************
 
     Saitek OSA Module: Kasparov Maestro A
 
-***************************************************************************/
+*******************************************************************************/
 
 #ifndef MAME_BUS_SAITEKOSA_MAESTROA_H
 #define MAME_BUS_SAITEKOSA_MAESTROA_H
@@ -12,6 +12,8 @@
 #pragma once
 
 #include "expansion.h"
+
+DECLARE_DEVICE_TYPE(OSA_MAESTROA, saitekosa_maestroa_device)
 
 
 class saitekosa_maestroa_device : public device_t, public device_saitekosa_expansion_interface
@@ -51,7 +53,5 @@ private:
 	bool m_latch_enable = false;
 };
 
-
-DECLARE_DEVICE_TYPE(OSA_MAESTROA, saitekosa_maestroa_device)
 
 #endif // MAME_BUS_SAITEKOSA_MAESTROA_H

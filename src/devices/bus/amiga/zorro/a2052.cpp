@@ -19,7 +19,7 @@
 //  DEVICE DEFINITIONS
 //**************************************************************************
 
-DEFINE_DEVICE_TYPE_NS(ZORRO_A2052, bus::amiga::zorro, a2052_device, "zorro_a2052", "CBM A2052 Fast Memory")
+DEFINE_DEVICE_TYPE(ZORRO_A2052, bus::amiga::zorro::a2052_device, "zorro_a2052", "CBM A2052 Fast Memory")
 
 
 namespace bus::amiga::zorro {
@@ -85,7 +85,7 @@ void a2052_device::autoconfig_base_address(offs_t address)
 	m_slot->cfgout_w(0);
 }
 
-WRITE_LINE_MEMBER( a2052_device::cfgin_w )
+void a2052_device::cfgin_w(int state)
 {
 	LOG("%s: configin_w (%d)\n", shortname(), state);
 

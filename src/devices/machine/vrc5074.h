@@ -31,7 +31,7 @@ public:
 	virtual void device_post_load() override;
 
 	template <typename T> void set_cpu_tag(T &&tag) { m_cpu.set_tag(std::forward<T>(tag)); }
-	void set_sdram_size(int index, int size) { m_sdram_size[index] = size; };
+	void set_sdram_size(int index, int size) { m_sdram_size[index] = size; }
 
 	void set_map(int id, const address_map_constructor &map, device_t *device);
 
@@ -40,11 +40,11 @@ public:
 	void sdram_addr_w(offs_t offset, uint32_t data, uint32_t mem_mask = ~0);
 
 	// PCI interrupts
-	DECLARE_WRITE_LINE_MEMBER(pci_intr_a);
-	DECLARE_WRITE_LINE_MEMBER(pci_intr_b);
-	DECLARE_WRITE_LINE_MEMBER(pci_intr_c);
-	DECLARE_WRITE_LINE_MEMBER(pci_intr_d);
-	DECLARE_WRITE_LINE_MEMBER(pci_intr_e);
+	void pci_intr_a(int state);
+	void pci_intr_b(int state);
+	void pci_intr_c(int state);
+	void pci_intr_d(int state);
+	void pci_intr_e(int state);
 	void update_pci_irq(const int index, const int state);
 
 	//cpu bus registers
@@ -65,7 +65,7 @@ public:
 	void target1_w(offs_t offset, uint32_t data, uint32_t mem_mask = ~0);
 
 	// Serial port
-	DECLARE_WRITE_LINE_MEMBER(uart_irq_callback);
+	void uart_irq_callback(int state);
 
 protected:
 	address_space *m_cpu_space;

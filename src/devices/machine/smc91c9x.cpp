@@ -10,14 +10,16 @@
 
 #include "emu.h"
 #include "smc91c9x.h"
-#include <sstream>
+
+#include "multibyte.h"
+
 #include <iomanip>
+#include <sstream>
 
 /***************************************************************************
     DEBUGGING
 ***************************************************************************/
 
-#define LOG_GENERAL (1U << 0)
 #define LOG_PACKETS (1U << 1)
 #define LOG_TX      (1U << 2)
 #define LOG_RX      (1U << 3)
@@ -62,7 +64,7 @@ smc91c96_device::smc91c96_device(const machine_config &mconfig, const char *tag,
 
 smc91c9x_device::smc91c9x_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock, dev_type device_type)
 	: device_t(mconfig, type, tag, owner, clock)
-	, device_network_interface(mconfig, *this, 10.0f)
+	, device_network_interface(mconfig, *this, 10)
 	, m_device_type(device_type)
 	, m_num_ebuf(16)
 	, m_irq_handler(*this)
@@ -82,9 +84,7 @@ void smc91c9x_device::device_start()
 	m_buffer = std::make_unique<u8[]>(ETHER_BUFFER_SIZE * m_num_ebuf);
 
 	// TX timer
-	m_tx_poll = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(smc91c9x_device::tx_poll), this));
-
-	m_irq_handler.resolve_safe();
+	m_tx_poll = timer_alloc(FUNC(smc91c9x_device::tx_poll), this);
 
 	// These registers don't get cleared on reset
 	m_reg[B1_CONFIG] = 0x0030;   m_regmask[B1_CONFIG] = 0x17c6;
@@ -975,7 +975,12 @@ void smc91c9x_device::write(offs_t offset, u16 data, u16 mem_mask)
 			if ( ACCESSING_BITS_8_15 )
 			{
 				set_promisc(m_reg[B0_RCR] & PRMS);
-				set_mac((char *)&m_reg[B1_IA0_1]);
+
+				u8 mac[6];
+				put_u16le(&mac[0], m_reg[B1_IA0_1]);
+				put_u16le(&mac[2], m_reg[B1_IA2_3]);
+				put_u16le(&mac[4], m_reg[B1_IA4_5]);
+				set_mac(mac);
 			}
 			break;
 

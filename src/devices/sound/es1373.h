@@ -22,19 +22,16 @@ public:
 	void reg_w(offs_t offset, uint32_t data, uint32_t mem_mask = ~0);
 
 protected:
-	virtual void device_resolve_objects() override;
 	virtual void device_start() override;
-	virtual void device_stop() override;
 	virtual void device_reset() override;
-	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
 	virtual void device_add_mconfig(machine_config &config) override;
 	virtual void device_post_load() override;
 	virtual void sound_stream_update(sound_stream &stream, std::vector<read_stream_view> const &inputs, std::vector<write_stream_view> &outputs) override;
 
+	TIMER_CALLBACK_MEMBER(delayed_stream_update);
+
 	// Sound stream
 	sound_stream *m_stream;
-
-	FILE *m_eslog;
 
 private:
 	struct chan_info {
@@ -57,7 +54,6 @@ private:
 	uint32_t calc_size(const uint8_t &format);
 	void send_audio_out(chan_info& chan, uint32_t intr_mask, write_stream_view &outL, write_stream_view &outR);
 
-	uint32_t m_tempCount;
 	emu_timer *m_timer;
 	address_space *m_memory_space;
 	devcb_write_line m_irq_handler;

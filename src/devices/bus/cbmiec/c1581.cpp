@@ -102,14 +102,14 @@ void c1581_device::c1581_mem(address_map &map)
 //  MOS8520_INTERFACE( cia_intf )
 //-------------------------------------------------
 
-WRITE_LINE_MEMBER( c1581_device::cnt_w )
+void c1581_device::cnt_w(int state)
 {
 	m_cnt_out = state;
 
 	update_iec();
 }
 
-WRITE_LINE_MEMBER( c1581_device::sp_w )
+void c1581_device::sp_w(int state)
 {
 	m_sp_out = state;
 
@@ -283,7 +283,7 @@ void c1581_device::device_add_mconfig(machine_config &config)
 	m_cia->pb_wr_callback().set(FUNC(c1581_device::cia_pb_w));
 
 	WD1772(config, m_fdc, 16_MHz_XTAL / 2);
-	FLOPPY_CONNECTOR(config, WD1772_TAG":0", c1581_floppies, "35dd", c1581_device::floppy_formats, true);
+	FLOPPY_CONNECTOR(config, WD1772_TAG":0", c1581_floppies, "35dd", c1581_device::floppy_formats, true).enable_sound(true);
 }
 
 

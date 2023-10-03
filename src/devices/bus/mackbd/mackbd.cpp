@@ -112,16 +112,10 @@ mac_keyboard_port_device::~mac_keyboard_port_device()
 {
 }
 
-WRITE_LINE_MEMBER(mac_keyboard_port_device::data_w)
+void mac_keyboard_port_device::data_w(int state)
 {
 	if (m_peripheral)
 		m_peripheral->data_w(state);
-}
-
-void mac_keyboard_port_device::device_resolve_objects()
-{
-	m_clock_cb.resolve_safe();
-	m_data_cb.resolve_safe();
 }
 
 void mac_keyboard_port_device::device_start()
@@ -158,6 +152,11 @@ void device_mac_keyboard_interface::interface_validity_check(validity_checker &v
 
 #include "keyboard.h"
 #include "pluskbd.h"
+
+
+// must come after including the headers that declare these extern
+template class device_finder<device_mac_keyboard_interface, false>;
+template class device_finder<device_mac_keyboard_interface, true>;
 
 
 void mac_keyboard_devices(device_slot_interface &device)

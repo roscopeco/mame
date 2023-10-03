@@ -57,12 +57,12 @@ private:
 	uint8_t ppi_pb_r();
 	void ppi_pc_w(uint8_t data);
 	uint8_t sti_gpio_r();
-	DECLARE_WRITE_LINE_MEMBER( speaker_w );
+	void speaker_w(int state);
 
 	void kb_w(uint8_t data);
 
-	DECLARE_WRITE_LINE_MEMBER( write_centronics_busy );
-	DECLARE_WRITE_LINE_MEMBER( write_centronics_fault );
+	void write_centronics_busy(int state);
+	void write_centronics_fault(int state);
 
 	MC6845_UPDATE_ROW( crtc_update_row );
 
@@ -99,9 +99,6 @@ private:
 	uint8_t m_base;           // ECB base address
 	uint8_t m_ppi_pa;         // PPI port A data
 	uint8_t m_ppi_pc;         // PPI port C data
-
-	// timers
-	emu_timer *m_kb_timer;
 
 	void vol0_w(uint8_t data);
 	void vol1_w(uint8_t data);

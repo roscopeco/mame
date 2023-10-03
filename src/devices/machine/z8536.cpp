@@ -564,7 +564,7 @@ void cio_base_device::write_register(offs_t offset, u8 data, u8 mask)
 //   counter_enabled - is counter enabled?
 //-------------------------------------------------
 
-bool cio_base_device::counter_enabled(device_timer_id id)
+bool cio_base_device::counter_enabled(int id)
 {
 	bool enabled = false;
 
@@ -591,7 +591,7 @@ bool cio_base_device::counter_enabled(device_timer_id id)
 //   counter_external_output -
 //-------------------------------------------------
 
-bool cio_base_device::counter_external_output(device_timer_id id)
+bool cio_base_device::counter_external_output(int id)
 {
 	return (m_register[COUNTER_TIMER_1_MODE_SPECIFICATION + id] & CTMS_EOE) ? true : false;
 }
@@ -601,7 +601,7 @@ bool cio_base_device::counter_external_output(device_timer_id id)
 //   counter_external_count -
 //-------------------------------------------------
 
-bool cio_base_device::counter_external_count(device_timer_id id)
+bool cio_base_device::counter_external_count(int id)
 {
 	return (m_register[COUNTER_TIMER_1_MODE_SPECIFICATION + id] & CTMS_ECE) ? true : false;
 }
@@ -611,7 +611,7 @@ bool cio_base_device::counter_external_count(device_timer_id id)
 //   counter_external_trigger -
 //-------------------------------------------------
 
-bool cio_base_device::counter_external_trigger(device_timer_id id)
+bool cio_base_device::counter_external_trigger(int id)
 {
 	return (m_register[COUNTER_TIMER_1_MODE_SPECIFICATION + id] & CTMS_ETE) ? true : false;
 }
@@ -621,7 +621,7 @@ bool cio_base_device::counter_external_trigger(device_timer_id id)
 //   counter_external_gate -
 //-------------------------------------------------
 
-bool cio_base_device::counter_external_gate(device_timer_id id)
+bool cio_base_device::counter_external_gate(int id)
 {
 	return (m_register[COUNTER_TIMER_1_MODE_SPECIFICATION + id] & CTMS_EDE) ? true : false;
 }
@@ -631,7 +631,7 @@ bool cio_base_device::counter_external_gate(device_timer_id id)
 //   counter_gated -
 //-------------------------------------------------
 
-bool cio_base_device::counter_gated(device_timer_id id)
+bool cio_base_device::counter_gated(int id)
 {
 	return (m_register[COUNTER_TIMER_1_COMMAND_AND_STATUS + id] & CTCS_GCB) ? true : false;
 }
@@ -641,7 +641,7 @@ bool cio_base_device::counter_gated(device_timer_id id)
 //   count - count down
 //-------------------------------------------------
 
-void cio_base_device::count(device_timer_id id)
+void cio_base_device::count(int id)
 {
 	if (!counter_gated(id)) return;
 	if (!(m_register[COUNTER_TIMER_1_COMMAND_AND_STATUS + id] & CTCS_CIP)) return;
@@ -686,7 +686,7 @@ void cio_base_device::count(device_timer_id id)
 //  trigger -
 //-------------------------------------------------
 
-void cio_base_device::trigger(device_timer_id id)
+void cio_base_device::trigger(int id)
 {
 	// ignore triggers during countdown if retrigger is disabled
 	if (!(m_register[COUNTER_TIMER_1_MODE_SPECIFICATION + id] & CTMS_REB) && (m_register[COUNTER_TIMER_1_COMMAND_AND_STATUS + id] & CTCS_CIP)) return;
@@ -705,7 +705,7 @@ void cio_base_device::trigger(device_timer_id id)
 //  gate -
 //-------------------------------------------------
 
-void cio_base_device::gate(device_timer_id id, int state)
+void cio_base_device::gate(int id, int state)
 {
 	// TODO
 }
@@ -779,11 +779,11 @@ void cio_base_device::external_port_w(int port, int bit, int state)
 cio_base_device::cio_base_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, u32 clock) :
 	device_t(mconfig, type, tag, owner, clock),
 	m_write_irq(*this),
-	m_read_pa(*this),
+	m_read_pa(*this, 0),
 	m_write_pa(*this),
-	m_read_pb(*this),
+	m_read_pb(*this, 0),
 	m_write_pb(*this),
-	m_read_pc(*this),
+	m_read_pc(*this, 0),
 	m_write_pc(*this),
 	m_irq(CLEAR_LINE)
 {
@@ -826,17 +826,8 @@ void cio_base_device::device_start()
 	}
 
 	// allocate timer
-	m_timer = timer_alloc();
+	m_timer = timer_alloc(FUNC(cio_base_device::advance_counters), this);
 	m_timer->adjust(attotime::from_hz(clock() / 2), 0, attotime::from_hz(clock() / 2));
-
-	// resolve callbacks
-	m_write_irq.resolve_safe();
-	m_read_pa.resolve_safe(0);
-	m_write_pa.resolve_safe();
-	m_read_pb.resolve_safe(0);
-	m_write_pb.resolve_safe();
-	m_read_pc.resolve_safe(0);
-	m_write_pc.resolve_safe();
 
 	save_item(NAME(m_irq));
 	save_item(NAME(m_register));
@@ -885,10 +876,10 @@ void z8536_device::device_reset()
 
 
 //-------------------------------------------------
-//  device_timer - handler timer events
+//  advance_counters -
 //-------------------------------------------------
 
-void cio_base_device::device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr)
+TIMER_CALLBACK_MEMBER(cio_base_device::advance_counters)
 {
 	if (counter_enabled(TIMER_1) && !counter_external_count(TIMER_1))
 	{

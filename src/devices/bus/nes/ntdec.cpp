@@ -23,12 +23,11 @@
 
 
 #ifdef NES_PCB_DEBUG
-#define VERBOSE 1
+#define VERBOSE (LOG_GENERAL)
 #else
-#define VERBOSE 0
+#define VERBOSE (0)
 #endif
-
-#define LOG_MMC(x) do { if (VERBOSE) logerror x; } while (0)
+#include "logmacro.h"
 
 
 //-------------------------------------------------
@@ -41,7 +40,7 @@ DEFINE_DEVICE_TYPE(NES_NTDEC_N715021, nes_ntdec_n715021_device, "nes_ntdec_n7150
 
 
 nes_ntdec_asder_device::nes_ntdec_asder_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock)
-	: nes_nrom_device(mconfig, NES_NTDEC_ASDER, tag, owner, clock) , m_latch(0), m_chr_outer(0)
+	: nes_nrom_device(mconfig, NES_NTDEC_ASDER, tag, owner, clock), m_latch(0), m_chr_outer(0)
 {
 }
 
@@ -79,7 +78,6 @@ void nes_ntdec_fh_device::pcb_reset()
 {
 	prg32((m_prg_chunks - 1) >> 1);
 	chr8(0, CHRROM);
-	set_nt_mirroring(PPU_MIRROR_VERT);
 }
 
 void nes_ntdec_n715021_device::pcb_reset()
@@ -118,7 +116,7 @@ void nes_ntdec_n715021_device::pcb_reset()
 
 void nes_ntdec_asder_device::write_h(offs_t offset, u8 data)
 {
-	LOG_MMC(("ntdec_asder write_h, offset: %04x, data: %02x\n", offset, data));
+	LOG("ntdec_asder write_h, offset: %04x, data: %02x\n", offset, data);
 
 	switch (offset & 0x6001)    // writes only at even addresses?
 	{
@@ -167,7 +165,7 @@ void nes_ntdec_asder_device::write_h(offs_t offset, u8 data)
 
 void nes_ntdec_fh_device::write_m(offs_t offset, u8 data)
 {
-	LOG_MMC(("ntdec_fh write_m, offset: %04x, data: %02x\n", offset, data));
+	LOG("ntdec_fh write_m, offset: %04x, data: %02x\n", offset, data);
 
 	switch (offset & 0x07)
 	{
@@ -206,7 +204,7 @@ void nes_ntdec_fh_device::write_m(offs_t offset, u8 data)
 
 void nes_ntdec_n715021_device::write_h(offs_t offset, u8 data)
 {
-	LOG_MMC(("ntdec_n715021 write_m, offset: %04x, data: %02x\n", offset, data));
-	prg16_89ab((offset >> 2) & 0x03);
+	LOG("ntdec_n715021 write_h, offset: %04x, data: %02x\n", offset, data);
+	prg16_89ab(BIT(offset, 2, 2));
 	chr8(offset & 0x03, CHRROM);
 }

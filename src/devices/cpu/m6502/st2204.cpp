@@ -68,13 +68,6 @@ st2202_device::st2202_device(const machine_config &mconfig, const char *tag, dev
 {
 }
 
-void st2204_device::device_resolve_objects()
-{
-	st2xxx_device::device_resolve_objects();
-
-	m_dac_callback.resolve_safe();
-}
-
 void st2204_device::device_start()
 {
 	std::unique_ptr<mi_st2204> intf = std::make_unique<mi_st2204>();
@@ -91,9 +84,9 @@ void st2204_device::device_start()
 	init_base_timer(0x0020);
 	init_lcd_timer(0x0040);
 
-	m_timer[0] = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(st2204_device::t0_interrupt), this));
-	m_timer[1] = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(st2204_device::t1_interrupt), this));
-	m_psg_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(st2204_device::psg_interrupt), this));
+	m_timer[0] = timer_alloc(FUNC(st2204_device::t0_interrupt), this);
+	m_timer[1] = timer_alloc(FUNC(st2204_device::t1_interrupt), this);
+	m_psg_timer = timer_alloc(FUNC(st2204_device::psg_interrupt), this);
 
 	save_item(NAME(m_tmode));
 	save_item(NAME(m_tcntr));

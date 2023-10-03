@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE softwarelist SYSTEM "softwarelist.dtd">
 <!--
-license:CC0
+license:CC0-1.0
 -->
 
 <softwarelist name="coco_flop" description="Tandy Radio Shack Color Computer disk images">
@@ -80,7 +80,7 @@ license:CC0
 			</dataarea>
 		</part>
 	</software>
-	
+
 	<!-- This begins the Rainbow On Disk archives. Rainbow Magazine was a TRS-80
 	Color Computer-focused magazine published in the USA that received
 	worldwide distribution. For an additional fee, you could receive a

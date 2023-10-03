@@ -9,12 +9,11 @@
 #include "emu.h"
 #include "wd1010.h"
 
-//#define LOG_GENERAL (1U <<  0)
-#define LOG_CMD     (1U <<  1)
-#define LOG_INT     (1U <<  2)
-#define LOG_SEEK    (1U <<  3)
-#define LOG_REGS    (1U <<  4)
-#define LOG_DATA    (1U <<  5)
+#define LOG_CMD     (1U << 1)
+#define LOG_INT     (1U << 2)
+#define LOG_SEEK    (1U << 3)
+#define LOG_REGS    (1U << 4)
+#define LOG_DATA    (1U << 5)
 
 #define VERBOSE  (LOG_CMD | LOG_INT | LOG_SEEK | LOG_REGS | LOG_DATA)
 //#define LOG_OUTPUT_STREAM std::cout
@@ -51,7 +50,7 @@ wd1010_device::wd1010_device(const machine_config &mconfig, const char *tag, dev
 	m_out_bcr_cb(*this),
 	m_out_dirin_cb(*this),
 	m_out_wg_cb(*this),
-	m_in_data_cb(*this),
+	m_in_data_cb(*this, 0),
 	m_out_data_cb(*this),
 	m_intrq(0),
 	m_brdy(0),
@@ -85,20 +84,10 @@ void wd1010_device::device_start()
 		m_drives[i].sector = 0;
 	}
 
-	// resolve callbacks
-	m_out_intrq_cb.resolve_safe();
-	m_out_bdrq_cb.resolve_safe();
-	m_out_bcs_cb.resolve_safe();
-	m_out_bcr_cb.resolve_safe();
-	m_out_dirin_cb.resolve_safe();
-	m_out_wg_cb.resolve_safe();
-	m_in_data_cb.resolve_safe(0);
-	m_out_data_cb.resolve_safe();
-
 	// allocate timer
-	m_seek_timer = timer_alloc(TIMER_SEEK);
-	m_read_timer = timer_alloc(TIMER_READ);
-	m_write_timer = timer_alloc(TIMER_WRITE);
+	m_seek_timer = timer_alloc(FUNC(wd1010_device::update_seek), this);
+	m_read_timer = timer_alloc(FUNC(wd1010_device::delayed_read), this);
+	m_write_timer = timer_alloc(FUNC(wd1010_device::delayed_write), this);
 
 	// register for save states
 	save_item(NAME(m_intrq));
@@ -124,56 +113,59 @@ void wd1010_device::device_reset()
 }
 
 //-------------------------------------------------
-//  device_timer - device-specific timer
+//  update_seek -
 //-------------------------------------------------
 
-void wd1010_device::device_timer(emu_timer &timer, device_timer_id tid, int param, void *ptr)
+TIMER_CALLBACK_MEMBER(wd1010_device::update_seek)
 {
-	switch (tid)
+	if ((m_command >> 4) != CMD_SCAN_ID)
 	{
-	case TIMER_SEEK:
+		LOGSEEK("Seek complete\n");
+		m_drives[drive()].cylinder = param;
+		m_status |= STATUS_SC;
+	}
 
-		if ((m_command >> 4) != CMD_SCAN_ID)
-		{
-			LOGSEEK("Seek complete\n");
-			m_drives[drive()].cylinder = param;
-			m_status |= STATUS_SC;
-		}
-
-		switch (m_command >> 4)
-		{
-		case CMD_RESTORE:
-			cmd_restore();
-			break;
-
-		case CMD_SEEK:
-			cmd_seek();
-			break;
-
-		case CMD_READ_SECTOR:
-			cmd_read_sector();
-			break;
-
-		case CMD_WRITE_SECTOR:
-		case CMD_WRITE_FORMAT:
-			cmd_write_sector();
-			break;
-
-		case CMD_SCAN_ID:
-			cmd_scan_id();
-			break;
-		}
-
+	switch (m_command >> 4)
+	{
+	case CMD_RESTORE:
+		cmd_restore();
 		break;
 
-	case TIMER_READ:
+	case CMD_SEEK:
+		cmd_seek();
+		break;
+
+	case CMD_READ_SECTOR:
 		cmd_read_sector();
 		break;
 
-	case TIMER_WRITE:
+	case CMD_WRITE_SECTOR:
+	case CMD_WRITE_FORMAT:
 		cmd_write_sector();
 		break;
+
+	case CMD_SCAN_ID:
+		cmd_scan_id();
+		break;
 	}
+}
+
+//-------------------------------------------------
+//  delayed_read -
+//-------------------------------------------------
+
+TIMER_CALLBACK_MEMBER(wd1010_device::delayed_read)
+{
+	cmd_read_sector();
+}
+
+//-------------------------------------------------
+//  delayed_write -
+//-------------------------------------------------
+
+TIMER_CALLBACK_MEMBER(wd1010_device::delayed_write)
+{
+	cmd_write_sector();
 }
 
 //-------------------------------------------------
@@ -302,14 +294,14 @@ void wd1010_device::end_command()
 
 int wd1010_device::get_lbasector()
 {
-	hard_disk_file *file = m_drives[drive()].drive->get_hard_disk_file();
-	hard_disk_info *info = hard_disk_get_info(file);
+	harddisk_image_device *file = m_drives[drive()].drive;
+	const auto &info = file->get_info();
 	int lbasector;
 
 	lbasector = m_cylinder;
-	lbasector *= info->heads;
+	lbasector *= info.heads;
 	lbasector += head();
-	lbasector *= info->sectors;
+	lbasector *= info.sectors;
 	lbasector += m_sector_number;
 
 	return lbasector;
@@ -534,11 +526,11 @@ void wd1010_device::cmd_read_sector()
 		}
 	}
 
-	hard_disk_file *file = m_drives[drive()].drive->get_hard_disk_file();
-	hard_disk_info *info = hard_disk_get_info(file);
+	harddisk_image_device *file = m_drives[drive()].drive;
+	const auto &info = file->get_info();
 
 	// verify that we can read
-	if (head() > info->heads)
+	if (head() > info.heads)
 	{
 		// out of range
 		LOG("--> Head out of range, aborting\n");
@@ -557,7 +549,7 @@ void wd1010_device::cmd_read_sector()
 
 	LOGDATA("--> Transferring sector to buffer (lba = %08x)\n", get_lbasector());
 
-	hard_disk_read(file, get_lbasector(), buffer);
+	file->read(get_lbasector(), buffer);
 
 	for (int i = 0; i < 512; i++)
 		m_out_data_cb(buffer[i]);
@@ -602,7 +594,7 @@ void wd1010_device::cmd_write_sector()
 		return;
 	}
 
-	hard_disk_file *file = m_drives[drive()].drive->get_hard_disk_file();
+	harddisk_image_device *file = m_drives[drive()].drive;
 	uint8_t buffer[512];
 
 	set_bdrq(0);
@@ -626,7 +618,7 @@ void wd1010_device::cmd_write_sector()
 			buffer[i] = m_in_data_cb();
 	}
 
-	hard_disk_write(file, get_lbasector(), buffer);
+	file->write(get_lbasector(), buffer);
 
 	// save last read head and sector number
 	m_drives[drive()].head = head();

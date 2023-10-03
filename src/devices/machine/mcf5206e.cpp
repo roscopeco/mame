@@ -7,10 +7,10 @@
 #include "emu.h"
 #include "mcf5206e.h"
 
-#define LOG_DEBUG       (0U << 0)
-#define LOG_INVALID     (0U << 1)
-#define LOG_TIMER       (0U << 2)
-
+#define LOG_DEBUG       (1U << 1)
+#define LOG_INVALID     (1U << 2)
+#define LOG_TIMER       (1U << 3)
+#define VERBOSE (0)
 #include "logmacro.h"
 
 void mcf5206e_peripheral_device::coldfire_regs_map(address_map &map)
@@ -846,7 +846,7 @@ void mcf5206e_peripheral_device::device_start()
 {
 	init_regs(true);
 
-	m_timer1 = machine().scheduler().timer_alloc( timer_expired_delegate( FUNC( mcf5206e_peripheral_device::timer1_callback ), this) );
+	m_timer1 = timer_alloc( FUNC( mcf5206e_peripheral_device::timer1_callback ), this );
 
 	save_item(NAME(m_ICR));
 	save_item(NAME(m_CSAR));

@@ -50,10 +50,10 @@ ioport_constructor null_modem_device::device_input_ports() const
 
 void null_modem_device::device_start()
 {
-	m_timer_poll = timer_alloc(TIMER_POLL);
+	m_timer_poll = timer_alloc(FUNC(null_modem_device::update_queue), this);
 }
 
-WRITE_LINE_MEMBER(null_modem_device::update_serial)
+void null_modem_device::update_serial(int state)
 {
 	int startbits = 1;
 	int databits = convert_databits(m_rs232_databits->read());
@@ -75,31 +75,16 @@ WRITE_LINE_MEMBER(null_modem_device::update_serial)
 	output_dsr(0);
 	output_cts(0);
 
-	m_rts = 0;
-	m_dtr = 0;
 	m_xoff = 0;
 }
 
 void null_modem_device::device_reset()
 {
 	update_serial(0);
-	queue();
+	update_queue(0);
 }
 
-void null_modem_device::device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr)
-{
-	switch (id)
-	{
-	case TIMER_POLL:
-		queue();
-		break;
-
-	default:
-		break;
-	}
-}
-
-void null_modem_device::queue()
+TIMER_CALLBACK_MEMBER(null_modem_device::update_queue)
 {
 	if (is_transmit_register_empty())
 	{
@@ -111,7 +96,7 @@ void null_modem_device::queue()
 
 		if (m_input_count != 0)
 		{
-			uint8_t fc = m_flow->read();
+			uint8_t const fc = m_flow->read();
 
 			if (fc == 0 || (fc == 1 && m_rts == 0) || (fc == 2 && m_dtr == 0) || (fc == 4 && m_xoff == 0))
 			{
@@ -121,7 +106,7 @@ void null_modem_device::queue()
 			}
 		}
 
-		int txbaud = convert_baud(m_rs232_txbaud->read());
+		int const txbaud = convert_baud(m_rs232_txbaud->read());
 		m_timer_poll->adjust(attotime::from_hz(txbaud));
 	}
 }
@@ -133,16 +118,14 @@ void null_modem_device::tra_callback()
 
 void null_modem_device::tra_complete()
 {
-	queue();
+	update_queue(0);
 }
 
 void null_modem_device::rcv_complete()
 {
-	u8 data;
-
 	receive_register_extract();
 
-	data = get_received_char();
+	uint8_t const data = get_received_char();
 	if (m_flow->read() != 4)
 	{
 		m_stream->output(data);

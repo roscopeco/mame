@@ -49,6 +49,7 @@
 
 #include "coretmpl.h" // BIT
 #include "ioprocs.h"
+#include "multibyte.h"
 
 
 os9_format::os9_format() : wd177x_format(formats)
@@ -67,20 +68,20 @@ const char *os9_format::description() const
 
 const char *os9_format::extensions() const
 {
-	return "dsk,os9";
+	return "os9,dsk";
 }
 
-int os9_format::identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants)
+int os9_format::identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants) const
 {
 	int const type = find_size(io, form_factor, variants);
 
 	if (type != -1)
-		return 75;
+		return FIFID_SIZE;
 
 	return 0;
 }
 
-int os9_format::find_size(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants)
+int os9_format::find_size(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants) const
 {
 	uint64_t size;
 	if (io.length(size))
@@ -90,9 +91,9 @@ int os9_format::find_size(util::random_read &io, uint32_t form_factor, const std
 	size_t actual;
 	io.read_at(0, os9_header, sizeof(os9_header), actual);
 
-	int os9_total_sectors = pick_integer_be(os9_header, 0x00, 3);
+	int os9_total_sectors = get_u24be(&os9_header[0x00]);
 	int os9_heads = util::BIT(os9_header[0x10], 0) ? 2 : 1;
-	int os9_sectors = pick_integer_be(os9_header, 0x11, 2);
+	int os9_sectors = get_u16be(&os9_header[0x11]);
 
 	if (os9_total_sectors <= 0 || os9_heads <= 0 || os9_sectors <= 0)
 		return -1;
@@ -103,10 +104,10 @@ int os9_format::find_size(util::random_read &io, uint32_t form_factor, const std
 	int opt_dtype = os9_header[0x3f + 0];
 	int opt_type = os9_header[0x3f + 3];
 	int opt_density = os9_header[0x3f + 4];
-	int opt_cylinders = pick_integer_be(os9_header, 0x3f + 5, 2);
+	int opt_cylinders = get_u16be(&os9_header[0x3f + 5]);
 	int opt_sides = os9_header[0x3f + 7];
-	int opt_sectors_per_track = pick_integer_be(os9_header, 0x3f + 9, 2);
-	int opt_track0_sectors = pick_integer_be(os9_header, 0x3f + 11, 2);
+	int opt_sectors_per_track = get_u16be(&os9_header[0x3f + 9]);
+	int opt_track0_sectors = get_u16be(&os9_header[0x3f + 11]);
 	int opt_interleave = os9_header[0x3f + 13];
 
 	int opt_mfm = util::BIT(opt_density, 0);
@@ -218,13 +219,13 @@ int os9_format::find_size(util::random_read &io, uint32_t form_factor, const std
 				continue;
 		}
 
-		LOG_FORMATS("OS9 matching format index %d\n", i);
+		LOG_FORMATS("os9_dsk: matching format index %d: tracks %d, sectors %d, sides: %d\n", i, f.track_count, f.sector_count, f.head_count);
 		return i;
 	}
 	return -1;
 }
 
-const wd177x_format::format &os9_format::get_track_format(const format &f, int head, int track)
+const wd177x_format::format &os9_format::get_track_format(const format &f, int head, int track) const
 {
 	int n = -1;
 
@@ -236,17 +237,17 @@ const wd177x_format::format &os9_format::get_track_format(const format &f, int h
 	}
 
 	if (n < 0) {
-		LOG_FORMATS("Error format not found\n");
+		LOG_FORMATS("os9_dsk: Error format not found\n");
 		return f;
 	}
 
 	if (head >= f.head_count) {
-		LOG_FORMATS("Error invalid head %d\n", head);
+		LOG_FORMATS("os9_dsk: Error invalid head %d\n", head);
 		return f;
 	}
 
 	if (track >= f.track_count) {
-		LOG_FORMATS("Error invalid track %d\n", track);
+		LOG_FORMATS("os9_dsk: Error invalid track %d\n", track);
 		return f;
 	}
 
@@ -583,4 +584,4 @@ const os9_format::format os9_format::formats_track0[] = {
 	{}
 };
 
-const floppy_format_type FLOPPY_OS9_FORMAT = &floppy_image_format_creator<os9_format>;
+const os9_format FLOPPY_OS9_FORMAT;

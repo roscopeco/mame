@@ -76,8 +76,8 @@ public:
 	uint8_t dack_r();
 	void dack_w(uint8_t data);
 
-	DECLARE_WRITE_LINE_MEMBER( ext_sync_w );
-	DECLARE_WRITE_LINE_MEMBER( lpen_w );
+	void ext_sync_w(int state);
+	void lpen_w(int state);
 
 	uint32_t screen_update(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect);
 
@@ -85,21 +85,18 @@ protected:
 	// device-level overrides
 	virtual void device_start() override;
 	virtual void device_reset() override;
-	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
 
 	virtual const tiny_rom_entry *device_rom_region() const override;
 	virtual space_config_vector memory_space_config() const override;
 
+	TIMER_CALLBACK_MEMBER(hsync_update);
+	TIMER_CALLBACK_MEMBER(vsync_update);
+	TIMER_CALLBACK_MEMBER(blank_update);
+
 	void start_dma();
 	void stop_dma();
-private:
-	enum
-	{
-		TIMER_VSYNC,
-		TIMER_HSYNC,
-		TIMER_BLANK
-	};
 
+private:
 	inline uint16_t readword(offs_t address);
 	inline void writeword(offs_t address, uint16_t data);
 	inline void fifo_clear();
@@ -131,7 +128,7 @@ private:
 	void process_fifo();
 	void continue_command();
 	void update_text(bitmap_rgb32 &bitmap, const rectangle &cliprect);
-	void draw_graphics_line(bitmap_rgb32 &bitmap, uint32_t addr, int y, int wd, int pitch);
+	void draw_graphics_line(bitmap_rgb32 &bitmap, uint32_t addr, int y, int wd, int mixed);
 	void update_graphics(bitmap_rgb32 &bitmap, const rectangle &cliprect, int force_bitmap);
 
 	void upd7220_vram(address_map &map);

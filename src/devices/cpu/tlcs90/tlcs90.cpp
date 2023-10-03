@@ -13,7 +13,6 @@
 *************************************************************************************************************/
 
 #include "emu.h"
-#include "debugger.h"
 #include "tlcs90.h"
 #include "tlcs90d.h"
 
@@ -158,7 +157,7 @@ void tlcs90_device::tmp90ph44_mem(address_map &map)
 tlcs90_device::tlcs90_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock, address_map_constructor program_map)
 	: cpu_device(mconfig, type, tag, owner, clock)
 	, m_program_config("program", ENDIANNESS_LITTLE, 8, 20, 0, program_map)
-	, m_port_read_cb(*this)
+	, m_port_read_cb(*this, 0xff)
 	, m_port_write_cb(*this)
 {
 }
@@ -2806,7 +2805,7 @@ TIMER_CALLBACK_MEMBER( tlcs90_device::t90_timer_callback )
 		if(i & 1)
 			break;
 		if ( (m_tclk & (0x0C << (i * 2))) == 0 ) // T0/T1 match signal clocks T1/T3
-			t90_timer_callback(ptr, i+1);
+			t90_timer_callback(i+1);
 		break;
 		case 0x01: // 16bit, only can happen for i=0,2
 		m_timer_value[i+1] = 0;
@@ -2851,9 +2850,6 @@ TIMER_CALLBACK_MEMBER( tlcs90_device::t90_timer4_callback )
 
 void tlcs90_device::device_start()
 {
-	m_port_read_cb.resolve_all_safe(0xff);
-	m_port_write_cb.resolve_all_safe();
-
 	save_item(NAME(m_prvpc.w.l));
 	save_item(NAME(m_pc.w.l));
 	save_item(NAME(m_sp.w.l));
@@ -2951,9 +2947,9 @@ void tlcs90_device::device_start()
 	// Timers
 
 	for (int i = 0; i < 4; i++)
-		m_timer[i] = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(tlcs90_device::t90_timer_callback),this));
+		m_timer[i] = timer_alloc(FUNC(tlcs90_device::t90_timer_callback), this);
 
-	m_timer[4] = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(tlcs90_device::t90_timer4_callback),this));
+	m_timer[4] = timer_alloc(FUNC(tlcs90_device::t90_timer4_callback), this);
 
 	state_add( T90_PC, "PC", m_pc.w.l).formatstr("%04X");
 	state_add( T90_SP, "SP", m_sp.w.l).formatstr("%04X");

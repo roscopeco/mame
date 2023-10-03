@@ -40,8 +40,10 @@ ef9340_1_device::ef9340_1_device(const machine_config &mconfig, const char *tag,
 	, device_video_interface(mconfig, *this)
 	, m_charset(*this, "ef9340_1")
 	, m_write_exram(*this)
-	, m_read_exram(*this)
+	, m_read_exram(*this, 0xff)
 {
+	m_offset_x = 0;
+	m_offset_y = 0;
 }
 
 
@@ -59,16 +61,13 @@ const tiny_rom_entry *ef9340_1_device::device_rom_region() const
 
 void ef9340_1_device::device_start()
 {
-	m_write_exram.resolve_safe();
-	m_read_exram.resolve_safe(0xff);
-
 	// let the screen create our temporary bitmap with the screen's dimensions
 	screen().register_screen_bitmap(m_tmp_bitmap);
 
-	m_line_timer = timer_alloc(TIMER_LINE);
+	m_line_timer = timer_alloc(FUNC(ef9340_1_device::draw_scanline), this);
 	m_line_timer->adjust(screen().time_until_pos(0, 0), 0, screen().scan_period());
 
-	m_blink_timer = timer_alloc(TIMER_BLINK);
+	m_blink_timer = timer_alloc(FUNC(ef9340_1_device::blink_update), this);
 	m_blink_timer->adjust(screen().time_until_pos(0, 0), 0, screen().frame_period());
 
 	// zerofill
@@ -107,25 +106,15 @@ void ef9340_1_device::device_start()
 }
 
 
-void ef9340_1_device::device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr)
+TIMER_CALLBACK_MEMBER(ef9340_1_device::blink_update)
 {
-	switch (id)
-	{
-		case TIMER_LINE:
-			ef9340_scanline(screen().vpos());
-			break;
+	// blink rate is approximately 0.5s
+	m_ef9340.blink_prescaler = (m_ef9340.blink_prescaler + 1) & 0x1f;
+	if (m_ef9340.R & 0x40 && m_ef9340.blink_prescaler == 24)
+		m_ef9340.blink_prescaler = 0;
 
-		case TIMER_BLINK:
-			// blink rate is approximately 0.5s
-			m_ef9340.blink_prescaler = (m_ef9340.blink_prescaler + 1) & 0x1f;
-			if (m_ef9340.R & 0x40 && m_ef9340.blink_prescaler == 24)
-				m_ef9340.blink_prescaler = 0;
-
-			if (m_ef9340.blink_prescaler == 0)
-				m_ef9340.blink = !m_ef9340.blink;
-
-			break;
-	}
+	if (m_ef9340.blink_prescaler == 0)
+		m_ef9340.blink = !m_ef9340.blink;
 }
 
 
@@ -321,8 +310,9 @@ u8 ef9340_1_device::ef9341_read(u8 command, u8 b)
 }
 
 
-void ef9340_1_device::ef9340_scanline(int vpos)
+TIMER_CALLBACK_MEMBER(ef9340_1_device::draw_scanline)
 {
+	int vpos = screen().vpos();
 	vpos -= m_offset_y;
 	if (vpos < 0)
 		return;

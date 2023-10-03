@@ -1,8 +1,12 @@
 // license:BSD-3-Clause
 // copyright-holders:Olivier Galibert
 #include "pasti_dsk.h"
+#include "imageutl.h"
 
 #include "ioprocs.h"
+#include "multibyte.h"
+
+#include <cstring>
 
 // Pasti format supported using the documentation at
 // http://www.sarnau.info/atari:pasti_file_format
@@ -38,7 +42,7 @@ bool pasti_format::supports_save() const
 	return false;
 }
 
-int pasti_format::identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants)
+int pasti_format::identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants) const
 {
 	uint8_t h[16];
 	size_t actual;
@@ -46,7 +50,7 @@ int pasti_format::identify(util::random_read &io, uint32_t form_factor, const st
 
 	if(!memcmp(h, "RSY\0\3\0", 6) &&
 		(1 || (h[10] >= 80 && h[10] <= 82) || (h[10] >= 160 && h[10] <= 164)))
-		return 100;
+		return FIFID_SIGN;
 
 	return 0;
 }
@@ -61,7 +65,7 @@ static void hexdump(const uint8_t *d, int s)
 	}
 }
 
-bool pasti_format::load(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants, floppy_image *image)
+bool pasti_format::load(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants, floppy_image *image) const
 {
 	size_t actual;
 	uint8_t fh[16];
@@ -81,11 +85,11 @@ bool pasti_format::load(util::random_read &io, uint32_t form_factor, const std::
 		for(int head=0; head < heads; head++) {
 			uint8_t th[16];
 			io.read_at(pos, th, 16, actual);
-			int entry_len = th[0] | (th[1] << 8) | (th[2] << 16) | (th[3] << 24);
-			int fuzz_len  = th[4] | (th[5] << 8) | (th[6] << 16) | (th[7] << 24);
-			int sect      = th[8] | (th[9] << 8);
-			int flags     = th[10] | (th[11] << 8);
-			int track_len = th[12] | (th[13] << 8);
+			int entry_len = get_u32le(&th[0]);
+			int fuzz_len  = get_u32le(&th[4]);
+			int sect      = get_u16le(&th[8]);
+			int flags     = get_u16le(&th[10]);
+			int track_len = get_u16le(&th[12]);
 			int track_num = th[14];
 			int flags2    = th[15];
 
@@ -99,13 +103,13 @@ bool pasti_format::load(util::random_read &io, uint32_t form_factor, const std::
 
 			int syncpos = -1;
 			if(flags & 0x0080) {
-				syncpos = tdata[0] | (tdata[1] << 8);
+				syncpos = get_u16le(tdata);
 				tdata += 2;
 			}
 
 			int tsize = 0;
 			if(flags & 0x0040) {
-				tsize = tdata[0] | (tdata[1] << 8);
+				tsize = get_u16le(tdata);
 				tdata += 2;
 			} else
 				tdata = nullptr;
@@ -130,10 +134,10 @@ bool pasti_format::load(util::random_read &io, uint32_t form_factor, const std::
 
 			for(int s=0; s<sect; s++) {
 				uint8_t *sh = &raw_track[16*s];
-				int s_off   = sh[0] | (sh[1] << 8) | (sh[2] << 16) | (sh[3] << 24);
-				int s_pos   = sh[4] | (sh[5] << 8);
-				int s_time  = sh[6] | (sh[7] << 8);
-				int s_flags = sh[14] | (sh[15] << 8);
+				int s_off   = get_u32le(&sh[0]);
+				int s_pos   = get_u16le(&sh[4]);
+				int s_time  = get_u16le(&sh[6]);
+				int s_flags = get_u16le(&sh[14]);
 
 				obs.sectors[s].data       = bdata + s_off;
 				obs.sectors[s].fuzzy_mask = nullptr;
@@ -158,11 +162,11 @@ bool pasti_format::load(util::random_read &io, uint32_t form_factor, const std::
 		}
 	}
 
-	image->set_variant(floppy_image::DSDD);
+	image->set_form_variant(floppy_image::FF_35, heads > 1 ? floppy_image::DSDD : floppy_image::SSDD);
 	return true;
 }
 
-const floppy_format_type FLOPPY_PASTI_FORMAT = &floppy_image_format_creator<pasti_format>;
+const pasti_format FLOPPY_PASTI_FORMAT;
 
 
 void pasti_format::wd_generate_track_from_observations(int track, int head, floppy_image *image, wd_obs &obs)

@@ -30,11 +30,12 @@ protected:
 	virtual void sound_stream_update(sound_stream &stream, std::vector<read_stream_view> const &inputs, std::vector<write_stream_view> &outputs) override;
 	virtual void device_add_mconfig(machine_config &config) override;
 	virtual space_config_vector memory_space_config() const override;
-	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
 
 	virtual void tra_callback() override;
 	virtual void tra_complete() override;
 	virtual void rcv_complete() override;
+
+	TIMER_CALLBACK_MEMBER(irq_timer_tick);
 
 private:
 	enum {
@@ -44,6 +45,8 @@ private:
 		MPUS_TX_INT  = 0x40,
 		MPUS_RX_INT  = 0x80
 	};
+
+	static const u16 sample_dec[0x100];
 
 	devcb_write_line m_midi_tx;
 
@@ -70,6 +73,8 @@ private:
 	u8 m_voice_select;
 	u8 m_irqen_76, m_irqen_77;
 	bool m_timer_interrupt;
+
+	util::notifier_subscription m_notif_rom_space;
 
 	void cpu_map(address_map &map);
 
@@ -105,8 +110,6 @@ private:
 	void midi_w(u8 data);
 	u8 midi_status_r();
 	void midi_status_w(u8 data);
-
-	static inline u16 uncomp_8_16(u8 value);
 };
 
 DECLARE_DEVICE_TYPE(KS0164, ks0164_device)

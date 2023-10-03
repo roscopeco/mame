@@ -49,6 +49,7 @@ DECLARE_DEVICE_TYPE(QED5271LE, qed5271le_device)
 DECLARE_DEVICE_TYPE(RM7000BE, rm7000be_device)
 DECLARE_DEVICE_TYPE(RM7000LE, rm7000le_device)
 DECLARE_DEVICE_TYPE(R5900LE, r5900le_device)
+DECLARE_DEVICE_TYPE(R5900BE, r5900be_device)
 
 
 /***************************************************************************
@@ -309,6 +310,7 @@ public:
 	void add_fastram(offs_t start, offs_t end, uint8_t readonly, void *base);
 	void clear_fastram(uint32_t select_start);
 	void mips3drc_set_options(uint32_t options);
+	uint32_t mips3drc_get_options();
 	void mips3drc_add_hotspot(offs_t pc, uint32_t opcode, uint32_t cycles);
 
 protected:
@@ -326,7 +328,7 @@ protected:
 
 	// device_memory_interface overrides
 	virtual space_config_vector memory_space_config() const override;
-	virtual bool memory_translate(int spacenum, int intention, offs_t &address) override;
+	virtual bool memory_translate(int spacenum, int intention, offs_t &address, address_space *&target_space) override;
 
 	// device_state_interface overrides
 	virtual void state_export(const device_state_entry &entry) override;
@@ -350,6 +352,8 @@ protected:
 	virtual void WWORD_MASKED(offs_t address, uint32_t data, uint32_t mem_mask);
 	virtual void WDOUBLE(offs_t address, uint64_t data);
 	virtual void WDOUBLE_MASKED(offs_t address, uint64_t data, uint64_t mem_mask);
+
+	virtual void set_cop0_reg(int idx, uint64_t val);
 
 	struct internal_mips3_state {
 		/* core registers */
@@ -431,7 +435,7 @@ protected:
 
 	address_space * m_program;
 	uint32_t        m_data_bits;
-	std::function<u32(offs_t)> m_pr32;
+	delegate<u32 (offs_t)> m_pr32;
 	std::function<const void * (offs_t)> m_prptr;
 	uint32_t        c_system_clock;
 	uint32_t        m_cpu_clock;
@@ -518,6 +522,12 @@ protected:
 
 	void generate_exception(int exception, int backup);
 	void generate_tlb_exception(int exception, offs_t address);
+
+	void static_generate_memory_mode_checks(drcuml_block &block, uml::code_handle &exception_addrerr, int &label, int mode);
+	void static_generate_fastram_accessor(drcuml_block &block, int &label, int size, bool iswrite, bool ismasked);
+	void static_generate_memory_rw(drcuml_block &block, int size, bool iswrite, bool ismasked);
+	virtual void static_generate_memory_accessor(int mode, int size, bool iswrite, bool ismasked, const char *name, uml::code_handle *&handleptr);
+
 	virtual void check_irqs();
 	virtual void handle_mult(uint32_t op);
 	virtual void handle_multu(uint32_t op);
@@ -532,13 +542,13 @@ public:
 private:
 	uint32_t compute_config_register();
 	uint32_t compute_prid_register();
+	uint32_t compute_fpu_prid_register();
 
 	uint32_t generate_tlb_index();
 	void tlb_map_entry(int tlbindex);
 	void tlb_write_common(int tlbindex);
 
 	uint64_t get_cop0_reg(int idx);
-	void set_cop0_reg(int idx, uint64_t val);
 	uint64_t get_cop0_creg(int idx);
 	void set_cop0_creg(int idx, uint64_t val);
 	void handle_cop0(uint32_t op);
@@ -619,11 +629,10 @@ private:
 	void static_generate_out_of_cycles();
 	void static_generate_tlb_mismatch();
 	void static_generate_exception(uint8_t exception, int recover, const char *name);
-	void static_generate_memory_accessor(int mode, int size, int iswrite, int ismasked, const char *name, uml::code_handle *&handleptr);
 
 	void generate_update_mode(drcuml_block &block);
 	void generate_update_cycles(drcuml_block &block, compiler_state &compiler, uml::parameter param, bool allow_exception);
-	void generate_checksum_block(drcuml_block &block, compiler_state &compiler, const opcode_desc *seqhead, const opcode_desc *seqlast);
+	void generate_checksum_block(drcuml_block &block, compiler_state &compiler, const opcode_desc *seqhead, const opcode_desc *seqlast, const opcode_desc *codelast);
 	void generate_sequence_instruction(drcuml_block &block, compiler_state &compiler, const opcode_desc *desc);
 	void generate_delay_slot_and_branch(drcuml_block &block, compiler_state &compiler, const opcode_desc *desc, uint8_t linkreg);
 
@@ -744,20 +753,49 @@ public:
 	}
 };
 
-class r4650be_device : public mips3_device {
+class r4650_device : public mips3_device {
+public:
+	// construction/destruction
+	r4650_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock, endianness_t endianness)
+		: mips3_device(mconfig, type, tag, owner, clock, MIPS3_TYPE_R4650, endianness, 32) // Should be 64 bits
+	{
+	}
+
+protected:
+	virtual bool memory_translate(int spacenum, int intention, offs_t &address, address_space *&target_space) override;
+
+	virtual void static_generate_memory_accessor(int mode, int size, bool iswrite, bool ismasked, const char *name, uml::code_handle *&handleptr) override;
+
+	virtual bool RBYTE(offs_t address, uint32_t *result) override;
+	virtual bool RHALF(offs_t address, uint32_t *result) override;
+	virtual bool RWORD(offs_t address, uint32_t *result, bool insn = false) override;
+	virtual bool RWORD_MASKED(offs_t address, uint32_t *result, uint32_t mem_mask) override;
+	virtual bool RDOUBLE(offs_t address, uint64_t *result) override;
+	virtual bool RDOUBLE_MASKED(offs_t address, uint64_t *result, uint64_t mem_mask) override;
+	virtual void WBYTE(offs_t address, uint8_t data) override;
+	virtual void WHALF(offs_t address, uint16_t data) override;
+	virtual void WWORD(offs_t address, uint32_t data) override;
+	virtual void WWORD_MASKED(offs_t address, uint32_t data, uint32_t mem_mask) override;
+	virtual void WDOUBLE(offs_t address, uint64_t data) override;
+	virtual void WDOUBLE_MASKED(offs_t address, uint64_t data, uint64_t mem_mask) override;
+
+	virtual void set_cop0_reg(int idx, uint64_t val) override;
+};
+
+class r4650be_device : public r4650_device {
 public:
 	// construction/destruction
 	r4650be_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
-		: mips3_device(mconfig, R4650BE, tag, owner, clock, MIPS3_TYPE_R4650, ENDIANNESS_BIG, 32) // Should be 64 bits
+		: r4650_device(mconfig, R4650BE, tag, owner, clock, ENDIANNESS_BIG)
 	{
 	}
 };
 
-class r4650le_device : public mips3_device {
+class r4650le_device : public r4650_device {
 public:
 	// construction/destruction
 	r4650le_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
-		: mips3_device(mconfig, R4650LE, tag, owner, clock, MIPS3_TYPE_R4650, ENDIANNESS_LITTLE, 32) // Should be 64 bits
+		: r4650_device(mconfig, R4650LE, tag, owner, clock, ENDIANNESS_LITTLE)
 	{
 	}
 };
@@ -837,23 +875,15 @@ public:
 	}
 };
 
-class r5900le_device : public mips3_device {
-public:
+class r5900_device : public mips3_device {
+protected:
 	// construction/destruction
-	template <typename T>
-	r5900le_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock, T &&vu0_tag)
-		: r5900le_device(mconfig, tag, owner, clock)
-	{
-		m_vu0.set_tag(std::forward<T>(vu0_tag));
-	}
-
-	r5900le_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
-		: mips3_device(mconfig, R5900LE, tag, owner, clock, MIPS3_TYPE_R5900, ENDIANNESS_LITTLE, 64)
+	r5900_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock, endianness_t endianness)
+		: mips3_device(mconfig, type, tag, owner, clock, MIPS3_TYPE_R5900, endianness, 64)
 		, m_vu0(*this, finder_base::DUMMY_TAG)
 	{
 	}
 
-protected:
 	virtual void device_start() override;
 
 	// device_disasm_interface overrides
@@ -872,8 +902,8 @@ protected:
 	void WDOUBLE(offs_t address, uint64_t data) override;
 	void WDOUBLE_MASKED(offs_t address, uint64_t data, uint64_t mem_mask) override;
 
-	bool RQUAD(offs_t address, uint64_t *result_hi, uint64_t *result_lo);
-	void WQUAD(offs_t address, uint64_t data_hi, uint64_t data_lo);
+	virtual bool RQUAD(offs_t address, uint64_t *result_hi, uint64_t *result_lo) = 0;
+	virtual void WQUAD(offs_t address, uint64_t data_hi, uint64_t data_lo) = 0;
 
 	uint64_t get_cop2_reg(int idx) override;
 	void set_cop2_reg(int idx, uint64_t val) override;
@@ -901,6 +931,46 @@ protected:
 	void check_irqs() override;
 
 	required_device<sonyvu0_device> m_vu0;
+};
+
+class r5900le_device : public r5900_device {
+public:
+	// construction/destruction
+	template <typename T>
+	r5900le_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock, T &&vu0_tag)
+		: r5900le_device(mconfig, tag, owner, clock)
+	{
+		m_vu0.set_tag(std::forward<T>(vu0_tag));
+	}
+
+	r5900le_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
+		: r5900_device(mconfig, R5900LE, tag, owner, clock, ENDIANNESS_LITTLE)
+	{
+	}
+
+protected:
+	bool RQUAD(offs_t address, uint64_t *result_hi, uint64_t *result_lo) override;
+	void WQUAD(offs_t address, uint64_t data_hi, uint64_t data_lo) override;
+};
+
+class r5900be_device : public r5900_device {
+public:
+	// construction/destruction
+	template <typename T>
+	r5900be_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock, T &&vu0_tag)
+		: r5900be_device(mconfig, tag, owner, clock)
+	{
+		m_vu0.set_tag(std::forward<T>(vu0_tag));
+	}
+
+	r5900be_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
+		: r5900_device(mconfig, R5900BE, tag, owner, clock, ENDIANNESS_BIG)
+	{
+	}
+
+protected:
+	bool RQUAD(offs_t address, uint64_t *result_hi, uint64_t *result_lo) override;
+	void WQUAD(offs_t address, uint64_t data_hi, uint64_t data_lo) override;
 };
 
 class qed5271be_device : public mips3_device {
@@ -969,7 +1039,6 @@ private:
 COMPILER-SPECIFIC OPTIONS
 ***************************************************************************/
 
-/* fix me -- how do we make this work?? */
 #define MIPS3DRC_STRICT_VERIFY      0x0001          /* verify all instructions */
 #define MIPS3DRC_STRICT_COP0        0x0002          /* validate all COP0 instructions */
 #define MIPS3DRC_STRICT_COP1        0x0004          /* validate all COP1 instructions */
@@ -977,9 +1046,9 @@ COMPILER-SPECIFIC OPTIONS
 #define MIPS3DRC_DISABLE_INTRABLOCK 0x0010          /* disable intrablock branching */
 #define MIPS3DRC_CHECK_OVERFLOWS    0x0020          /* actually check overflows on add/sub instructions */
 #define MIPS3DRC_ACCURATE_DIVZERO   0x0040          /* load correct values into HI/LO on integer divide-by-zero */
+#define MIPS3DRC_EXTRA_INSTR_CHECK  0x0080          /* adds the last instruction value to all validation entry locations, used with STRICT_VERIFY */
 
 #define MIPS3DRC_COMPATIBLE_OPTIONS (MIPS3DRC_STRICT_VERIFY | MIPS3DRC_STRICT_COP1 | MIPS3DRC_STRICT_COP0 | MIPS3DRC_STRICT_COP2)
 #define MIPS3DRC_FASTEST_OPTIONS    (0)
-
 
 #endif // MAME_CPU_MIPS_MIPS3_H

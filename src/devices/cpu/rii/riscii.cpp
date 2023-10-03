@@ -20,6 +20,7 @@
 #include "riidasm.h"
 
 #define LOG_TBRD (1U << 1)
+#define LOG_PROD (1U << 2)
 #include "logmacro.h"
 
 // device type definitions
@@ -64,8 +65,8 @@ riscii_series_device::riscii_series_device(const machine_config &mconfig, device
 	: cpu_device(mconfig, type, tag, owner, clock)
 	, m_program_config("program", ENDIANNESS_LITTLE, 16, addrbits, -1)
 	, m_regs_config("register", ENDIANNESS_LITTLE, 8, 8 + bankbits, 0, regs)
-	, m_porta_in_cb(*this)
-	, m_port_in_cb(*this)
+	, m_porta_in_cb(*this, 0xff)
+	, m_port_in_cb(*this, 0xff)
 	, m_port_out_cb(*this)
 	, m_pcmask((1 << pcbits) - 1)
 	, m_tbptmask(((1 << (addrbits + 1)) - 1) | 0x800000)
@@ -188,13 +189,6 @@ device_memory_interface::space_config_vector riscii_series_device::memory_space_
 	};
 }
 
-void riscii_series_device::device_resolve_objects()
-{
-	m_porta_in_cb.resolve_safe(0xff);
-	m_port_in_cb.resolve_all_safe(0xff);
-	m_port_out_cb.resolve_all_safe();
-}
-
 void riscii_series_device::device_start()
 {
 	space(AS_PROGRAM).cache(m_cache);
@@ -206,8 +200,10 @@ void riscii_series_device::device_start()
 
 	set_icountptr(m_icount);
 
-	m_timer0 = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(riscii_series_device::timer0), this));
-	m_speech_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(riscii_series_device::speech_timer), this));
+	m_timer[0] = timer_alloc(FUNC(riscii_series_device::timer0), this);
+	m_timer[1] = timer_alloc(FUNC(riscii_series_device::timer1), this);
+	m_timer[2] = timer_alloc(FUNC(riscii_series_device::timer2), this);
+	m_speech_timer = timer_alloc(FUNC(riscii_series_device::speech_timer), this);
 
 	state_add<u32>(RII_PC, "PC", [this]() { return m_pc; }, [this](u32 pc) { debug_set_pc(pc); }).mask(m_pcmask);
 	state_add<u32>(STATE_GENPC, "GENPC", [this]() { return m_pc; }, [this](u32 pc) { debug_set_pc(pc); }).mask(m_pcmask).noshow();
@@ -352,7 +348,9 @@ void riscii_series_device::device_reset()
 	m_tr01con = 0x00;
 	m_tr2con = 0x00;
 	m_sfcr = 0x00;
-	m_timer0->adjust(attotime::never);
+	m_timer[0]->adjust(attotime::never);
+	m_timer[1]->adjust(attotime::never);
+	m_timer[2]->adjust(attotime::never);
 
 	// reset synthesizer
 	std::fill_n(&m_env[0], 4, 0x00);
@@ -614,7 +612,10 @@ u8 riscii_series_device::port_r(offs_t offset)
 
 void riscii_series_device::port_w(offs_t offset, u8 data)
 {
+	if (m_port_data[offset] == data)
+		return;
 	m_port_data[offset] = data;
+
 	if (offset < 2)
 	{
 		u8 dc = m_port_dcr[offset];
@@ -638,6 +639,29 @@ u8 riscii_series_device::stbcon_r()
 void riscii_series_device::stbcon_w(u8 data)
 {
 	m_stbcon = data;
+	if (BIT(data, 5))
+	{
+		if (BIT(data, 4))
+		{
+			// All key mode
+			port_w(8, 0x00);
+			port_w(9, 0x00);
+		}
+		else
+		{
+			// Key strobe output on ports J and K
+			if (BIT(data, 3))
+			{
+				port_w(9, 0xff);
+				port_w(8, (1 << (data & 7)) ^ 0xff);
+			}
+			else
+			{
+				port_w(8, 0xff);
+				port_w(9, (1 << (data & 7)) ^ 0xff);
+			}
+		}
+	}
 }
 
 u8 riscii_series_device::painten_r()
@@ -801,11 +825,12 @@ void riscii_series_device::sprh_w(u8 data)
 
 void riscii_series_device::timer0_reload()
 {
+	// Prescaler values are 1:1, 1:4, 1:16, 1:64
 	const unsigned prescale = 1 << ((m_tr01con & 0x03) << 1);
 	if (BIT(m_tr01con, 2))
-		m_timer0->adjust(cycles_to_attotime((m_trl0 + 1) * prescale * 2));
+		m_timer[0]->adjust(cycles_to_attotime((m_trl0 + 1) * prescale * 2));
 	else
-		m_timer0->adjust(attotime::from_ticks((m_trl0 + 1) * prescale, 32768));
+		m_timer[0]->adjust(attotime::from_ticks((m_trl0 + 1) * prescale, 32768));
 }
 
 TIMER_CALLBACK_MEMBER(riscii_series_device::timer0)
@@ -816,12 +841,73 @@ TIMER_CALLBACK_MEMBER(riscii_series_device::timer0)
 
 u16 riscii_series_device::timer0_count() const
 {
-	if (!m_timer0->enabled())
+	if (!m_timer[0]->enabled())
 		return 0;
-	else if (BIT(m_tr01con, 2))
-		return m_trl0 - m_timer0->remaining().as_ticks(32768);
 	else
-		return m_trl0 - attotime_to_cycles(m_timer0->remaining()) / 2;
+	{
+		// Timer 0 counts up
+		const unsigned prescale = 1 << ((m_tr01con & 0x03) << 1);
+		if (BIT(m_tr01con, 2))
+			return m_trl0 - attotime_to_cycles(m_timer[0]->remaining()) / 2 / prescale;
+		else
+			return m_trl0 - m_timer[0]->remaining().as_ticks(32768) / prescale;
+	}
+}
+
+void riscii_series_device::timer1_reload()
+{
+	// Prescaler values are 1:4, 1:16, 1:64, 1:256
+	const unsigned prescale = 1 << (((m_tr01con & 0x30) >> 3) + 2);
+	m_timer[1]->adjust(attotime::from_ticks((m_trl1 + 1) * prescale, 32768));
+}
+
+TIMER_CALLBACK_MEMBER(riscii_series_device::timer1)
+{
+	m_intsta |= 0x02;
+	timer1_reload();
+}
+
+u8 riscii_series_device::timer1_count() const
+{
+	if (!m_timer[1]->enabled())
+		return 0;
+	else
+	{
+		// Timer 1 counts down
+		const unsigned prescale = 1 << (((m_tr01con & 0x30) >> 3) + 2);
+		return m_timer[1]->remaining().as_ticks(32768) / prescale;
+	}
+}
+
+void riscii_series_device::timer2_reload()
+{
+	// Prescaler values are 1:1, 1:2, 1:4, 1:8
+	const unsigned prescale = 1 << (m_tr2con & 0x03);
+	if (BIT(m_tr2con, 2))
+		m_timer[2]->adjust(cycles_to_attotime((m_trl2 + 1) * prescale * 2));
+	else
+		m_timer[2]->adjust(attotime::from_ticks((m_trl2 + 1) * prescale, 32768));
+}
+
+TIMER_CALLBACK_MEMBER(riscii_series_device::timer2)
+{
+	m_intsta |= 0x04;
+	timer2_reload();
+}
+
+u8 riscii_series_device::timer2_count() const
+{
+	if (!m_timer[2]->enabled())
+		return 0;
+	else
+	{
+		// Timer 2 counts down
+		const unsigned prescale = 1 << (m_tr2con & 0x03);
+		if (BIT(m_tr2con, 2))
+			return attotime_to_cycles(m_timer[2]->remaining()) / 2 / prescale;
+		else
+			return m_timer[2]->remaining().as_ticks(32768) / prescale;
+	}
 }
 
 u8 riscii_series_device::trl0l_r()
@@ -871,7 +957,11 @@ u8 riscii_series_device::tr01con_r()
 
 void riscii_series_device::tr01con_w(u8 data)
 {
-	m_tr01con = data;
+	u8 old_tr01con = std::exchange(m_tr01con, data);
+	if (BIT(data, 6) && !BIT(old_tr01con, 6))
+		timer1_reload();
+	else if (!BIT(data, 6) && BIT(old_tr01con, 6))
+		m_timer[1]->adjust(attotime::never);
 }
 
 u8 riscii_series_device::tr2con_r()
@@ -881,12 +971,16 @@ u8 riscii_series_device::tr2con_r()
 
 void riscii_series_device::tr2con_w(u8 data)
 {
-	// TODO: capture mode, event counter mode
-	if ((data & 0x30) == 0x10 && (m_tr2con & 0x30) == 0)
+	// TODO: Timer 0 capture mode, event counter mode
+	u8 old_tr2con = std::exchange(m_tr2con, data);
+	if ((data & 0x30) == 0x10 && (old_tr2con & 0x30) == 0)
 		timer0_reload();
-	else if ((data & 0x30) == 0x10 && (m_tr2con & 0x30) == 0)
-		m_timer0->adjust(attotime::never);
-	m_tr2con = data;
+	else if ((data & 0x30) == 0x10 && (old_tr2con & 0x30) == 0)
+		m_timer[0]->adjust(attotime::never);
+	if (BIT(data, 3) && !BIT(old_tr2con, 3))
+		timer2_reload();
+	else if (!BIT(data, 3) && BIT(old_tr2con, 3))
+		m_timer[2]->adjust(attotime::never);
 }
 
 u8 riscii_series_device::trlir_r()
@@ -911,12 +1005,12 @@ u8 riscii_series_device::t0ch_r()
 
 u8 riscii_series_device::tr1c_r()
 {
-	return 0xff;
+	return timer1_count();
 }
 
 u8 riscii_series_device::tr2c_r()
 {
-	return 0xff;
+	return timer2_count();
 }
 
 u8 riscii_series_device::sfcr_r()
@@ -1302,7 +1396,7 @@ void riscii_series_device::execute_mul_imm(u8 data)
 	int mier = BIT(m_cpucon, 3) ? int(s8(m_acc)) : int(m_acc);
 	int mcand = BIT(m_cpucon, 4) ? int(s8(data)) : int(data);
 	m_prod = u16(mier * mcand);
-	logerror("%s: %d * %d = %04X\n", machine().describe_context(), mier, mcand, m_prod);
+	LOGMASKED(LOG_PROD, "%s: %d * %d = %04X\n", machine().describe_context(), mier, mcand, m_prod);
 }
 
 void riscii_series_device::execute_or(u8 reg, bool a)

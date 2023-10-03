@@ -3,7 +3,7 @@
 /***********************************************************************************************************
 
 
- PC-Engine & Turbografx-16 cart emulation
+ PC-Engine & Turbografx-16 HuCard emulation
 
 
  ***********************************************************************************************************/
@@ -13,15 +13,16 @@
 #include "pce_rom.h"
 
 
+
 //-------------------------------------------------
 //  pce_rom_device - constructor
 //-------------------------------------------------
 
-DEFINE_DEVICE_TYPE(PCE_ROM_STD,      pce_rom_device,      "pce_rom",      "PCE/TG16 Carts")
-DEFINE_DEVICE_TYPE(PCE_ROM_CDSYS3,   pce_cdsys3_device,   "pce_cdsys3",   "PCE/TG16 CD-System Cart v3.00")
-DEFINE_DEVICE_TYPE(PCE_ROM_POPULOUS, pce_populous_device, "pce_populous", "PCE Populous Cart")
-DEFINE_DEVICE_TYPE(PCE_ROM_SF2,      pce_sf2_device,      "pce_sf2",      "PCE Street Fighter 2 CE Cart")
-DEFINE_DEVICE_TYPE(PCE_ROM_TENNOKOE, pce_tennokoe_device, "pce_tennokoe", "PCE Tennokoe Bank Cart")
+DEFINE_DEVICE_TYPE(PCE_ROM_STD,      pce_rom_device,      "pce_rom",      "PCE/TG16 HuCards")
+DEFINE_DEVICE_TYPE(PCE_ROM_CDSYS3,   pce_cdsys3_device,   "pce_cdsys3",   "PCE/TG16 CD-System HuCard v3.00")
+DEFINE_DEVICE_TYPE(PCE_ROM_POPULOUS, pce_populous_device, "pce_populous", "PCE Populous HuCard")
+DEFINE_DEVICE_TYPE(PCE_ROM_SF2,      pce_sf2_device,      "pce_sf2",      "PCE Street Fighter 2 CE HuCard")
+DEFINE_DEVICE_TYPE(PCE_ROM_TENNOKOE, pce_tennokoe_device, "pce_tennokoe", "PCE Tennokoe Bank HuCard")
 
 
 pce_rom_device::pce_rom_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock)
@@ -111,14 +112,16 @@ void pce_tennokoe_device::nvram_default()
 	memcpy(m_bram + 0x1800, m_rom + 0x8800, 0x800);
 }
 
-void pce_tennokoe_device::nvram_read(emu_file &file)
+bool pce_tennokoe_device::nvram_read(util::read_stream &file)
 {
-	file.read(m_bram, m_bram_size);
+	size_t actual_size;
+	return !file.read(m_bram, m_bram_size, actual_size) && actual_size == m_bram_size;
 }
 
-void pce_tennokoe_device::nvram_write(emu_file &file)
+bool pce_tennokoe_device::nvram_write(util::write_stream &file)
 {
-	file.write(m_bram, m_bram_size);
+	size_t actual_size;
+	return !file.write(m_bram, m_bram_size, actual_size) && actual_size == m_bram_size;
 }
 
 /*-------------------------------------------------

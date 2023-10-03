@@ -6,11 +6,11 @@
 #pragma once
 
 #include "pccard.h"
-#include "bus/ata/idehd.h"
+#include "atastorage.h"
 
 DECLARE_DEVICE_TYPE(ATA_FLASH_PCCARD, ata_flash_pccard_device)
 
-class ata_flash_pccard_device : public ide_hdd_device, public device_pccard_interface
+class ata_flash_pccard_device : public cf_device_base, public device_pccard_interface
 {
 public:
 	ata_flash_pccard_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
@@ -23,14 +23,17 @@ public:
 protected:
 	ata_flash_pccard_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock);
 
-	// device-level overrides
+	// device_t implementation
 	virtual void device_reset() override;
 
-	virtual attotime seek_time() override;
-	uint8_t calculate_status() override { return ata_hle_device::calculate_status(); };
-
 private:
-	uint8_t m_cis[512];
+	// ata_hle_device_base implementation
+	virtual void set_irq_out(int state) override { }
+	virtual void set_dmarq_out(int state) override { }
+	virtual void set_dasp_out(int state) override { }
+	virtual void set_pdiag_out(int state) override { }
+
+	std::vector<uint8_t> m_cis;
 	uint8_t m_configuration_option;
 	uint8_t m_configuration_and_status;
 	uint8_t m_pin_replacement;
@@ -53,7 +56,7 @@ protected:
 	virtual bool is_ready() override;
 
 private:
-	uint8_t m_key[5];
+	std::vector<uint8_t> m_key;
 	uint16_t m_locked;
 };
 
@@ -75,7 +78,7 @@ protected:
 	static const int IDE_COMMAND_TAITO_GNET_UNLOCK_2 = 0xfc;
 
 private:
-	uint8_t m_key[5];
+	std::vector<uint8_t> m_key;
 	bool m_locked;
 };
 
@@ -95,7 +98,7 @@ protected:
 	static constexpr int IDE_COMMAND_TAITO_COMPACT_FLASH_UNLOCK = 0x0f;
 
 private:
-	uint8_t m_key[5];
+	std::vector<uint8_t> m_key;
 	bool m_locked;
 };
 

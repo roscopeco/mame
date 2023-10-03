@@ -1,6 +1,6 @@
 // license:BSD-3-Clause
 // copyright-holders:Dirk Best, hap
-/***************************************************************************
+/*******************************************************************************
 
     Saitek OSA Expansion Slot
 
@@ -22,7 +22,7 @@
     NMI-P     >
     V+        >
 
-***************************************************************************/
+*******************************************************************************/
 
 #ifndef MAME_BUS_SAITEKOSA_EXPANSION_H
 #define MAME_BUS_SAITEKOSA_EXPANSION_H
@@ -31,10 +31,12 @@
 
 #include "screen.h"
 
+DECLARE_DEVICE_TYPE(SAITEKOSA_EXPANSION, saitekosa_expansion_device)
 
-//**************************************************************************
+
+//******************************************************************************
 //  TYPE DEFINITIONS
-//**************************************************************************
+//******************************************************************************
 
 class device_saitekosa_expansion_interface;
 
@@ -111,7 +113,7 @@ public:
 	virtual void ack_w(int state) { }
 	virtual void pw_w(int state) { }
 
-	virtual u32 screen_update(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect) { return UPDATE_HAS_NOT_CHANGED; }
+	virtual u32 screen_update(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect) { return 0; }
 
 protected:
 	device_saitekosa_expansion_interface(const machine_config &mconfig, device_t &device);
@@ -121,8 +123,5 @@ protected:
 
 void saitekosa_expansion_modules(device_slot_interface &device);
 
-
-// device type definition
-DECLARE_DEVICE_TYPE(SAITEKOSA_EXPANSION, saitekosa_expansion_device)
 
 #endif // MAME_BUS_SAITEKOSA_EXPANSION_H

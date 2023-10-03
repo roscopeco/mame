@@ -340,7 +340,6 @@ void c1551_device::device_add_mconfig(machine_config &config)
 	m_maincpu->set_addrmap(AS_PROGRAM, &c1551_device::c1551_mem);
 	m_maincpu->read_callback().set(FUNC(c1551_device::port_r));
 	m_maincpu->write_callback().set(FUNC(c1551_device::port_w));
-	//config.set_perfect_quantum(m_maincpu); FIXME: not safe in a slot device - add barriers
 
 	PLS100(config, m_pla);
 
@@ -439,7 +438,7 @@ void c1551_device::device_start()
 	m_leds.resolve();
 
 	// allocate timers
-	m_irq_timer = timer_alloc();
+	m_irq_timer = timer_alloc(FUNC(c1551_device::irq_timer_tick), this);
 	m_irq_timer->adjust(attotime::zero, CLEAR_LINE);
 
 	// install image callbacks
@@ -475,10 +474,10 @@ void c1551_device::device_reset()
 
 
 //-------------------------------------------------
-//  device_timer - handler timer events
+//  irq_timer_tick - update IRQ line state
 //-------------------------------------------------
 
-void c1551_device::device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr)
+TIMER_CALLBACK_MEMBER(c1551_device::irq_timer_tick)
 {
 	m_maincpu->set_input_line(M6502_IRQ_LINE, param);
 

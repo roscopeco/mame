@@ -18,7 +18,6 @@
 
 #include "emu.h"
 #include "82937.h"
-#include "coreutil.h"
 
 // Debugging
 #define VERBOSE 0
@@ -84,7 +83,7 @@ void hp82937_io_card_device::clear_service()
 	m_translator->clear_service();
 }
 
-WRITE_LINE_MEMBER(hp82937_io_card_device::reset_w)
+void hp82937_io_card_device::reset_w(int state)
 {
 	m_cpu->set_input_line(INPUT_LINE_RESET , state);
 	if (state) {
@@ -93,7 +92,7 @@ WRITE_LINE_MEMBER(hp82937_io_card_device::reset_w)
 	}
 }
 
-READ_LINE_MEMBER(hp82937_io_card_device::t0_r)
+int hp82937_io_card_device::t0_r()
 {
 	return m_iatn;
 }
@@ -180,7 +179,7 @@ void hp82937_io_card_device::latch_w(uint8_t data)
 	update_data_out();
 }
 
-WRITE_LINE_MEMBER(hp82937_io_card_device::ieee488_ctrl_w)
+void hp82937_io_card_device::ieee488_ctrl_w(int state)
 {
 	update_signals();
 	update_data_out();

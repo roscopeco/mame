@@ -51,7 +51,7 @@ public:
 	uint8_t data_r(offs_t offset);
 	void data_w(offs_t offset, uint8_t data);
 
-	DECLARE_WRITE_LINE_MEMBER( write_out2 );
+	void write_out2(int state);
 
 	void at_8042_set_outport(uint8_t data, int initial);
 	void at_8042_receive(uint8_t data, bool mouse = false);
@@ -64,12 +64,11 @@ protected:
 	virtual void device_start() override;
 	virtual void device_reset() override;
 	virtual void device_add_mconfig(machine_config &config) override;
-	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
 	virtual ioport_constructor device_input_ports() const override;
 
-	void mouse_enqueue(uint8_t value);
+	TIMER_CALLBACK_MEMBER(update_timer);
 
-	static const device_timer_id TIMER_UPDATE = 0;
+	void mouse_enqueue(uint8_t value);
 
 private:
 	uint8_t m_inport;
@@ -114,7 +113,7 @@ private:
 	optional_ioport m_mousebtn_port;
 
 	kbdc8042_type_t     m_keybtype;
-	kbdc8042_interrupt_type_t	m_interrupttype;
+	kbdc8042_interrupt_type_t   m_interrupttype;
 
 	devcb_write_line    m_system_reset_cb;
 	devcb_write_line    m_gate_a20_cb;
@@ -130,7 +129,7 @@ private:
 
 	emu_timer *         m_update_timer;
 
-	DECLARE_WRITE_LINE_MEMBER( keyboard_w );
+	void keyboard_w(int state);
 };
 
 // device type definition

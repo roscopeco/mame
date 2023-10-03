@@ -11,8 +11,12 @@
 *********************************************************************/
 
 #include "formats/g64_dsk.h"
+#include "imageutl.h"
 
 #include "ioprocs.h"
+#include "multibyte.h"
+
+#include "osdcore.h" // osd_printf_*
 
 
 #define G64_FORMAT_HEADER   "GCR-1541"
@@ -29,19 +33,19 @@ const uint32_t g64_format::c1541_cell_size[] =
 	3250  // 16MHz/13/4
 };
 
-int g64_format::identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants)
+int g64_format::identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants) const
 {
 	char h[8];
 
 	size_t actual;
 	io.read_at(0, h, 8, actual);
 	if (!memcmp(h, G64_FORMAT_HEADER, 8))
-		return 100;
+		return FIFID_SIGN;
 
 	return 0;
 }
 
-bool g64_format::load(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants, floppy_image *image)
+bool g64_format::load(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants, floppy_image *image) const
 {
 	uint64_t size;
 	if (io.length(size))
@@ -69,7 +73,7 @@ bool g64_format::load(util::random_read &io, uint32_t form_factor, const std::ve
 
 		uint32_t tpos = POS_TRACK_OFFSET + (track * 4);
 		uint32_t spos = tpos + (track_count * 4);
-		uint32_t dpos = pick_integer_le(&img[0], tpos, 4);
+		uint32_t dpos = get_u32le(&img[tpos]);
 
 		if (!dpos)
 			continue;
@@ -80,7 +84,7 @@ bool g64_format::load(util::random_read &io, uint32_t form_factor, const std::ve
 			return false;
 		}
 
-		uint32_t speed_zone = pick_integer_le(&img[0], spos, 4);
+		uint32_t speed_zone = get_u32le(&img[spos]);
 
 		if (speed_zone > 3)
 		{
@@ -88,7 +92,7 @@ bool g64_format::load(util::random_read &io, uint32_t form_factor, const std::ve
 			return false;
 		}
 
-		uint16_t track_bytes = pick_integer_le(&img[0], dpos, 2);
+		uint16_t track_bytes = get_u16le(&img[dpos]);
 		int track_size = track_bytes * 8;
 
 		LOG_FORMATS("head %u track %u offs %u size %u cell %ld\n", head, cylinder, dpos, track_bytes, 200000000L/track_size);
@@ -116,7 +120,7 @@ int g64_format::generate_bitstream(int track, int head, int speed_zone, std::vec
 	return ((actual_cell_size >= cell_size-10) && (actual_cell_size <= cell_size+10)) ? speed_zone : -1;
 }
 
-bool g64_format::save(util::random_read_write &io, const std::vector<uint32_t> &variants, floppy_image *image)
+bool g64_format::save(util::random_read_write &io, const std::vector<uint32_t> &variants, floppy_image *image) const
 {
 	uint8_t const zerofill[] = { 0x00, 0x00, 0x00, 0x00 };
 	std::vector<uint8_t> const prefill(TRACK_LENGTH, 0xff);
@@ -170,9 +174,9 @@ bool g64_format::save(util::random_read_write &io, const std::vector<uint32_t> &
 			uint8_t speed_offset[4];
 			uint8_t track_length[2];
 
-			place_integer_le(track_offset, 0, 4, dpos);
-			place_integer_le(speed_offset, 0, 4, speed_zone);
-			place_integer_le(track_length, 0, 2, packed.size());
+			put_u32le(track_offset, dpos);
+			put_u32le(speed_offset, speed_zone);
+			put_u16le(track_length, packed.size());
 
 			io.write_at(tpos, track_offset, 4, actual);
 			io.write_at(spos, speed_offset, 4, actual);
@@ -202,4 +206,4 @@ const char *g64_format::extensions() const
 	return "g64,g41,g71";
 }
 
-const floppy_format_type FLOPPY_G64_FORMAT = &floppy_image_format_creator<g64_format>;
+const g64_format FLOPPY_G64_FORMAT;

@@ -81,7 +81,7 @@ ASCII/EBCDIC control character recognition, timed interrupts and more.
 
 
 Known issues:
-- MESS does currently not handle all these model specific features.
+- MAME does currently not handle all these model specific features.
 
 
 History:
@@ -241,7 +241,7 @@ void ins8250_uart_device::clear_int(int flag)
 	update_interrupt();
 }
 
-READ_LINE_MEMBER(ins8250_uart_device::intrpt_r)
+int ins8250_uart_device::intrpt_r()
 {
 	return !BIT(m_regs.iir, 0);
 }
@@ -603,31 +603,31 @@ void ins8250_uart_device::update_msr()
 		trigger_int(COM_INT_PENDING_MODEM_STATUS_REGISTER);
 }
 
-WRITE_LINE_MEMBER(ins8250_uart_device::dcd_w)
+void ins8250_uart_device::dcd_w(int state)
 {
 	m_dcd = state;
 	update_msr();
 }
 
-WRITE_LINE_MEMBER(ins8250_uart_device::dsr_w)
+void ins8250_uart_device::dsr_w(int state)
 {
 	m_dsr = state;
 	update_msr();
 }
 
-WRITE_LINE_MEMBER(ins8250_uart_device::ri_w)
+void ins8250_uart_device::ri_w(int state)
 {
 	m_ri = state;
 	update_msr();
 }
 
-WRITE_LINE_MEMBER(ins8250_uart_device::cts_w)
+void ins8250_uart_device::cts_w(int state)
 {
 	m_cts = state;
 	update_msr();
 }
 
-WRITE_LINE_MEMBER(ins8250_uart_device::rx_w)
+void ins8250_uart_device::rx_w(int state)
 {
 	m_rxd = state;
 
@@ -637,12 +637,6 @@ WRITE_LINE_MEMBER(ins8250_uart_device::rx_w)
 
 void ins8250_uart_device::device_start()
 {
-	m_out_tx_cb.resolve_safe();
-	m_out_dtr_cb.resolve_safe();
-	m_out_rts_cb.resolve_safe();
-	m_out_int_cb.resolve_safe();
-	m_out_out1_cb.resolve_safe();
-	m_out_out2_cb.resolve_safe();
 	set_tra_rate(0);
 	set_rcv_rate(0);
 
@@ -689,7 +683,7 @@ void ins8250_uart_device::device_reset()
 
 void ns16550_device::device_start()
 {
-	m_timeout = timer_alloc();
+	m_timeout = timer_alloc(FUNC(ns16550_device::timeout_expired), this);
 	ins8250_uart_device::device_start();
 	save_item(NAME(m_rintlvl));
 	save_item(NAME(m_rfifo));
@@ -713,13 +707,10 @@ void ns16550_device::device_reset()
 	ins8250_uart_device::device_reset();
 }
 
-void ns16550_device::device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr)
+TIMER_CALLBACK_MEMBER(ns16550_device::timeout_expired)
 {
-	if(!id)
-	{
-		trigger_int(COM_INT_PENDING_CHAR_TIMEOUT);
-		m_timeout->adjust(attotime::never);
-	}
+	trigger_int(COM_INT_PENDING_CHAR_TIMEOUT);
+	m_timeout->adjust(attotime::never);
 }
 
 void ns16550_device::push_tx(u8 data)

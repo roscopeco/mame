@@ -130,7 +130,7 @@ uint8_t mc1502_fdc_device::mc1502_wd17xx_motor_r()
 	return motor_on;
 }
 
-WRITE_LINE_MEMBER(mc1502_fdc_device::mc1502_fdc_irq_drq)
+void mc1502_fdc_device::mc1502_fdc_irq_drq(int state)
 {
 	if (state)
 		m_isa->set_ready(CLEAR_LINE); // deassert I/O CH RDY
@@ -217,7 +217,7 @@ void mc1502_fdc_device::device_start()
 	m_isa->install_device(0x0048, 0x004b, read8sm_delegate(*m_fdc, FUNC(fd1793_device::read)), write8sm_delegate(*m_fdc, FUNC(fd1793_device::write)));
 	m_isa->install_device(0x004c, 0x004f, read8sm_delegate(*this, FUNC(mc1502_fdc_device::mc1502_fdcv2_r)), write8sm_delegate(*this, FUNC(mc1502_fdc_device::mc1502_fdc_w)));
 
-	motor_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(mc1502_fdc_device::motor_callback),this));
+	motor_timer = timer_alloc(FUNC(mc1502_fdc_device::motor_callback), this);
 	motor_on = 0;
 	m_control = 0;
 }

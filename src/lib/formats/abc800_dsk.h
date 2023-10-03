@@ -24,12 +24,12 @@ public:
 	virtual const char *extensions() const override;
 
 protected:
-	virtual void build_sector_description(const format &d, uint8_t *sectdata, desc_s *sectors, int track, int head) const override;
+	virtual int get_image_offset(const format &f, int head, int track) const override;
 
 private:
 	static const format formats[];
 };
 
-extern const floppy_format_type FLOPPY_ABC800_FORMAT;
+extern const abc800_format FLOPPY_ABC800_FORMAT;
 
 #endif // MAME_FORMATS_ABC800_DSK_H

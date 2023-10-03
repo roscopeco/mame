@@ -107,10 +107,10 @@ isa8_device::isa8_device(const machine_config &mconfig, const char *tag, device_
 isa8_device::isa8_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock) :
 	device_t(mconfig, type, tag, owner, clock),
 	device_memory_interface(mconfig, *this),
-	m_mem_config("ISA 8-bit mem", ENDIANNESS_LITTLE, 8, 24, 0, address_map_constructor()),
-	m_io_config("ISA 8-bit I/O", ENDIANNESS_LITTLE, 8, 16, 0, address_map_constructor()),
-	m_mem16_config("ISA 16-bit mem", ENDIANNESS_LITTLE, 16, 24, 0, address_map_constructor()),
-	m_io16_config("ISA 16-bit I/O", ENDIANNESS_LITTLE, 16, 16, 0, address_map_constructor()),
+	m_mem_config("mem8", ENDIANNESS_LITTLE, 8, 24, 0, address_map_constructor()),
+	m_io_config("io8", ENDIANNESS_LITTLE, 8, 16, 0, address_map_constructor()),
+	m_mem16_config("mem16", ENDIANNESS_LITTLE, 16, 24, 0, address_map_constructor()),
+	m_io16_config("io16", ENDIANNESS_LITTLE, 16, 16, 0, address_map_constructor()),
 	m_memspace(*this, finder_base::DUMMY_TAG, -1),
 	m_iospace(*this, finder_base::DUMMY_TAG, -1),
 	m_memwidth(0),
@@ -223,20 +223,6 @@ void isa8_device::device_config_complete()
 
 void isa8_device::device_resolve_objects()
 {
-	// resolve callbacks
-	m_write_iochrdy.resolve_safe();
-	m_write_iochck.resolve_safe();
-
-	m_out_irq2_cb.resolve_safe();
-	m_out_irq3_cb.resolve_safe();
-	m_out_irq4_cb.resolve_safe();
-	m_out_irq5_cb.resolve_safe();
-	m_out_irq6_cb.resolve_safe();
-	m_out_irq7_cb.resolve_safe();
-	m_out_drq1_cb.resolve_safe();
-	m_out_drq2_cb.resolve_safe();
-	m_out_drq3_cb.resolve_safe();
-
 	m_iowidth = m_iospace->data_width();
 	m_memwidth = m_memspace->data_width();
 }
@@ -361,6 +347,11 @@ void isa8_device::install_bank(offs_t start, offs_t end, uint8_t *data)
 	m_memspace->install_ram(start, end, data);
 }
 
+void isa8_device::install_bank(offs_t start, offs_t end, memory_bank *bank)
+{
+	m_memspace->install_readwrite_bank(start, end, bank);
+}
+
 void isa8_device::unmap_bank(offs_t start, offs_t end)
 {
 	m_memspace->unmap_readwrite(start, end);
@@ -396,17 +387,17 @@ void isa8_device::unmap_readwrite(offs_t start, offs_t end)
 }
 
 // interrupt request from isa card
-WRITE_LINE_MEMBER( isa8_device::irq2_w ) { m_out_irq2_cb(state); }
-WRITE_LINE_MEMBER( isa8_device::irq3_w ) { m_out_irq3_cb(state); }
-WRITE_LINE_MEMBER( isa8_device::irq4_w ) { m_out_irq4_cb(state); }
-WRITE_LINE_MEMBER( isa8_device::irq5_w ) { m_out_irq5_cb(state); }
-WRITE_LINE_MEMBER( isa8_device::irq6_w ) { m_out_irq6_cb(state); }
-WRITE_LINE_MEMBER( isa8_device::irq7_w ) { m_out_irq7_cb(state); }
+void isa8_device::irq2_w(int state) { m_out_irq2_cb(state); }
+void isa8_device::irq3_w(int state) { m_out_irq3_cb(state); }
+void isa8_device::irq4_w(int state) { m_out_irq4_cb(state); }
+void isa8_device::irq5_w(int state) { m_out_irq5_cb(state); }
+void isa8_device::irq6_w(int state) { m_out_irq6_cb(state); }
+void isa8_device::irq7_w(int state) { m_out_irq7_cb(state); }
 
 // dma request from isa card
-WRITE_LINE_MEMBER( isa8_device::drq1_w ) { m_out_drq1_cb(state); }
-WRITE_LINE_MEMBER( isa8_device::drq2_w ) { m_out_drq2_cb(state); }
-WRITE_LINE_MEMBER( isa8_device::drq3_w ) { m_out_drq3_cb(state); }
+void isa8_device::drq1_w(int state) { m_out_drq1_cb(state); }
+void isa8_device::drq2_w(int state) { m_out_drq2_cb(state); }
+void isa8_device::drq3_w(int state) { m_out_drq3_cb(state); }
 
 uint8_t isa8_device::dack_r(int line)
 {
@@ -460,7 +451,7 @@ void isa8_device::nmi()
 
 device_isa8_card_interface::device_isa8_card_interface(const machine_config &mconfig, device_t &device)
 	: device_interface(device, "isa"),
-		m_isa(nullptr), m_isa_dev(nullptr), m_next(nullptr)
+		m_isa(nullptr), m_isa_dev(nullptr)
 {
 }
 
@@ -514,27 +505,6 @@ isa16_device::isa16_device(const machine_config &mconfig, const char *tag, devic
 	m_out_drq6_cb(*this),
 	m_out_drq7_cb(*this)
 {
-}
-
-//-------------------------------------------------
-//  device_start - device-specific startup
-//-------------------------------------------------
-
-void isa16_device::device_start()
-{
-	isa8_device::device_start();
-
-	// resolve callbacks
-	m_out_irq10_cb.resolve_safe();
-	m_out_irq11_cb.resolve_safe();
-	m_out_irq12_cb.resolve_safe();
-	m_out_irq14_cb.resolve_safe();
-	m_out_irq15_cb.resolve_safe();
-
-	m_out_drq0_cb.resolve_safe();
-	m_out_drq5_cb.resolve_safe();
-	m_out_drq6_cb.resolve_safe();
-	m_out_drq7_cb.resolve_safe();
 }
 
 template<typename R, typename W> void isa16_device::install16_device(offs_t start, offs_t end, R rhandler, W whandler)
@@ -591,50 +561,48 @@ void isa16_device::io16_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 
 uint16_t isa16_device::mem16_swap_r(offs_t offset, uint16_t mem_mask)
 {
-	uint16_t rv;
-	mem_mask = (mem_mask<<8) | (mem_mask>>8);
+	mem_mask = swapendian_int16(mem_mask);
 
-	rv = m_memspace->read_word(offset<<1, mem_mask);
+	uint16_t rv = m_memspace->read_word(offset<<1, mem_mask);
 
-	return (rv<<8) | (rv>>8);
+	return swapendian_int16(rv);
 }
 
 void isa16_device::mem16_swap_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 {
-	mem_mask = (mem_mask<<8) | (mem_mask>>8);
-	data = (data<<8) | (data>>8);
+	mem_mask = swapendian_int16(mem_mask);
+	data = swapendian_int16(data);
 	m_memspace->write_word(offset<<1, data, mem_mask);
 }
 
 uint16_t isa16_device::io16_swap_r(offs_t offset, uint16_t mem_mask)
 {
-	uint16_t rv;
-	mem_mask = (mem_mask<<8) | (mem_mask>>8);
+	mem_mask = swapendian_int16(mem_mask);
 
-	rv = m_iospace->read_word(offset<<1, mem_mask);
+	uint16_t rv = m_iospace->read_word(offset<<1, mem_mask);
 
-	return (rv<<8) | (rv>>8);
+	return swapendian_int16(rv);
 }
 
 void isa16_device::io16_swap_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 {
-	mem_mask = (mem_mask<<8) | (mem_mask>>8);
-	data = (data<<8) | (data>>8);
+	mem_mask = swapendian_int16(mem_mask);
+	data = swapendian_int16(data);
 	m_iospace->write_word(offset<<1, data, mem_mask);
 }
 
 // interrupt request from isa card
-WRITE_LINE_MEMBER( isa16_device::irq10_w ) { m_out_irq10_cb(state); }
-WRITE_LINE_MEMBER( isa16_device::irq11_w ) { m_out_irq11_cb(state); }
-WRITE_LINE_MEMBER( isa16_device::irq12_w ) { m_out_irq12_cb(state); }
-WRITE_LINE_MEMBER( isa16_device::irq14_w ) { m_out_irq14_cb(state); }
-WRITE_LINE_MEMBER( isa16_device::irq15_w ) { m_out_irq15_cb(state); }
+void isa16_device::irq10_w(int state) { m_out_irq10_cb(state); }
+void isa16_device::irq11_w(int state) { m_out_irq11_cb(state); }
+void isa16_device::irq12_w(int state) { m_out_irq12_cb(state); }
+void isa16_device::irq14_w(int state) { m_out_irq14_cb(state); }
+void isa16_device::irq15_w(int state) { m_out_irq15_cb(state); }
 
 // dma request from isa card
-WRITE_LINE_MEMBER( isa16_device::drq0_w ) { m_out_drq0_cb(state); }
-WRITE_LINE_MEMBER( isa16_device::drq5_w ) { m_out_drq5_cb(state); }
-WRITE_LINE_MEMBER( isa16_device::drq6_w ) { m_out_drq6_cb(state); }
-WRITE_LINE_MEMBER( isa16_device::drq7_w ) { m_out_drq7_cb(state); }
+void isa16_device::drq0_w(int state) { m_out_drq0_cb(state); }
+void isa16_device::drq5_w(int state) { m_out_drq5_cb(state); }
+void isa16_device::drq6_w(int state) { m_out_drq6_cb(state); }
+void isa16_device::drq7_w(int state) { m_out_drq7_cb(state); }
 
 uint16_t isa16_device::dack16_r(int line)
 {

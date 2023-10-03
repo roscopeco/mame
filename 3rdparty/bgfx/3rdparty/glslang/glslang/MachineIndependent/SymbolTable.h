@@ -69,6 +69,8 @@
 #include "../Include/intermediate.h"
 #include "../Include/InfoSink.h"
 
+#include <cstdint>
+
 namespace glslang {
 
 //
@@ -84,7 +86,7 @@ typedef TVector<const char*> TExtensionList;
 class TSymbol {
 public:
     POOL_ALLOCATOR_NEW_DELETE(GetThreadPoolAllocator())
-    explicit TSymbol(const TString *n) :  name(n), extensions(0), writable(true) { }
+    explicit TSymbol(const TString *n) :  name(n), uniqueId(0), extensions(0), writable(true) { }
     virtual TSymbol* clone() const = 0;
     virtual ~TSymbol() { }  // rely on all symbol owned memory coming from the pool
 
@@ -117,7 +119,7 @@ public:
     virtual int getNumExtensions() const { return extensions == nullptr ? 0 : (int)extensions->size(); }
     virtual const char** getExtensions() const { return extensions->data(); }
 
-#if !defined(GLSLANG_WEB) && !defined(GLSLANG_ANGLE)
+#if !defined(GLSLANG_WEB)
     virtual void dump(TInfoSink& infoSink, bool complete = false) const = 0;
     void dumpExtensions(TInfoSink& infoSink) const;
 #endif
@@ -196,7 +198,7 @@ public:
     }
     virtual const char** getMemberExtensions(int member) const { return (*memberExtensions)[member].data(); }
 
-#if !defined(GLSLANG_WEB) && !defined(GLSLANG_ANGLE)
+#if !defined(GLSLANG_WEB)
     virtual void dump(TInfoSink& infoSink, bool complete = false) const;
 #endif
 
@@ -224,7 +226,7 @@ struct TParameter {
     TString *name;
     TType* type;
     TIntermTyped* defaultValue;
-    void copyParam(const TParameter& param)
+    TParameter& copyParam(const TParameter& param)
     {
         if (param.name)
             name = NewPoolTString(param.name->c_str());
@@ -232,6 +234,7 @@ struct TParameter {
             name = 0;
         type = param.type->clone();
         defaultValue = param.defaultValue;
+        return *this;
     }
     TBuiltInVariable getDeclaredBuiltIn() const { return type->getQualifier().declaredBuiltIn; }
 };
@@ -328,7 +331,7 @@ public:
     virtual const TSpirvInstruction& getSpirvInstruction() const { return spirvInst; }
 #endif
 
-#if !defined(GLSLANG_WEB) && !defined(GLSLANG_ANGLE)
+#if !defined(GLSLANG_WEB)
     virtual void dump(TInfoSink& infoSink, bool complete = false) const override;
 #endif
 
@@ -394,7 +397,7 @@ public:
     virtual const char** getExtensions() const override { return anonContainer.getMemberExtensions(memberNumber); }
 
     virtual int getAnonId() const { return anonId; }
-#if !defined(GLSLANG_WEB) && !defined(GLSLANG_ANGLE)
+#if !defined(GLSLANG_WEB)
     virtual void dump(TInfoSink& infoSink, bool complete = false) const override;
 #endif
 
@@ -413,13 +416,20 @@ public:
     TSymbolTableLevel() : defaultPrecision(0), anonId(0), thisLevel(false) { }
     ~TSymbolTableLevel();
 
-    bool insert(TSymbol& symbol, bool separateNameSpaces)
+    bool insert(const TString& name, TSymbol* symbol) {
+        return level.insert(tLevelPair(name, symbol)).second;
+    }
+
+    bool insert(TSymbol& symbol, bool separateNameSpaces, const TString& forcedKeyName = TString())
     {
         //
         // returning true means symbol was added to the table with no semantic errors
         //
         const TString& name = symbol.getName();
-        if (name == "") {
+        if (forcedKeyName.length()) {
+            return level.insert(tLevelPair(forcedKeyName, &symbol)).second;
+        }
+        else if (name == "") {
             symbol.getAsVariable()->setAnonId(anonId++);
             // An empty name means an anonymous container, exposing its members to the external scope.
             // Give it a name and insert its members in the symbol table, pointing to the container.
@@ -469,6 +479,16 @@ public:
         }
 
         return true;
+    }
+
+    void retargetSymbol(const TString& from, const TString& to) {
+        tLevel::const_iterator fromIt = level.find(from);
+        tLevel::const_iterator toIt = level.find(to);
+        if (fromIt == level.end() || toIt == level.end())
+            return;
+        delete fromIt->second;
+        level[from] = toIt->second;
+        retargetedSymbols.push_back({from, to});
     }
 
     TSymbol* find(const TString& name) const
@@ -564,7 +584,7 @@ public:
 
     void relateToOperator(const char* name, TOperator op);
     void setFunctionExtensions(const char* name, int num, const char* const extensions[]);
-#if !defined(GLSLANG_WEB) && !defined(GLSLANG_ANGLE)
+#if !defined(GLSLANG_WEB)
     void dump(TInfoSink& infoSink, bool complete = false) const;
 #endif
     TSymbolTableLevel* clone() const;
@@ -583,6 +603,8 @@ protected:
 
     tLevel level;  // named mappings
     TPrecisionQualifier *defaultPrecision;
+    // pair<FromName, ToName>
+    TVector<std::pair<TString, TString>> retargetedSymbols;
     int anonId;
     bool thisLevel;  // True if this level of the symbol table is a structure scope containing member function
                      // that are supposed to see anonymous access to member variables.
@@ -788,6 +810,12 @@ public:
         return symbol;
     }
 
+    void retargetSymbol(const TString& from, const TString& to) {
+        int level = currentLevel();
+        table[level]->retargetSymbol(from, to);
+    }
+
+
     // Find of a symbol that returns how many layers deep of nested
     // structures-with-member-functions ('this' scopes) deep the symbol was
     // found in.
@@ -886,7 +914,7 @@ public:
     }
 
     long long getMaxSymbolId() { return uniqueId; }
-#if !defined(GLSLANG_WEB) && !defined(GLSLANG_ANGLE)
+#if !defined(GLSLANG_WEB)
     void dump(TInfoSink& infoSink, bool complete = false) const;
 #endif
     void copyTable(const TSymbolTable& copyOf);

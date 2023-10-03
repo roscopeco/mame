@@ -1,10 +1,10 @@
 // license:BSD-3-Clause
 // copyright-holders:hap
-/***************************************************************************
+/*******************************************************************************
 
     Saitek OSA Module: Kasparov Maestro/Analyst
 
-***************************************************************************/
+*******************************************************************************/
 
 #ifndef MAME_BUS_SAITEKOSA_MAESTRO_H
 #define MAME_BUS_SAITEKOSA_MAESTRO_H
@@ -15,6 +15,9 @@
 
 #include "bus/generic/slot.h"
 #include "video/hd44780.h"
+
+DECLARE_DEVICE_TYPE(OSA_MAESTRO, saitekosa_maestro_device)
+DECLARE_DEVICE_TYPE(OSA_ANALYST, saitekosa_analyst_device)
 
 
 class saitekosa_maestro_device : public device_t, public device_saitekosa_expansion_interface
@@ -69,19 +72,16 @@ public:
 
 	virtual u32 screen_update(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect) override;
 
+	static auto parent_rom_device_type() { return &OSA_MAESTRO; }
+
 protected:
 	virtual const tiny_rom_entry *device_rom_region() const override;
 	virtual void device_add_mconfig(machine_config &config) override;
-	virtual void device_config_complete() override;
 
 private:
 	required_device<hd44780_device> m_lcd;
 
 	virtual void main_map(address_map &map) override;
 };
-
-
-DECLARE_DEVICE_TYPE(OSA_MAESTRO, saitekosa_maestro_device)
-DECLARE_DEVICE_TYPE(OSA_ANALYST, saitekosa_analyst_device)
 
 #endif // MAME_BUS_SAITEKOSA_MAESTRO_H

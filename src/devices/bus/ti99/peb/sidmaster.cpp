@@ -24,14 +24,14 @@
 #include "emu.h"
 #include "sidmaster.h"
 
-#define LOG_WARN       (1U<<1)
-#define LOG_WRITE      (1U<<2)
+#define LOG_WARN       (1U << 1)
+#define LOG_WRITE      (1U << 2)
 
-#define VERBOSE ( LOG_GENERAL | LOG_WARN )
+#define VERBOSE (LOG_GENERAL | LOG_WARN)
 
 #include "logmacro.h"
 
-DEFINE_DEVICE_TYPE_NS(TI99_SIDMASTER, bus::ti99::peb, sidmaster_device, "ti99_sidmaster", "SID Master 99")
+DEFINE_DEVICE_TYPE(TI99_SIDMASTER, bus::ti99::peb::sidmaster_device, "ti99_sidmaster", "SID Master 99")
 
 namespace bus::ti99::peb {
 

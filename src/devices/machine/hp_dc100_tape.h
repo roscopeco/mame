@@ -13,26 +13,21 @@
 
 #pragma once
 
+#include "imagedev/magtape.h"
+
 #include "formats/hti_tape.h"
 
-class hp_dc100_tape_device : public device_t,
-							 public device_image_interface
+class hp_dc100_tape_device : public microtape_image_device
 {
 public:
 	// Construction
 	hp_dc100_tape_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
 
-	// device_image_interface overrides
-	virtual image_init_result call_load() override;
-	virtual image_init_result call_create(int format_type, util::option_resolution *format_options) override;
+	// device_image_interface implementation
+	virtual std::pair<std::error_condition, std::string> call_load() override;
+	virtual std::pair<std::error_condition, std::string> call_create(int format_type, util::option_resolution *format_options) override;
 	virtual void call_unload() override;
 	virtual std::string call_display() override;
-	virtual iodevice_t image_type() const noexcept override { return IO_MAGTAPE; }
-	virtual bool is_readable() const noexcept override { return true; }
-	virtual bool is_writeable() const noexcept override { return true; }
-	virtual bool is_creatable() const noexcept override { return true; }
-	virtual bool must_be_loaded() const noexcept override { return false; }
-	virtual bool is_reset_on_load() const noexcept override { return false; }
 	virtual const char *file_extensions() const noexcept override;
 
 	// **** Units ****
@@ -105,10 +100,14 @@ public:
 	auto wr_bit() { return m_wr_bit_handler.bind(); }
 
 protected:
-	// device-level overrides
+	// device_t implementation
 	virtual void device_start() override;
 	virtual void device_reset() override;
-	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
+
+	TIMER_CALLBACK_MEMBER(bit_timer_tick);
+	TIMER_CALLBACK_MEMBER(tacho_timer_tick);
+	TIMER_CALLBACK_MEMBER(hole_timer_tick);
+	TIMER_CALLBACK_MEMBER(motion_timer_tick);
 
 private:
 	devcb_write_line m_cart_out_handler;
@@ -158,7 +157,7 @@ private:
 	bool m_image_dirty;
 
 	void clear_state();
-	image_init_result internal_load(bool is_create);
+	std::pair<std::error_condition, std::string> internal_load(bool is_create);
 	void set_tape_present(bool present);
 	double compute_set_point(tape_speed_t speed , bool fwd) const;
 	void start_tape();

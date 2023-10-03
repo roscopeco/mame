@@ -60,14 +60,15 @@ public:
 
 	uint8_t read();
 
-	DECLARE_READ_LINE_MEMBER(da_r) { return m_da; }
+	int da_r() { return m_da; }
 
 protected:
 	mm74c922_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock, int max_y);
 
 	// device-level overrides
 	virtual void device_start() override;
-	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
+
+	TIMER_CALLBACK_MEMBER(perform_scan);
 
 private:
 	void change_output_lines();

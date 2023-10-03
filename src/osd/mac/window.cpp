@@ -20,14 +20,13 @@
 #include "emu.h"
 #include "emuopts.h"
 #include "render.h"
+#include "screen.h"
 #include "ui/uimain.h"
 
 // OSD headers
 
 #include "window.h"
 #include "osdmac.h"
-#include "modules/render/drawbgfx.h"
-#include "modules/render/drawogl.h"
 #include "modules/monitor/monitor_common.h"
 
 //============================================================
@@ -68,18 +67,6 @@ bool mac_osd_interface::window_init()
 {
 	osd_printf_verbose("Enter macwindow_init\n");
 
-	// initialize the drawers
-
-	switch (video_config.mode)
-	{
-		case VIDEO_MODE_BGFX:
-			renderer_bgfx::init(machine());
-			break;
-		case VIDEO_MODE_OPENGL:
-			renderer_ogl::init(machine());
-			break;
-	}
-
 	// set up the window list
 	osd_printf_verbose("Leave macwindow_init\n");
 	return true;
@@ -88,7 +75,7 @@ bool mac_osd_interface::window_init()
 
 void mac_osd_interface::update_slider_list()
 {
-	for (auto window : osd_common_t::s_window_list)
+	for (auto const &window : osd_common_t::window_list())
 	{
 		// check if any window has dirty sliders
 		if (window->renderer().sliders_dirty())
@@ -103,11 +90,20 @@ void mac_osd_interface::build_slider_list()
 {
 	m_sliders.clear();
 
-	for (auto window : osd_common_t::s_window_list)
+	for (auto const &window : osd_common_t::window_list())
 	{
 		std::vector<ui::menu_item> window_sliders = window->renderer().get_slider_list();
 		m_sliders.insert(m_sliders.end(), window_sliders.begin(), window_sliders.end());
 	}
+}
+
+void mac_osd_interface::process_events()
+{
+}
+
+bool mac_osd_interface::has_focus() const
+{
+	return true;
 }
 
 //============================================================
@@ -122,23 +118,11 @@ void mac_osd_interface::window_exit()
 	// free all the windows
 	while (!osd_common_t::s_window_list.empty())
 	{
-		auto window = osd_common_t::s_window_list.front();
-
-		// Part of destroy removes the window from the list
+		auto window = std::move(osd_common_t::s_window_list.back());
+		s_window_list.pop_back();
 		window->destroy();
 	}
 
-	switch(video_config.mode)
-	{
-		case VIDEO_MODE_BGFX:
-			renderer_bgfx::exit();
-			break;
-		case VIDEO_MODE_OPENGL:
-			renderer_ogl::exit();
-			break;
-		default:
-			break;
-	}
 	osd_printf_verbose("Leave macwindow_exit\n");
 }
 
@@ -217,8 +201,6 @@ void mac_window_info::toggle_full_screen()
 		m_windowed_dim = get_size();
 	}
 
-	// reset UI to main menu
-	machine().ui().menu_reset();
 	// kill off the drawers
 	renderer_reset();
 	if (fullscreen() && video_config.switchres)
@@ -229,7 +211,7 @@ void mac_window_info::toggle_full_screen()
 
 	downcast<mac_osd_interface &>(machine().osd()).release_keys();
 
-	set_renderer(osd_renderer::make_for_type(video_config.mode, shared_from_this()));
+	renderer_create();
 
 	// toggle the window mode
 	set_fullscreen(!fullscreen());
@@ -311,7 +293,7 @@ int mac_window_info::window_init()
 
 	create_target();
 
-	set_renderer(osd_renderer::make_for_type(video_config.mode, static_cast<osd_window*>(this)->shared_from_this()));
+	renderer_create();
 
 	result = complete_create();
 
@@ -558,24 +540,6 @@ int mac_window_info::complete_create()
 	}
 
 	set_platform_window(window);
-
-	// set main window
-	if (index() > 0)
-	{
-		for (auto w : osd_common_t::s_window_list)
-		{
-			if (w->index() == 0)
-			{
-				set_main_window(std::dynamic_pointer_cast<osd_window>(w));
-				break;
-			}
-		}
-	}
-	else
-	{
-		// We must be the main window
-		set_main_window(shared_from_this());
-	}
 
 	// update monitor resolution after mode change to ensure proper pixel aspect
 	monitor()->refresh();
@@ -882,10 +846,11 @@ osd_dim mac_window_info::get_max_bounds(int constrain)
 
 mac_window_info::mac_window_info(
 		running_machine &a_machine,
+		render_module &renderprovider,
 		int index,
 		std::shared_ptr<osd_monitor_info> a_monitor,
 		const osd_window_config *config)
-	: osd_window_t(a_machine, index, a_monitor, *config)
+	: osd_window_t(a_machine, renderprovider, index, a_monitor, *config)
 	, m_startmaximized(0)
 	// Following three are used by input code to defer resizes
 	, m_minimum_dim(0, 0)

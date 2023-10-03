@@ -7,7 +7,7 @@
 #pragma once
 
 #include "cdrom.h"
-#include "imagedev/chd_cd.h"
+#include "imagedev/cdromimg.h"
 #include "machine/timer.h"
 #include "sound/cdda.h"
 
@@ -82,7 +82,7 @@ private:
 	{
 		int32_t size; // size of block
 		int32_t FAD;  // FAD on disc
-		uint8_t data[CD_MAX_SECTOR_DATA];
+		uint8_t data[cdrom_file::MAX_SECTOR_DATA];
 		uint8_t chan; // channel
 		uint8_t fnum; // file number
 		uint8_t subm; // subchannel mode
@@ -119,7 +119,7 @@ private:
 	};
 
 	int get_track_index(uint32_t fad);
-	int sega_cdrom_get_adr_control(cdrom_file *file, int track);
+	int sega_cdrom_get_adr_control(int track);
 	void cr_standard_return(uint16_t cur_status);
 	void mpeg_standard_return(uint16_t cur_status);
 	void cd_free_block(blockT *blktofree);
@@ -138,8 +138,6 @@ private:
 	blockT *cd_alloc_block(uint8_t *blknum);
 	partitionT *cd_filterdata(filterT *flt, int trktype, uint8_t *p_ok);
 	partitionT *cd_read_filtered_sector(int32_t fad, uint8_t *p_ok);
-
-	cdrom_file *cdrom;// = (cdrom_file *)nullptr;
 
 	// local variables
 	partitionT partitions[MAX_FILTERS];

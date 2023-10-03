@@ -2,7 +2,7 @@
 // copyright-holders:Aaron Giles, Vas Crabb
 /***************************************************************************
 
-    unzip.c
+    unzip.cpp
 
     Functions to manipulate data within ZIP files.
 
@@ -13,6 +13,7 @@
 #include "corestr.h"
 #include "hashing.h"
 #include "ioprocs.h"
+#include "multibyte.h"
 #include "timeconv.h"
 
 #include "osdcore.h"
@@ -31,6 +32,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <mutex>
+#include <optional>
 #include <ratio>
 #include <utility>
 #include <vector>
@@ -210,12 +212,9 @@ public:
 
 	std::chrono::system_clock::time_point current_last_modified() const noexcept
 	{
-		if (!m_header.modified_cached)
-		{
+		if (!m_header.modified)
 			m_header.modified = decode_dos_time(m_header.modified_date, m_header.modified_time);
-			m_header.modified_cached = true;
-		}
-		return m_header.modified;
+		return *m_header.modified;
 	}
 
 	std::uint32_t current_crc() const noexcept { return m_header.crc; }
@@ -293,26 +292,29 @@ private:
 
 	struct file_header
 	{
+	private:
+		using optional_time_point = std::optional<std::chrono::system_clock::time_point>;
+
+	public:
 		file_header() noexcept { }
 		file_header(file_header const &) = default;
 		file_header(file_header &&) noexcept = default;
 		file_header &operator=(file_header const &) = default;
 		file_header &operator=(file_header &&) noexcept = default;
 
-		std::uint16_t                                   version_created;        // version made by
-		std::uint16_t                                   version_needed;         // version needed to extract
-		std::uint16_t                                   bit_flag;               // general purpose bit flag
-		std::uint16_t                                   compression;            // compression method
-		mutable std::chrono::system_clock::time_point   modified;               // last mod file date/time
-		std::uint32_t                                   crc;                    // crc-32
-		std::uint64_t                                   compressed_length;      // compressed size
-		std::uint64_t                                   uncompressed_length;    // uncompressed size
-		std::uint32_t                                   start_disk_number;      // disk number start
-		std::uint64_t                                   local_header_offset;    // relative offset of local header
-		std::string                                     file_name;              // file name
+		std::uint16_t               version_created;        // version made by
+		std::uint16_t               version_needed;         // version needed to extract
+		std::uint16_t               bit_flag;               // general purpose bit flag
+		std::uint16_t               compression;            // compression method
+		mutable optional_time_point modified;               // last mod file date/time
+		std::uint32_t               crc;                    // crc-32
+		std::uint64_t               compressed_length;      // compressed size
+		std::uint64_t               uncompressed_length;    // uncompressed size
+		std::uint32_t               start_disk_number;      // disk number start
+		std::uint64_t               local_header_offset;    // relative offset of local header
+		std::string                 file_name;              // file name
 
-		std::uint16_t                                   modified_date, modified_time;
-		mutable bool                                    modified_cached;
+		std::uint16_t               modified_date, modified_time;
 	};
 
 	// contains extracted end of central directory information
@@ -392,29 +394,15 @@ protected:
 	}
 	std::uint16_t read_word(std::size_t offs) const noexcept
 	{
-		return
-				(std::uint16_t(m_buffer[offs + 1]) << 8) |
-				(std::uint16_t(m_buffer[offs + 0]) << 0);
+		return get_u16le(&m_buffer[offs]);
 	}
 	std::uint32_t read_dword(std::size_t offs) const noexcept
 	{
-		return
-				(std::uint32_t(m_buffer[offs + 3]) << 24) |
-				(std::uint32_t(m_buffer[offs + 2]) << 16) |
-				(std::uint32_t(m_buffer[offs + 1]) << 8) |
-				(std::uint32_t(m_buffer[offs + 0]) << 0);
+		return get_u32le(&m_buffer[offs]);
 	}
 	std::uint64_t read_qword(std::size_t offs) const noexcept
 	{
-		return
-				(std::uint64_t(m_buffer[offs + 7]) << 56) |
-				(std::uint64_t(m_buffer[offs + 6]) << 48) |
-				(std::uint64_t(m_buffer[offs + 5]) << 40) |
-				(std::uint64_t(m_buffer[offs + 4]) << 32) |
-				(std::uint64_t(m_buffer[offs + 3]) << 24) |
-				(std::uint64_t(m_buffer[offs + 2]) << 16) |
-				(std::uint64_t(m_buffer[offs + 1]) << 8) |
-				(std::uint64_t(m_buffer[offs + 0]) << 0);
+		return get_u64le(&m_buffer[offs]);
 	}
 	std::string read_string(std::size_t offs, std::string::size_type len) const
 	{
@@ -592,17 +580,17 @@ public:
 		, m_compressed_size(header.compressed_size())
 		, m_header_offset(header.header_offset())
 		, m_start_disk(header.start_disk())
-		, m_offs_compressed_size(~m_uncompressed_size ? 0 : 8)
-		, m_offs_header_offset(m_offs_compressed_size + (~m_compressed_size ? 0 : 8))
-		, m_offs_start_disk(m_offs_header_offset + (~m_header_offset ? 0 : 8))
-		, m_offs_end(m_offs_start_disk + (~m_start_disk ? 0 : 4))
+		, m_offs_compressed_size((0xffff'ffffU != m_uncompressed_size) ? 0 : 8)
+		, m_offs_header_offset(m_offs_compressed_size + ((0xffff'ffffU != m_compressed_size) ? 0 : 8))
+		, m_offs_start_disk(m_offs_header_offset + ((0xffff'ffffU != m_header_offset) ? 0 : 8))
+		, m_offs_end(m_offs_start_disk + ((0xffffU != m_start_disk) ? 0 : 4))
 	{
 	}
 
-	std::uint64_t   uncompressed_size() const noexcept  { return ~m_uncompressed_size ? m_uncompressed_size : read_qword(0x00); }
-	std::uint64_t   compressed_size() const noexcept    { return ~m_compressed_size ? m_compressed_size : read_qword(m_offs_compressed_size); }
-	std::uint64_t   header_offset() const noexcept      { return ~m_header_offset ? m_header_offset : read_qword(m_offs_header_offset); }
-	std::uint32_t   start_disk() const noexcept         { return ~m_start_disk ? m_start_disk : read_dword(m_offs_start_disk); }
+	std::uint64_t   uncompressed_size() const noexcept  { return (0xffff'ffffU != m_uncompressed_size) ? m_uncompressed_size : read_qword(0x00); }
+	std::uint64_t   compressed_size() const noexcept    { return (0xffff'ffffU != m_compressed_size) ? m_compressed_size : read_qword(m_offs_compressed_size); }
+	std::uint64_t   header_offset() const noexcept      { return (0xffff'ffffU != m_header_offset) ? m_header_offset : read_qword(m_offs_header_offset); }
+	std::uint32_t   start_disk() const noexcept         { return (0xffffU != m_start_disk) ? m_start_disk : read_dword(m_offs_start_disk); }
 
 	std::size_t total_length() const noexcept { return minimum_length() + m_offs_end; }
 	static constexpr std::size_t minimum_length() { return 0x00; }
@@ -798,7 +786,7 @@ int zip_file_impl::search(std::uint32_t search_crc, std::string_view search_file
 			// don't immediately decode DOS timestamp - it's expensive
 			header.modified_date       = reader.modified_date();
 			header.modified_time       = reader.modified_time();
-			header.modified_cached     = false;
+			header.modified            = std::nullopt;
 
 			// copy the filename
 			bool is_utf8(general_flag_reader(header.bit_flag).utf8_encoding());
@@ -850,7 +838,6 @@ int zip_file_impl::search(std::uint32_t search_crc, std::string_view search_file
 							try
 							{
 								header.modified = system_clock_time_point_from_ntfs_duration(ticks);
-								header.modified_cached = true;
 							}
 							catch (...)
 							{
@@ -1013,7 +1000,7 @@ std::error_condition zip_file_impl::read_ecd() noexcept
 		// if we found it, fill out the data
 		if (offset >= 0)
 		{
-			osd_printf_verbose("unzip: found %s ECD\n", m_filename);
+			osd_printf_verbose("unzip: found %s ECD at %d\n", m_filename, offset);
 
 			// extract ECD info
 			ecd_reader const ecd_rd(buffer.get() + offset);
@@ -1388,8 +1375,8 @@ std::error_condition zip_file_impl::decompress_data_type_14(std::uint64_t offset
 
 	// reset the stream
 	ISzAlloc alloc_imp;
-	alloc_imp.Alloc = [] (void *p, std::size_t size) -> void * { return size ? std::malloc(size) : nullptr; };
-	alloc_imp.Free = [] (void *p, void *address) -> void { std::free(address); };
+	alloc_imp.Alloc = [] (ISzAllocPtr p, std::size_t size) -> void * { return size ? std::malloc(size) : nullptr; };
+	alloc_imp.Free = [] (ISzAllocPtr p, void *address) -> void { std::free(address); };
 	CLzmaDec stream;
 	LzmaDec_Construct(&stream);
 
@@ -1418,7 +1405,7 @@ std::error_condition zip_file_impl::decompress_data_type_14(std::uint64_t offset
 				m_header.file_name, m_filename);
 		return archive_file::error::FILE_TRUNCATED;
 	}
-	std::uint16_t const props_size((std::uint16_t(m_buffer[3]) << 8) | std::uint16_t(m_buffer[2]));
+	std::uint16_t const props_size(get_u16le(&m_buffer[2]));
 	if (props_size > m_buffer.size())
 	{
 		osd_printf_error(

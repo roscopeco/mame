@@ -38,17 +38,17 @@ public:
 	uint8_t read();
 	void write(uint8_t data);
 
-	DECLARE_WRITE_LINE_MEMBER( ds0_w );
-	DECLARE_WRITE_LINE_MEMBER( ds1_w );
-	DECLARE_WRITE_LINE_MEMBER( drv_sel_w );
-	DECLARE_WRITE_LINE_MEMBER( mode_sel_w );
-	DECLARE_WRITE_LINE_MEMBER( rw_sel_w );
-	DECLARE_WRITE_LINE_MEMBER( mtr0_w );
-	DECLARE_WRITE_LINE_MEMBER( mtr1_w );
-	DECLARE_WRITE_LINE_MEMBER( odd_hd_w );
-	DECLARE_WRITE_LINE_MEMBER( pull_sync_w );
+	void ds0_w(int state);
+	void ds1_w(int state);
+	void drv_sel_w(int state);
+	void mode_sel_w(int state);
+	void rw_sel_w(int state);
+	void mtr0_w(int state);
+	void mtr1_w(int state);
+	void odd_hd_w(int state);
+	void pull_sync_w(int state);
 
-	DECLARE_READ_LINE_MEMBER( wps_r ) { return checkpoint_live.drv_sel ? m_floppy1->wpt_r() : m_floppy0->wpt_r(); }
+	int wps_r() { return checkpoint_live.drv_sel ? m_floppy1->wpt_r() : m_floppy0->wpt_r(); }
 
 	void stp0_w(int stp);
 	void stp1_w(int stp);
@@ -60,10 +60,11 @@ protected:
 	// device-level overrides
 	virtual void device_start() override;
 	virtual void device_reset() override;
-	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
 
 	// optional information overrides
 	virtual const tiny_rom_entry *device_rom_region() const override;
+
+	TIMER_CALLBACK_MEMBER(update_state);
 
 	void stp_w(floppy_image_device *floppy, int mtr, int &old_stp, int stp);
 

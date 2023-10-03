@@ -17,14 +17,15 @@ parameter animation, some things can only be done with scripting.  MAME uses an
 event-based model.  Scripts can supply functions that will be called after
 certain events, or when certain data is required.
 
-Layout scripting requires the layout plugin to be enabled.  For example, to run
-BWB Double Take with the Lua script in the layout enabled, you might use this
-command::
+Layout scripting requires the :ref:`layout plugin <plugins-layout>` to be
+enabled.  For example, to run BWB Double Take with the Lua script in the layout
+enabled, you might use this command::
 
     mame -plugins -plugin layout v4dbltak
 
-If you may want to add the settings to enable the layout plugin to an INI file
-to save having to enable it every time you start a system.
+You may want to add the settings to enable the layout plugin to an INI file to
+save having to enable it every time you start a system.  See :ref:`plugins` for
+more information about using plugins with MAME.
 
 
 .. _layscript-examples:
@@ -35,9 +36,8 @@ Practical examples
 Before diving into the technical details of how it works, we’ll start with some
 example layout files using Lua script for enhancement.  It’s assumed that you’re
 familiar with MAME’s artwork system and have a basic understanding of Lua
-scripting.  For details on MAME’s layout file, see :ref:`layfile`; for an
-introduction to Lua scripting in MAME, see :ref:`luaengine`; for detailed
-descriptions of MAME’s Lua classes, see :ref:`luareference`.
+scripting.  For details on MAME’s layout file, see :ref:`layfile`;  for detailed
+descriptions of MAME’s Lua interface, see :ref:`luascript`.
 
 .. _layscript-examples-espial:
 
@@ -187,19 +187,21 @@ as a function by the layout plugin when the layout file is loaded.  The layout
 views have been built at this point, but the emulated system has not finished
 starting.  In particular, it’s not safe to access inputs and outputs at this
 time.  The key variable in the script environment is ``file``, which gives the
-script access to its layout file.
+script access to its :ref:`layout file <luascript-ref-renderlayfile>`.
 
 We supply a function to be called after tags in the layout file have been
 resolved.  At this point, the emulated system will have completed starting.
 This function does the following tasks:
 
-* Looks up the two I/O ports used for player input.  I/O ports can be looked up
-  by tag relative to the device that caused the layout file to be loaded.
-* Looks up the two view items used to display joystick state.  Views can be
-  looked up by name (i.e. value of the ``name`` attribute), and items within a
-  view can be looked up by ID (i.e. the value of the ``id`` attribute).
+* Looks up the two :ref:`I/O ports <luascript-ref-ioport>` used for player
+  input.  I/O ports can be looked up by tag relative to the device that caused
+  the layout file to be loaded.
+* Looks up the two :ref:`view items <luascript-ref-renderlayitem>` used to
+  display joystick state.  Views can be looked up by name (i.e. value of the
+  ``name`` attribute), and items within a view can be looked up by ID (i.e. the
+  value of the ``id`` attribute).
 * Supplies a function to be called before view items are added to the render
-  target.
+  target when drawing a frame.
 * Hides the warning that reminds the user to enable the layout plugin by setting
   the element state for the item to 0 (the text component is only drawn when
   the element state is 1).
@@ -258,7 +260,7 @@ Here’s our layout file:
                 <bounds x="0" y="0" width="0.1" height="0.1" />
                 <color alpha="0" />
             </rect>
-            <!-- draw the outlined of a square -->
+            <!-- draw the outline of a square -->
             <rect><bounds x="0.02" y="0.02" width="0.06" height="0.01" /></rect>
             <rect><bounds x="0.02" y="0.07" width="0.06" height="0.01" /></rect>
             <rect><bounds x="0.02" y="0.02" width="0.01" height="0.06" /></rect>
@@ -288,7 +290,7 @@ Here’s our layout file:
             <element id="vertical" ref="line">
                 <!-- element draws a vertical line, no need to rotate it -->
                 <orientation rotate="0" />
-                <!-- centre it in the square horizotnally, using the full height -->
+                <!-- centre it in the square horizontally, using the full height -->
                 <bounds x="4.55" y="1.9" width="0.1" height="1" />
             </element>
 
@@ -300,7 +302,7 @@ Here’s our layout file:
                 <bounds x="4.1" y="2.35" width="1" height="0.1" />
             </element>
 
-            <!-- draw a small box at the intersection of the vertical and horiztonal lines -->
+            <!-- draw a small box at the intersection of the vertical and horizontal lines -->
             <element id="box" ref="box">
                 <bounds x="4.55" y="2.35" width="0.1" height="0.1" />
             </element>
@@ -413,20 +415,20 @@ Here’s our layout file:
 The layout has a ``script`` element containing the Lua script, to be called as a
 function by the layout plugin when the layout file is loaded.  This happens
 after the layout views have been build, but before the emulated system has
-finished starting.  The layout file object is supplied to the script in the
-``file`` variable.
+finished starting.  The :ref:`layout file <luascript-ref-renderlayfile>` object
+is supplied to the script in the ``file`` variable.
 
 We supply a function to be called after tags in the layout file have been
 resolved.  This function does the following:
 
-* Looks up the analog axis inputs.
-* Looks up the view item that draws the outline of area where the yoke position
-  is displayed.
+* Looks up the analog axis :ref:`inputs <luascript-ref-ioport>`.
+* Looks up the :ref:`view item <luascript-ref-renderlayitem>` that draws the
+  outline of area where the yoke position is displayed.
 * Declares some variables to hold calculated values across function calls.
 * Supplies a function to be called when the view’s dimensions have been
   recomputed.
 * Supplies a function to be called before adding view items to the render
-  container.
+  container when drawing a frame.
 * Supplies functions that will supply the bounds for the animated items.
 * Hides the warning that reminds the user to enable the layout plugin by setting
   the element state for the item to 0 (the text component is only drawn when
@@ -471,18 +473,23 @@ The layout script environment
 The Lua environment is provided by the layout plugin.  It’s fairly minimal, only
 providing what’s needed:
 
-* ``file`` giving the script’s layout file object.  Has a ``device`` property
-  for obtaining the device that caused the layout file to be loaded, and a
-  ``views`` property for obtaining the layout’s views (indexed by name).
-* ``machine`` giving MAME’s current running machine.
-* ``emu.render_bounds`` and ``emu.render_color`` functions for creating bounds
-  and colour objects.
-* ``emu.print_error``, ``emu.print_info`` and ``emu.print_debug`` functions for
-  diagnostic output.
-* Standard Lua ``pairs``, ``ipairs``, ``table.insert`` and ``table.remove``
-  functions for manipulating tables and other containers.
+* ``file`` giving the script’s :ref:`layout file <luascript-ref-renderlayfile>`
+  object.  Has a ``device`` property for obtaining the :ref:`device
+  <luascript-ref-device>` that caused the layout file to be loaded, and a
+  ``views`` property for obtaining the layout’s :ref:`views
+  <luascript-ref-renderlayview>` (indexed by name).
+* ``machine`` giving MAME’s current :ref:`running machine
+  <luascript-ref-machine>`.
+* ``emu.attotime``, ``emu.render_bounds`` and ``emu.render_color`` functions for
+  creating :ref:`attotime <luascript-ref-attotime>`, :ref:`bounds
+  <luascript-ref-renderbounds>` and :ref:`colour <luascript-ref-rendercolor>`
+  objects.
+* ``emu.print_verbose``, ``emu.print_error``, ``emu.print_warning``,
+  ``emu.print_info`` and ``emu.print_debug`` functions for diagnostic output.
+* Standard Lua ``tonumber``, ``tostring``, ``pairs`` and ``ipairs`` functions,
+  and ``table`` and ``string`` objects for manipulating strings, tables and
+  other containers.
 * Standard Lua ``print`` function for text output to the console.
-* Standard Lua ``string.format`` function for string formatting.
 
 
 .. _layscript-events:
@@ -594,7 +601,7 @@ Get item bounds
     argument to restore the default bounds handler (based on the item’s
     animation state and ``bounds`` child elements).
 Get item colour
-    ``item::set_color_callback(cb)``
+    ``item:set_color_callback(cb)``
 
     Set callback for getting the item’s colour (the element texture’s colours
     multiplied by this colour).  Do not attempt to access the item’s ``color``
@@ -604,3 +611,59 @@ Get item colour
     ARGB colour (usually created by calling ``emu.render_color``), and takes no
     parameters.  Call with ``nil`` as the argument to restore the default colour
     handler (based on the item’s animation state and ``color`` child elements).
+Get item horizontal scroll window size
+    ``item:set_scroll_size_x_callback(cb)``
+
+    Set callback for getting the item’s horizontal scroll window size.  This
+    allows the script to control how much of the element is displayed by the
+    item.  Do not attempt to access the item’s ``scroll_size_x`` property from
+    the callback, as it will result in infinite recursion.
+
+    The callback function must return a floating-point number representing the
+    horizontal window size as a proportion of the associated element’s width,
+    and takes no parameters.  A value of 1.0 will display the entire width of
+    the element; smaller values will display proportionally smaller parts of the
+    element.  Call with ``nil`` as the argument to restore the default
+    horizontal scroll window size handler (based on the ``xscroll`` child
+    element).
+Get item vertical scroll window size
+    ``item:set_scroll_size_y_callback(cb)``
+
+    Set callback for getting the item’s vertical scroll window size.  This
+    allows the script to control how much of the element is displayed by the
+    item.  Do not attempt to access the item’s ``scroll_size_y`` property from
+    the callback, as it will result in infinite recursion.
+
+    The callback function must return a floating-point number representing the
+    vertical window size as a proportion of the associated element’s height, and
+    takes no parameters.  A value of 1.0 will display the entire height of the
+    element; smaller values will display proportionally smaller parts of the
+    element.  Call with ``nil`` as the argument to restore the default
+    vertical scroll window size handler (based on the ``xscroll`` child
+    element).
+Get item horizontal scroll position
+    ``item:set_scroll_pos_x_callback(cb)``
+
+    Set callback for getting the item’s horizontal scroll position.  This allows
+    the script to control which part of the element is displayed by the item.
+    Do not attempt to access the item’s ``scroll_pos_x`` property from the
+    callback, as this will result in infinite recursion.
+
+    The callback must return a floating-point number, and takes no parameters.
+    A value of 0.0 aligns the left edge of the element with the left edge of the
+    item; larger values pan right.  Call with ``nil`` as the argument to restore
+    the default horizontal scroll position handler (based on bindings in the
+    ``xscroll`` child element).
+Get item vertical scroll position
+    ``item:set_scroll_pos_y_callback(cb)``
+
+    Set callback for getting the item’s vertical scroll position.  This allows
+    the script to control which part of the element is displayed by the item.
+    Do not attempt to access the item’s ``scroll_pos_y`` property from the
+    callback, as this will result in infinite recursion.
+
+    The callback must return a floating-point number, and takes no parameters.
+    A value of 0.0 aligns the top edge of the element with the top edge of the
+    item; larger values pan down.  Call with ``nil`` as the argument to restore
+    the default vertical scroll position handler (based on bindings in the
+    ``yscroll`` child element).

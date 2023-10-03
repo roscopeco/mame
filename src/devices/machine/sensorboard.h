@@ -34,12 +34,13 @@ public:
 	sensorboard_device &set_ui_enable(bool b) { if (!b) m_maxspawn = 0; m_ui_enabled = (b) ? 7 : 0; return *this; } // enable UI inputs
 	sensorboard_device &set_mod_enable(bool b) { if (b) m_ui_enabled |= 1; else m_ui_enabled &= ~1; return *this; } // enable modifier keys
 
-	auto init_cb() { return m_custom_init_cb.bind(); } // for setting pieces starting position
-	auto sensor_cb() { return m_custom_sensor_cb.bind(); } // x = offset & 0xf, y = offset >> 4 & 0xf
-	auto spawn_cb() { return m_custom_spawn_cb.bind(); } // spawnpoint/piece = offset, retval = new piece id
-	auto output_cb() { return m_custom_output_cb.bind(); } // pos = offset(A8 for ui/board, A9 for count), id = data
+	auto clear_cb() { return m_clear_cb.bind(); } // 0 = internal clear, 1 = user presses clear
+	auto init_cb() { return m_init_cb.bind(); } // for setting pieces starting position
+	auto sensor_cb() { return m_sensor_cb.bind(); } // x = offset & 0xf, y = offset >> 4 & 0xf
+	auto spawn_cb() { return m_spawn_cb.bind(); } // spawnpoint/piece = offset, retval = new piece id
+	auto output_cb() { return m_output_cb.bind(); } // pos = offset(A8 for ui/board, A9 for count), id = data
 
-	void preset_chess(int state); // init_cb() preset for chessboards
+	void preset_chess(int state = 0); // init_cb() preset for chessboards
 
 	// read sensors
 	u8 read_sensor(u8 x, u8 y);
@@ -51,7 +52,7 @@ public:
 	// handle board state
 	u8 read_piece(u8 x, u8 y) { return m_curstate[y * m_width + x]; }
 	void write_piece(u8 x, u8 y, u8 id) { m_curstate[y * m_width + x] = id; }
-	void clear_board() { memset(m_curstate, 0, sizeof(m_curstate)); }
+	void clear_board(int state = 0) { memset(m_curstate, 0, sizeof(m_curstate)); } // default clear_cb()
 
 	void refresh();
 	void cancel_sensor();
@@ -59,6 +60,7 @@ public:
 	// handle pieces
 	void cancel_hand();
 	void remove_hand();
+	int get_handpos() { return m_handpos; }
 	bool drop_piece(u8 x, u8 y);
 	bool pickup_piece(u8 x, u8 y);
 
@@ -85,9 +87,9 @@ protected:
 
 	// device_nvram_interface overrides
 	virtual void nvram_default() override;
-	virtual void nvram_read(emu_file &file) override;
-	virtual void nvram_write(emu_file &file) override;
-	virtual bool nvram_can_write() override;
+	virtual bool nvram_read(util::read_stream &file) override;
+	virtual bool nvram_write(util::write_stream &file) override;
+	virtual bool nvram_can_write() const override;
 
 private:
 	output_finder<0x10, 0x10> m_out_piece;
@@ -98,10 +100,11 @@ private:
 	required_ioport m_inp_ui;
 	required_ioport m_inp_conf;
 
-	devcb_write_line m_custom_init_cb;
-	devcb_read8 m_custom_sensor_cb;
-	devcb_read8 m_custom_spawn_cb;
-	devcb_write16 m_custom_output_cb;
+	devcb_write_line m_clear_cb;
+	devcb_write_line m_init_cb;
+	devcb_read8 m_sensor_cb;
+	devcb_read8 m_spawn_cb;
+	devcb_write16 m_output_cb;
 
 	bool m_nosensors;
 	bool m_magnets;
@@ -128,7 +131,7 @@ private:
 	u32 m_usize;
 
 	bool m_nvram_auto;
-	bool nvram_on();
+	bool nvram_on() const;
 
 	emu_timer *m_undotimer;
 	TIMER_CALLBACK_MEMBER(undo_tick);

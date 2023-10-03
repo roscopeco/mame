@@ -21,7 +21,7 @@ ROM_START(hp98543)
 	ROM_LOAD("1818-3907.bin", 0x000000, 0x002000, CRC(5e2bf02a) SHA1(9ba9391cf39624ef8027ce42c84e100344b2a2b8))
 ROM_END
 
-DEFINE_DEVICE_TYPE_NS(HPDIO_98543, bus::hp_dio, dio16_98543_device, "dio98543", "HP98543 medium-res color DIO video card")
+DEFINE_DEVICE_TYPE(HPDIO_98543, bus::hp_dio::dio16_98543_device, "dio98543", "HP98543 medium-res color DIO video card")
 
 namespace bus::hp_dio {
 
@@ -166,31 +166,31 @@ void dio16_98543_device::vram_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 		tc->vram_w(offset, data, mem_mask);
 }
 
-WRITE_LINE_MEMBER(dio16_98543_device::vblank_w)
+void dio16_98543_device::vblank_w(int state)
 {
 	for (auto &tc: m_topcat)
 		tc->vblank_w(state);
 }
 
-WRITE_LINE_MEMBER(dio16_98543_device::int0_w)
+void dio16_98543_device::int0_w(int state)
 {
 	m_ints[0] = state;
 	update_int();
 }
 
-WRITE_LINE_MEMBER(dio16_98543_device::int1_w)
+void dio16_98543_device::int1_w(int state)
 {
 	m_ints[1] = state;
 	update_int();
 }
 
-WRITE_LINE_MEMBER(dio16_98543_device::int2_w)
+void dio16_98543_device::int2_w(int state)
 {
 	m_ints[2] = state;
 	update_int();
 }
 
-WRITE_LINE_MEMBER(dio16_98543_device::int3_w)
+void dio16_98543_device::int3_w(int state)
 {
 
 	m_ints[3] = state;

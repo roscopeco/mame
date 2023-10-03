@@ -29,13 +29,16 @@
  *
  */
 
-#include "flopimg.h"
+#include "flopimg_legacy.h"
 #include "imageutl.h"
 
 #include "ioprocs.h"
+#include "multibyte.h"
 
 
 #define D88_HEADER_LEN 0x2b0
+
+#define SPOT_DUPLICATES 0
 
 struct d88_tag
 {
@@ -69,7 +72,7 @@ static int d88_get_sector_id(floppy_image_legacy *floppy, int head, int track, i
 	x=0;
 	while(x<sector_index)
 	{
-		offset += ((sector_hdr[15] << 8) | sector_hdr[14]);
+		offset += get_u16le(&sector_hdr[14]);
 		offset += 16;
 		floppy_image_read(floppy,sector_hdr,offset,16);
 		x++;
@@ -121,10 +124,10 @@ static floperr_t d88_get_sector_length(floppy_image_legacy *floppy, int head, in
 		if(sector == sector_hdr[2])
 		{
 			if(sector_length)
-				*sector_length = (sector_hdr[15] << 8) | sector_hdr[14];
+				*sector_length = get_u16le(&sector_hdr[14]);
 			return FLOPPY_ERROR_SUCCESS;
 		}
-		len = (sector_hdr[15] << 8) | sector_hdr[14];
+		len = get_u16le(&sector_hdr[14]);
 		len += 16;
 		offset += len;
 	}
@@ -162,7 +165,7 @@ static uint32_t d88_get_sector_offset(floppy_image_legacy* floppy, int head, int
 			LOG_FORMATS("d88_get_sector_offset - track %i, side %i, sector %02x, returns %08x\n",track,head,sector,offset+16);
 			return offset + 16;
 		}
-		len = (sector_hdr[15] << 8) | sector_hdr[14];
+		len = get_u16le(&sector_hdr[14]);
 		len += 16;
 		offset += len;
 	}
@@ -192,7 +195,7 @@ static floperr_t d88_get_indexed_sector_info(floppy_image_legacy *floppy, int he
 	x=0;
 	while(x<sector_index)
 	{
-		offset += ((sector_hdr[15] << 8) | sector_hdr[14]);
+		offset += get_u16le(&sector_hdr[14]);
 		offset += 16;
 		floppy_image_read(floppy,sector_hdr,offset,16);
 		x++;
@@ -202,7 +205,7 @@ static floperr_t d88_get_indexed_sector_info(floppy_image_legacy *floppy, int he
 		return FLOPPY_ERROR_SEEKERROR;
 
 	if(sector_length)
-		*sector_length = (sector_hdr[15] << 8) | sector_hdr[14];
+		*sector_length = get_u16le(&sector_hdr[14]);
 	if(cylinder)
 		*cylinder = sector_hdr[0];
 	if(side)
@@ -276,43 +279,29 @@ static floperr_t d88_write_indexed_sector(floppy_image_legacy *floppy, int head,
 static void d88_get_header(floppy_image_legacy* floppy,uint32_t* size, uint8_t* prot, uint8_t* type, uint32_t* offsets)
 {
 	uint8_t header[D88_HEADER_LEN];
-	int x,s;
 
 	floppy_image_read(floppy,header,0,D88_HEADER_LEN);
 
-#ifdef SPOT_DUPLICATES
+	if(SPOT_DUPLICATES)
+	{
 		// there exist many .d88 files with same data and different headers and
 		// this allows to spot duplicates, making easier to debug softlists.
 		uint32_t temp_size = floppy_image_size(floppy);
-		uint8_t tmp_copy[temp_size - D88_HEADER_LEN];
-		floppy_image_read(floppy,tmp_copy,D88_HEADER_LEN,temp_size - D88_HEADER_LEN);
-		printf("CRC16: %d\n", ccitt_crc16(0xffff, tmp_copy, temp_size - D88_HEADER_LEN));
-#endif
+		auto tmp_copy = std::make_unique<uint8_t[]>(temp_size - D88_HEADER_LEN);
+		floppy_image_read(floppy,tmp_copy.get(),D88_HEADER_LEN,temp_size - D88_HEADER_LEN);
+		printf("CRC16: %d\n", ccitt_crc16(0xffff, tmp_copy.get(), temp_size - D88_HEADER_LEN));
+	}
 
 	if(prot)
 		*prot = header[0x1a];
 	if(type)
 		*type = header[0x1b];
 	if(size)
-	{
-		s = 0;
-		s |= header[0x1f] << 24;
-		s |= header[0x1e] << 16;
-		s |= header[0x1d] << 8;
-		s |= header[0x1c];
-		*size = s;
-	}
+		*size = get_u32le(&header[0x1c]);
 	if(offsets)
 	{
-		for(x=0;x<164;x++)
-		{
-			s = 0;
-			s |= header[0x23 + (x*4)] << 24;
-			s |= header[0x22 + (x*4)] << 16;
-			s |= header[0x21 + (x*4)] << 8;
-			s |= header[0x20 + (x*4)];
-			*(offsets+x) = s;
-		}
+		for(int x=0;x<164;x++)
+			*(offsets+x) = get_u32le(&header[0x20 + (x*4)]);
 	}
 }
 
@@ -415,7 +404,7 @@ const char *d88_format::extensions() const
 	return "d77,d88,1dd";
 }
 
-int d88_format::identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants)
+int d88_format::identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants) const
 {
 	uint64_t size;
 	if(io.length(size))
@@ -426,12 +415,12 @@ int d88_format::identify(util::random_read &io, uint32_t form_factor, const std:
 	io.read_at(0, h, 32, actual);
 	if((little_endianize_int32(*(uint32_t *)(h+0x1c)) == size) &&
 		(h[0x1b] == 0x00 || h[0x1b] == 0x10 || h[0x1b] == 0x20 || h[0x1b] == 0x30 || h[0x1b] == 0x40))
-		return 100;
+		return FIFID_SIZE|FIFID_STRUCT;
 
 	return 0;
 }
 
-bool d88_format::load(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants, floppy_image *image)
+bool d88_format::load(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants, floppy_image *image) const
 {
 	size_t actual;
 
@@ -497,6 +486,7 @@ bool d88_format::load(util::random_read &io, uint32_t form_factor, const std::ve
 			uint8_t sect_data[65536];
 			int sdatapos = 0;
 			int sector_count = 1;
+			uint8_t density = 0;
 			for(int i=0; i<sector_count; i++) {
 
 				if (pos + 16 > file_size)
@@ -516,6 +506,8 @@ bool d88_format::load(util::random_read &io, uint32_t form_factor, const std::ve
 					// Support broken vfman converter
 					if(sector_count == 0x1000)
 						sector_count = 0x10;
+
+					density = hs[6];
 				}
 
 				sects[i].track       = hs[0];
@@ -536,16 +528,13 @@ bool d88_format::load(util::random_read &io, uint32_t form_factor, const std::ve
 					sects[i].data    = nullptr;
 			}
 
-			build_pc_track_mfm(track, head, image, cell_count, sector_count, sects, calc_default_pc_gap3_size(form_factor, sects[0].actual_size));
+			if(density == 0x40)
+				build_pc_track_fm(track, head, image, cell_count / 2, sector_count, sects, calc_default_pc_gap3_size(form_factor, sects[0].actual_size));
+			else
+				build_pc_track_mfm(track, head, image, cell_count, sector_count, sects, calc_default_pc_gap3_size(form_factor, sects[0].actual_size));
 		}
 
 	return true;
-}
-
-
-bool d88_format::save(util::random_read_write &io, const std::vector<uint32_t> &variants, floppy_image *image)
-{
-	return false;
 }
 
 bool d88_format::supports_save() const
@@ -553,4 +542,4 @@ bool d88_format::supports_save() const
 	return false;
 }
 
-const floppy_format_type FLOPPY_D88_FORMAT = &floppy_image_format_creator<d88_format>;
+const d88_format FLOPPY_D88_FORMAT;

@@ -60,7 +60,7 @@ public:
 	// callbacks
 	auto lpstb_handler() { return m_lpstb_handler.bind(); }
 
-	DECLARE_WRITE_LINE_MEMBER(lpstb_w) { m_lpstb_handler(state); }
+	void lpstb_w(int state) { m_lpstb_handler(state); }
 
 	uint8_t ch_r(int channel);
 	uint8_t pb_r();
@@ -81,8 +81,8 @@ private:
 class device_bbc_analogue_interface : public device_interface
 {
 public:
-	virtual uint8_t ch_r(int channel) { return 0x00; };
-	virtual uint8_t pb_r() { return 0x30; };
+	virtual uint8_t ch_r(int channel) { return 0x00; }
+	virtual uint8_t pb_r() { return 0x30; }
 
 protected:
 	device_bbc_analogue_interface(const machine_config &mconfig, device_t &device);

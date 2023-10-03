@@ -21,10 +21,10 @@ public:
 	void write(offs_t offset, uint8_t data) override;
 	void crureadz(offs_t offset, uint8_t *value) override;
 	void cruwrite(offs_t offset, uint8_t data) override;
-	DECLARE_WRITE_LINE_MEMBER(romgq_line) override;
+	void romgq_line(int state) override;
 
 	void set_gromlines(line_state mline, line_state moline, line_state gsq) override;
-	DECLARE_WRITE_LINE_MEMBER(gclock_in) override;
+	void gclock_in(int state) override;
 
 	void insert(int index, ti99_cartridge_device* cart) override;
 	void remove(int index) override;
@@ -42,9 +42,9 @@ protected:
 	virtual ioport_constructor device_input_ports() const override;
 
 	// device_nvram_interface
-	void nvram_default() override;
-	void nvram_read(emu_file &file) override;
-	void nvram_write(emu_file &file) override;
+	virtual void nvram_default() override;
+	virtual bool nvram_read(util::read_stream &file) override;
+	virtual bool nvram_write(util::write_stream &file) override;
 
 private:
 	int     m_gk_switch[6];         // Used to cache the switch settings.

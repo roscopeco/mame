@@ -113,7 +113,6 @@
 #include "bus/interpro/keyboard/keyboard.h"
 #include "bus/interpro/mouse/mouse.h"
 
-#define LOG_GENERAL (1U << 0)
 #define LOG_LINE    (1U << 1)
 #define LOG_BLIT    (1U << 2)
 
@@ -616,9 +615,9 @@ void gt_device_base::device_start()
 	save_item(NAME(m_control));
 
 	// allocate timers
-	m_blit_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(gt_device_base::blit), this));
-	m_line_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(gt_device_base::line), this));
-	m_done_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(gt_device_base::done), this));
+	m_blit_timer = timer_alloc(FUNC(gt_device_base::blit), this);
+	m_line_timer = timer_alloc(FUNC(gt_device_base::line), this);
+	m_done_timer = timer_alloc(FUNC(gt_device_base::done), this);
 }
 
 void gt_device_base::control_w(offs_t offset, u32 data, u32 mem_mask)
@@ -1391,7 +1390,7 @@ void gtdb_device::srx_mapping_w(u32 data)
 	m_bus->install_map(*this, srx_base, srx_base | 0xffffff, &gtdb_device::map_dynamic);
 }
 
-WRITE_LINE_MEMBER(gtdb_device::serial_irq)
+void gtdb_device::serial_irq(int state)
 {
 	if (state)
 		m_mouse_int |= SERIAL;

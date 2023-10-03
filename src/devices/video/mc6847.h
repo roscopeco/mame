@@ -60,17 +60,9 @@ protected:
 	mc6847_friend_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock,
 			const uint8_t *fontdata, bool is_mc6847t1, double tpfs, int field_sync_falling_edge_scanline, int divider, bool supports_partial_body_scanlines);
 
-	// timer constants
-	static constexpr device_timer_id TIMER_FRAME = 0;
-	static constexpr device_timer_id TIMER_HSYNC_OFF = 1;
-	static constexpr device_timer_id TIMER_HSYNC_ON = 2;
-	static constexpr device_timer_id TIMER_FSYNC = 3;
-
 	// fonts
-	static const uint8_t pal_round_fontdata8x12[];
-	static const uint8_t pal_square_fontdata8x12[];
-	static const uint8_t ntsc_round_fontdata8x12[];
-	static const uint8_t ntsc_square_fontdata8x12[];
+	static const uint8_t vdg_t1_fontdata8x12[];
+	static const uint8_t vdg_fontdata8x12[];
 	static const uint8_t semigraphics4_fontdata8x12[];
 	static const uint8_t semigraphics6_fontdata8x12[];
 	static const uint8_t s68047_fontdata8x12[];
@@ -275,13 +267,12 @@ protected:
 
 	// device-level overrides
 	virtual void device_start() override;
-	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
 	virtual void device_reset() override;
 	virtual void device_post_load() override;
 
 	// other overridables
-	virtual void new_frame();
-	virtual void horizontal_sync_changed(bool line);
+	virtual TIMER_CALLBACK_MEMBER(new_frame);
+	virtual TIMER_CALLBACK_MEMBER(horizontal_sync_changed);
 	virtual void field_sync_changed(bool line);
 	virtual void enter_bottom_border();
 	virtual void record_border_scanline(uint16_t physical_scanline);
@@ -291,9 +282,6 @@ protected:
 	// miscellaneous
 	void video_flush();
 	std::string describe_context() const;
-
-	// setup functions
-	emu_timer *setup_timer(device_timer_id id, double offset, double period);
 
 	// converts to B&W
 	static pixel_t black_and_white(rgb_t color)
@@ -499,8 +487,8 @@ private:
 	uint32_t m_partial_scanline_clocks;
 
 	// functions
-	void change_horizontal_sync(bool line);
-	void change_field_sync(bool line);
+	virtual TIMER_CALLBACK_MEMBER(change_horizontal_sync);
+	TIMER_CALLBACK_MEMBER(change_field_sync);
 	void update_field_sync_timer();
 	void next_scanline();
 	int32_t get_clocks_since_hsync();
@@ -524,14 +512,14 @@ public:
 	uint32_t screen_update(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect);
 
 	// mode changing operations
-	DECLARE_WRITE_LINE_MEMBER( ag_w )       { change_mode(MODE_AG, state); }
-	DECLARE_WRITE_LINE_MEMBER( gm2_w )      { change_mode(MODE_GM2, state); }
-	DECLARE_WRITE_LINE_MEMBER( gm1_w )      { change_mode(MODE_GM1, state); }
-	DECLARE_WRITE_LINE_MEMBER( gm0_w )      { change_mode(MODE_GM0, state); }
-	DECLARE_WRITE_LINE_MEMBER( as_w )       { change_mode(MODE_AS, state); }
-	DECLARE_WRITE_LINE_MEMBER( css_w )      { change_mode(MODE_CSS, state); }
-	DECLARE_WRITE_LINE_MEMBER( intext_w )   { change_mode(MODE_INTEXT, state); }
-	DECLARE_WRITE_LINE_MEMBER( inv_w )      { change_mode(MODE_INV, state); }
+	void ag_w(int state)       { change_mode(MODE_AG, state); }
+	void gm2_w(int state)      { change_mode(MODE_GM2, state); }
+	void gm1_w(int state)      { change_mode(MODE_GM1, state); }
+	void gm0_w(int state)      { change_mode(MODE_GM0, state); }
+	void as_w(int state)       { change_mode(MODE_AS, state); }
+	void css_w(int state)      { change_mode(MODE_CSS, state); }
+	void intext_w(int state)   { change_mode(MODE_INTEXT, state); }
+	void inv_w(int state)      { change_mode(MODE_INV, state); }
 
 protected:
 	mc6847_base_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock, const uint8_t *fontdata, double tpfs);

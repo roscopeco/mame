@@ -59,8 +59,8 @@ device_c64_expansion_card_interface::~device_c64_expansion_card_interface()
 c64_expansion_slot_device::c64_expansion_slot_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
 	device_t(mconfig, C64_EXPANSION_SLOT, tag, owner, clock),
 	device_single_card_slot_interface<device_c64_expansion_card_interface>(mconfig, *this),
-	device_image_interface(mconfig, *this),
-	m_read_dma_cd(*this),
+	device_cartrom_image_interface(mconfig, *this),
+	m_read_dma_cd(*this, 0),
 	m_write_dma_cd(*this),
 	m_write_irq(*this),
 	m_write_nmi(*this),
@@ -77,14 +77,6 @@ c64_expansion_slot_device::c64_expansion_slot_device(const machine_config &mconf
 void c64_expansion_slot_device::device_start()
 {
 	m_card = get_card_device();
-
-	// resolve callbacks
-	m_read_dma_cd.resolve_safe(0);
-	m_write_dma_cd.resolve_safe();
-	m_write_irq.resolve_safe();
-	m_write_nmi.resolve_safe();
-	m_write_dma.resolve_safe();
-	m_write_reset.resolve_safe();
 }
 
 
@@ -101,7 +93,7 @@ void c64_expansion_slot_device::device_reset()
 //  call_load -
 //-------------------------------------------------
 
-image_init_result c64_expansion_slot_device::call_load()
+std::pair<std::error_condition, std::string> c64_expansion_slot_device::call_load()
 {
 	if (m_card)
 	{
@@ -190,13 +182,10 @@ image_init_result c64_expansion_slot_device::call_load()
 		}
 
 		if ((m_card->m_roml_size & (m_card->m_roml_size - 1)) || (m_card->m_romh_size & (m_card->m_romh_size - 1)))
-		{
-			seterror(image_error::INVALIDIMAGE, "ROM size must be power of 2");
-			return image_init_result::FAIL;
-		}
+			return std::make_pair(image_error::INVALIDLENGTH, "ROM size must be power of 2");
 	}
 
-	return image_init_result::PASS;
+	return std::make_pair(std::error_condition(), std::string());
 }
 
 
@@ -360,6 +349,7 @@ void c64_expansion_slot_device::set_passthrough()
 #include "sw8k.h"
 #include "swiftlink.h"
 #include "system3.h"
+#include "tibdd001.h"
 #include "tdos.h"
 #include "turbo232.h"
 #include "vizastar.h"
@@ -368,6 +358,7 @@ void c64_expansion_slot_device::set_passthrough()
 #include "westermann.h"
 #include "xl80.h"
 #include "zaxxon.h"
+#include "z80videopak.h"
 
 void c64_expansion_cards(device_slot_interface &device)
 {
@@ -391,6 +382,7 @@ void c64_expansion_cards(device_slot_interface &device)
 	device.option_add("speakez", C64_SPEAKEASY);
 	device.option_add("supercpu", C64_SUPERCPU);
 	device.option_add("swiftlink", C64_SWIFTLINK);
+	device.option_add("tibdd001", C64_TIB_DD_001);
 	device.option_add("turbo232", C64_TURBO232);
 	device.option_add("buscard", C64_BUSCARD);
 	device.option_add("buscard2", C64_BUSCARD2);
@@ -443,4 +435,5 @@ void c64_expansion_cards(device_slot_interface &device)
 	device.option_add_internal("westermann", C64_WESTERMANN);
 	device.option_add_internal("zaxxon", C64_ZAXXON);
 	device.option_add_internal("xl80", C64_XL80);
+	device.option_add_internal("z80videopak", C64_Z80VIDEOPAK);
 }

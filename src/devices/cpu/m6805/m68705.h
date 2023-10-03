@@ -48,7 +48,7 @@ public:
 		, m_options(0)
 		, m_divisor(7)
 		, m_source(CLOCK)
-		, m_timer(false)
+		, m_timer(true)
 	{
 	}
 
@@ -129,9 +129,8 @@ public:
 	auto portb_w() { return m_port_cb_w[1].bind(); }
 	auto portc_w() { return m_port_cb_w[2].bind(); }
 
-	WRITE_LINE_MEMBER(timer_w) { m_timer.timer_w(state); }
+	void timer_w(int state) { m_timer.timer_w(state); }
 
-protected:
 	// state index constants
 	enum
 	{
@@ -162,6 +161,7 @@ protected:
 		M68705_MOR
 	};
 
+protected:
 	static unsigned const PORT_COUNT = 4;
 
 	m6805_hmos_device(machine_config const &mconfig, char const *tag, device_t *owner, u32 clock, device_type type, u32 addr_width, unsigned ram_size);
@@ -260,8 +260,8 @@ protected:
 	virtual void device_reset() override;
 	virtual void execute_set_input(int inputnum, int state) override;
 	virtual void nvram_default() override;
-	virtual void nvram_read(emu_file &file) override;
-	virtual void nvram_write(emu_file &file) override;
+	virtual bool nvram_read(util::read_stream &file) override;
+	virtual bool nvram_write(util::write_stream &file) override;
 
 	u8 *const get_user_rom() const { return &m_user_rom[0]; }
 	virtual u8 get_mask_options() const = 0;
@@ -335,18 +335,30 @@ class m6805p2_device : public m6805_mrom_device
 {
 public:
 	m6805p2_device(machine_config const &mconfig, char const *tag, device_t *owner, u32 clock);
+
+	// mask options
+	void set_timer_divisor(unsigned divisor) { m_timer.set_divisor(divisor); }
+	void set_timer_external_source(bool external) { m_timer.set_source(external ? m6805_timer::TIMER : m6805_timer::CLOCK_TIMER); }
 };
 
 class m6805p6_device : public m6805_mrom_device
 {
 public:
 	m6805p6_device(machine_config const &mconfig, char const *tag, device_t *owner, u32 clock);
+
+	// mask options
+	void set_timer_divisor(unsigned divisor) { m_timer.set_divisor(divisor); }
+	void set_timer_external_source(bool external) { m_timer.set_source(external ? m6805_timer::TIMER : m6805_timer::CLOCK_TIMER); }
 };
 
 class m6805r2_device : public m6805_mrom_device
 {
 public:
 	m6805r2_device(machine_config const &mconfig, char const *tag, device_t *owner, u32 clock);
+
+	// mask options
+	void set_timer_divisor(unsigned divisor) { m_timer.set_divisor(divisor); }
+	void set_timer_external_source(bool external) { m_timer.set_source(external ? m6805_timer::TIMER : m6805_timer::CLOCK_TIMER); }
 
 protected:
 	virtual void internal_map(address_map &map) override;
@@ -365,6 +377,10 @@ class m6805u2_device : public m6805_mrom_device
 {
 public:
 	m6805u2_device(machine_config const &mconfig, char const *tag, device_t *owner, u32 clock);
+
+	// mask options
+	void set_timer_divisor(unsigned divisor) { m_timer.set_divisor(divisor); }
+	void set_timer_external_source(bool external) { m_timer.set_source(external ? m6805_timer::TIMER : m6805_timer::CLOCK_TIMER); }
 };
 
 class m6805u3_device : public m6805_mrom_device
@@ -424,6 +440,8 @@ class m68705u3_device : public m68705u_device
 {
 public:
 	m68705u3_device(machine_config const &mconfig, char const *tag, device_t *owner, u32 clock);
+
+	static auto parent_rom_device_type() { return &M68705R3; }
 
 protected:
 	virtual tiny_rom_entry const *device_rom_region() const override;

@@ -338,12 +338,12 @@ void rasterizer_params::compute_equations()
 u32 rasterizer_params::hash() const
 {
 	return m_generic ^
-			rotate(m_alphamode, 0) ^
-			rotate(m_fbzmode, 6) ^
-			rotate(m_fbzcp, 12) ^
-			rotate(m_fogmode, 18) ^
-			rotate(m_texmode0, 24) ^
-			rotate(m_texmode1, 30);
+			rotl_32(m_alphamode, 0) ^
+			rotl_32(m_fbzmode, 6) ^
+			rotl_32(m_fbzcp, 12) ^
+			rotl_32(m_fogmode, 18) ^
+			rotl_32(m_texmode0, 24) ^
+			rotl_32(m_texmode1, 30);
 }
 
 
@@ -1211,9 +1211,9 @@ void rasterizer_palette::compute_ncc(u32 const *regs)
 		s32 q = regs[8 + BIT(index, 0, 2)];
 
 		// add the coloring
-		s32 r = std::clamp(y + (s32(i <<  5) >> 23) + (s32(q <<  5) >> 23), 0, 255);
-		s32 g = std::clamp(y + (s32(i << 14) >> 23) + (s32(q << 14) >> 23), 0, 255);
-		s32 b = std::clamp(y + (s32(i << 23) >> 23) + (s32(q << 23) >> 23), 0, 255);
+		s32 r = std::clamp(y + util::sext(i >> 18, 9) + util::sext(q >> 18, 9), 0, 255);
+		s32 g = std::clamp(y + util::sext(i >>  9, 9) + util::sext(q >>  9, 9), 0, 255);
+		s32 b = std::clamp(y + util::sext(i      , 9) + util::sext(q      , 9), 0, 255);
 
 		// fill in the table
 		m_texel[index] = rgb_t(0xff, r, g, b);
@@ -1245,6 +1245,10 @@ voodoo_renderer::voodoo_renderer(running_machine &machine, u16 tmu_config, const
 {
 	// empty the hash table
 	std::fill(std::begin(m_raster_hash), std::end(m_raster_hash), nullptr);
+
+	// register our arrays
+	register_poly_array(m_textures);
+	register_poly_array(m_palettes);
 
 	// add all predefined rasterizers
 	for (static_rasterizer_info const *info = s_predef_raster_table; info->params.generic() != 0xffffffff; info++)
@@ -1278,7 +1282,7 @@ void voodoo_renderer::register_save(save_proxy &save)
 poly_data &voodoo_renderer::alloc_poly()
 {
 	// allocate poly data and compute the rasterization parameters
-	poly_data &poly = object_data_alloc();
+	poly_data &poly = object_data().next();
 	poly.raster.compute(m_fbi_reg, m_tmu0_reg, m_tmu1_reg);
 	return poly;
 }
@@ -1368,7 +1372,7 @@ inline bool ATTR_FORCE_INLINE voodoo_renderer::stipple_test(thread_stats_block &
 	// rotate mode
 	if (fbzmode.stipple_pattern() == 0)
 	{
-		stipple = (stipple >> 1) | (stipple << 31);
+		stipple = rotr_32(stipple, 1);
 		if (s32(stipple) >= 0)
 		{
 			threadstats.stipple_count++;
@@ -2607,19 +2611,6 @@ void voodoo_renderer::dump_rasterizer_stats()
 		// reset
 		best->display = display_index;
 	}
-}
-
-
-//-------------------------------------------------
-//  reset_after_wait - handle a reset after a
-//  wait operation by resetting our allocated
-//  object queues
-//-------------------------------------------------
-
-void voodoo_renderer::reset_after_wait()
-{
-	m_textures.reset();
-	m_palettes.reset();
 }
 
 

@@ -34,7 +34,7 @@ public:
 
 	uint8_t sdx_status_r();
 	void sdx_control_w(uint8_t data);
-	DECLARE_WRITE_LINE_MEMBER(motor_w);
+	void motor_w(int state);
 
 protected:
 	// construction/destruction
@@ -87,7 +87,7 @@ private:
 
 	required_device<screen_device> m_screen;
 	required_device<palette_device> m_palette;
-	required_device<mc6845_device> m_crtc;
+	required_device<hd6845s_device> m_crtc;
 	required_memory_region m_char_rom;
 	uint8_t m_80col_char_ram[0x800];
 	uint8_t m_80col_attr_ram[0x800];

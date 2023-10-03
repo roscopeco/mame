@@ -2,7 +2,7 @@
 // copyright-holders:Sandro Ronco
 /***************************************************************************
 
-        Hitachi HD44780 LCD controller
+    Hitachi HD44780 LCD controller
 
 ***************************************************************************/
 
@@ -45,9 +45,9 @@ public:
 
 	u8 db_r();
 	void db_w(u8 data);
-	DECLARE_WRITE_LINE_MEMBER(rs_w);
-	DECLARE_WRITE_LINE_MEMBER(rw_w);
-	DECLARE_WRITE_LINE_MEMBER(e_w);
+	void rs_w(int state);
+	void rw_w(int state);
+	void e_w(int state);
 
 	const u8 *render();
 	virtual uint32_t screen_update(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect);
@@ -58,20 +58,22 @@ protected:
 	// device-level overrides
 	virtual void device_start() override;
 	virtual void device_reset() override;
-	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
 
 	// optional information overrides
 	virtual const tiny_rom_entry *device_rom_region() const override;
+
+	TIMER_CALLBACK_MEMBER(clear_busy_flag);
+	TIMER_CALLBACK_MEMBER(blink_tick);
 
 	// charset
 	enum
 	{
 		CHARSET_HD44780_A00,
 		CHARSET_SED1278_0B,
+		CHARSET_KS0066_F00,
 		CHARSET_KS0066_F05 /*,
 		CHARSET_HD44780_A01,
 		CHARSET_HD44780_A02,
-		CHARSET_KS0066_F00,
 		CHARSET_KS0066_F03,
 		CHARSET_KS0066_F04,
 		CHARSET_KS0066_F06,
@@ -96,9 +98,6 @@ private:
 	void pixel_update(bitmap_ind16 &bitmap, u8 line, u8 pos, u8 y, u8 x, int state);
 
 	// internal state
-	static constexpr device_timer_id TIMER_BUSY = 0;
-	static constexpr device_timer_id TIMER_BLINKING = 1;
-
 	emu_timer * m_blink_timer;
 	emu_timer * m_busy_timer;
 
@@ -150,6 +149,15 @@ public:
 	sed1278_0b_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
 };
 
+// ======================> ks0066_f00_device
+
+class ks0066_f00_device : public hd44780_device
+{
+public:
+	// construction/destruction
+	ks0066_f00_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
+};
+
 // ======================> ks0066_f05_device
 
 class ks0066_f05_device :  public hd44780_device
@@ -162,6 +170,7 @@ public:
 // device type definition
 DECLARE_DEVICE_TYPE(HD44780,    hd44780_device)
 DECLARE_DEVICE_TYPE(SED1278_0B, sed1278_0b_device)
+DECLARE_DEVICE_TYPE(KS0066_F00, ks0066_f00_device)
 DECLARE_DEVICE_TYPE(KS0066_F05, ks0066_f05_device)
 
 #endif // MAME_VIDEO_HD44780_H

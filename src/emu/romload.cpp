@@ -11,13 +11,18 @@
 #include "emu.h"
 #include "romload.h"
 
-#include "corestr.h"
-#include "emuopts.h"
 #include "drivenum.h"
+#include "emuopts.h"
+#include "fileio.h"
+#include "main.h"
 #include "softlist_dev.h"
+
 #include "ui/uimain.h"
 
+#include "corestr.h"
+
 #include <algorithm>
+#include <cstdarg>
 #include <set>
 
 
@@ -356,13 +361,14 @@ std::error_condition rom_load_manager::set_disk_handle(std::string_view region, 
 
 /*-------------------------------------------------
     determine_bios_rom - determine system_bios
-    from SystemBios structure and OPTION_BIOS
+    from SYSTEM_BIOS structure and OPTION_BIOS
 -------------------------------------------------*/
 
-void rom_load_manager::determine_bios_rom(device_t &device, const char *specbios)
+void rom_load_manager::determine_bios_rom(device_t &device, std::string_view specbios)
 {
 	// default is applied by the device at config complete time
-	if (specbios && *specbios && core_stricmp(specbios, "default"))
+	using namespace std::literals;
+	if (!specbios.empty() && !util::streqlower(specbios, "default"sv))
 	{
 		bool found(false);
 		for (const rom_entry &rom : device.rom_region_vector())
@@ -371,11 +377,9 @@ void rom_load_manager::determine_bios_rom(device_t &device, const char *specbios
 			{
 				char const *const biosname = ROM_GETNAME(&rom);
 				int const bios_flags = ROM_GETBIOSFLAGS(&rom);
-				char bios_number[20];
 
 				// Allow '-bios n' to still be used
-				sprintf(bios_number, "%d", bios_flags - 1);
-				if (!core_stricmp(bios_number, specbios) || !core_stricmp(biosname, specbios))
+				if (specbios == std::to_string(bios_flags - 1) || util::streqlower(specbios, biosname))
 				{
 					found = true;
 					device.set_system_bios(bios_flags);
@@ -1070,7 +1074,13 @@ void rom_load_manager::process_disk_entries(std::initializer_list<std::reference
 			err = do_open_disk(machine().options(), searchpath, romp, chd->orig_chd(), next_parent);
 			if (err)
 			{
-				handle_missing_file(romp, std::vector<std::string>(), err);
+				std::vector<std::string> tried;
+				for (auto const &paths : searchpath)
+				{
+					for (std::string const &path : paths.get())
+						tried.emplace_back(path);
+				}
+				handle_missing_file(romp, tried, err);
 				chd = nullptr;
 				continue;
 			}
@@ -1200,7 +1210,7 @@ void rom_load_manager::normalize_flags_for_device(std::string_view rgntag, u8 &w
 /*-------------------------------------------------
     load_software_part_region - load a software part
 
-    This is used by MESS when loading a piece of
+    This is used by MAME when loading a piece of
     software. The code should be merged with
     process_region_list or updated to use a slight
     more general process_region_list.
@@ -1220,7 +1230,7 @@ void rom_load_manager::load_software_part_region(device_t &device, software_list
 	const software_info *const swinfo = swlist.find(std::string(swname));
 	if (swinfo)
 	{
-		// dispay a warning for unsupported software
+		// display a warning for unsupported software
 		// TODO: list supported clones like we do for machines?
 		if (swinfo->supported() == software_support::PARTIALLY_SUPPORTED)
 		{
@@ -1459,7 +1469,7 @@ rom_load_manager::rom_load_manager(running_machine &machine)
 					card_bios.erase(found);
 				}
 			}
-			determine_bios_rom(device, specbios.c_str());
+			determine_bios_rom(device, specbios);
 		}
 	}
 

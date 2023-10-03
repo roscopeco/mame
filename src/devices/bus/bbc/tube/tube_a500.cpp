@@ -69,6 +69,7 @@ void bbc_tube_a500_device::device_add_mconfig(machine_config &config)
 	TUBE(config, m_ula);
 	m_ula->pnmi_handler().set(m_fiqs, FUNC(input_merger_device::in_w<0>));
 	m_ula->pirq_handler().set(m_irqs, FUNC(input_merger_device::in_w<0>));
+	m_ula->prst_handler().set(FUNC(bbc_tube_a500_device::prst_w));
 
 	ACORN_MEMC(config, m_memc, 24_MHz_XTAL / 3, m_vidc);
 	m_memc->set_addrmap(0, &bbc_tube_a500_device::a500_map);
@@ -80,15 +81,15 @@ void bbc_tube_a500_device::device_add_mconfig(machine_config &config)
 	m_ioc->kout_w().set("keyboard", FUNC(archimedes_keyboard_device::kin_w));
 	m_ioc->peripheral_r<4>().set(m_ula, FUNC(tube_device::parasite_r));
 	m_ioc->peripheral_w<4>().set(m_ula, FUNC(tube_device::parasite_w));
-	m_ioc->peripheral_r<6>().set_log("IOC: External Expansion R");
-	m_ioc->peripheral_w<6>().set_log("IOC: External Expansion W");
+	m_ioc->peripheral_r<6>().set([this]() { logerror("%s IOC: External Expansion R\n", machine().describe_context()); return 0xffffffff; });
+	m_ioc->peripheral_w<6>().set([this](uint32_t data) { logerror("%s IOC: External Expansion W %08X\n", machine().describe_context(), data); });
 
 	ARCHIMEDES_KEYBOARD(config, "keyboard").kout().set(m_ioc, FUNC(acorn_ioc_device::kin_w));
 
 	screen_device &screen(SCREEN(config, "screen", SCREEN_TYPE_RASTER));
 	screen.screen_vblank().set(m_ioc, FUNC(acorn_ioc_device::ir_w));
 
-	ACORN_VIDC10(config, m_vidc, 24_MHz_XTAL);
+	ACORN_VIDC1(config, m_vidc, 24_MHz_XTAL);
 	m_vidc->set_screen("screen");
 	m_vidc->vblank().set(m_memc, FUNC(acorn_memc_device::vidrq_w));
 	m_vidc->sound_drq().set(m_memc, FUNC(acorn_memc_device::sndrq_w));
@@ -138,6 +139,11 @@ void bbc_tube_a500_device::device_start()
 //**************************************************************************
 //  IMPLEMENTATION
 //**************************************************************************
+
+void bbc_tube_a500_device::prst_w(int state)
+{
+	m_maincpu->set_input_line(INPUT_LINE_RESET, state);
+}
 
 uint8_t bbc_tube_a500_device::host_r(offs_t offset)
 {

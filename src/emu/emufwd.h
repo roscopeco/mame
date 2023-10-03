@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include "utilfwd.h"
+
 #include <type_traits>
 
 
@@ -36,24 +38,7 @@ class output_module;
 // declared in osdepend.h
 class osd_font;
 class osd_interface;
-
-
-
-//----------------------------------
-// lib/util
-//----------------------------------
-
-// declared in aviio.h
-class avi_file;
-
-// declared in chd.h
-class chd_file;
-
-// declared in unzip.h
-namespace util { class archive_file; }
-
-// declared in xmlfile.h
-namespace util::xml { class data_node; class file; }
+class osd_midi_device;
 
 
 
@@ -98,6 +83,7 @@ class symbol_table;
 class debug_breakpoint;
 class debug_watchpoint;
 class debug_registerpoint;
+class debug_exceptionpoint;
 
 // declared in debugger.h
 class debugger_manager;
@@ -107,6 +93,7 @@ class devcb_base;
 template <typename Input, std::make_unsigned_t<Input> DefaultMask> class devcb_write;
 
 // declared in devfind.h
+class device_resolver_base;
 class finder_base;
 template <class DeviceClass, bool Required> class device_finder;
 
@@ -128,6 +115,9 @@ class device_image_interface;
 
 // declared in dimemory.h
 class device_memory_interface;
+
+// declared in dinetwork.h
+class device_network_interface;
 
 // declared in dipalette.h
 class device_palette_interface;
@@ -151,6 +141,12 @@ class memory_view;
 
 // declared in emuopts.h
 class emu_options;
+
+// declared in fileio.h
+class emu_file;
+
+// declared in http.h
+class http_manager;
 
 // declared in gamedrv.h
 class game_driver;
@@ -181,7 +177,11 @@ class running_machine;
 
 // declared in mconfig.h
 namespace emu::detail { class machine_config_replace; }
+struct internal_layout;
 class machine_config;
+
+// declared in main.h
+class machine_manager;
 
 // declared in natkeyboard.h
 class natural_keyboard;
@@ -193,9 +193,6 @@ class network_manager;
 class output_manager;
 
 // declared in render.h
-class layout_element;
-class layout_view;
-class layout_file;
 class render_container;
 class render_manager;
 class render_target;
@@ -203,6 +200,12 @@ class render_texture;
 
 // declared in rendfont.h
 class render_font;
+
+// declared in rendlay.h
+class layout_element;
+class layout_view_item;
+class layout_view;
+class layout_file;
 
 // declared in romentry.h
 class rom_entry;

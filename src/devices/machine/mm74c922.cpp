@@ -34,7 +34,7 @@ DEFINE_DEVICE_TYPE(MM74C923, mm74c923_device, "mm74c923", "MM74C923 20-Key Encod
 
 mm74c922_device::mm74c922_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock, int max_y) :
 	device_t(mconfig, type, tag, owner, clock),
-	m_write_da(*this), m_read_x(*this), m_tristate_data(*this),
+	m_write_da(*this), m_read_x(*this, (1 << max_y) - 1), m_tristate_data(*this, (1 << max_y) - 1),
 	m_cap_osc(0), m_cap_debounce(0),
 	m_max_y(max_y),
 	m_inhibit(false),
@@ -63,16 +63,11 @@ mm74c923_device::mm74c923_device(const machine_config &mconfig, const char *tag,
 
 void mm74c922_device::device_start()
 {
-	// resolve callbacks
-	m_write_da.resolve_safe();
-	m_read_x.resolve_all_safe((1 << m_max_y) - 1);
-	m_tristate_data.resolve_safe((1 << m_max_y) - 1);
-
 	// set initial values
 	change_output_lines();
 
 	// allocate timers
-	m_scan_timer = timer_alloc();
+	m_scan_timer = timer_alloc(FUNC(mm74c922_device::perform_scan), this);
 	m_scan_timer->adjust(attotime::zero, 0, attotime::from_hz(500)); // approximate rate from a 100n capacitor
 
 	// register for state saving
@@ -87,10 +82,10 @@ void mm74c922_device::device_start()
 
 
 //-------------------------------------------------
-//  device_timer - handler timer events
+//  perform_scan - scan the keyboard matrix
 //-------------------------------------------------
 
-void mm74c922_device::device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr)
+TIMER_CALLBACK_MEMBER(mm74c922_device::perform_scan)
 {
 	change_output_lines();
 	clock_scan_counters();

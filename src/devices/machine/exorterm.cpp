@@ -304,7 +304,7 @@ void exorterm155_device::pia_kbd_pb_w(u8 data)
 	// if the firmware uses these?
 }
 
-WRITE_LINE_MEMBER(exorterm155_device::pia_cfg_cb2_w)
+void exorterm155_device::pia_cfg_cb2_w(int state)
 {
 	m_beeper->set_state(!state);
 }
@@ -332,11 +332,6 @@ void exorterm155_device::pia_disp_pb_w(u8 data)
 	m_special_char_disp = BIT(data, 4);
 
 	m_rs232_conn_dtr_handler(BIT(data, 7));
-}
-
-READ_LINE_MEMBER(exorterm155_device::pia_disp_ca2_r)
-{
-	return m_ring;
 }
 
 //**************************************************************************
@@ -458,7 +453,7 @@ GFXDECODE_END
 //  MACHINE EMULATION
 //**************************************************************************
 
-WRITE_LINE_MEMBER(exorterm155_device::sys_timer_w)
+void exorterm155_device::sys_timer_w(int state)
 {
 	// 3.4ms
 	m_pia_disp->cb1_w(state);
@@ -478,7 +473,7 @@ WRITE_LINE_MEMBER(exorterm155_device::sys_timer_w)
 	}
 }
 
-WRITE_LINE_MEMBER(exorterm155_device::write_f1_clock)
+void exorterm155_device::write_f1_clock(int state)
 {
 	if (BIT(m_rs232_baud->read(), 0))
 	{
@@ -487,7 +482,7 @@ WRITE_LINE_MEMBER(exorterm155_device::write_f1_clock)
 	}
 }
 
-WRITE_LINE_MEMBER(exorterm155_device::write_f3_clock)
+void exorterm155_device::write_f3_clock(int state)
 {
 	if (BIT(m_rs232_baud->read(), 1))
 	{
@@ -496,7 +491,7 @@ WRITE_LINE_MEMBER(exorterm155_device::write_f3_clock)
 	}
 }
 
-WRITE_LINE_MEMBER(exorterm155_device::write_f5_clock)
+void exorterm155_device::write_f5_clock(int state)
 {
 	if (BIT(m_rs232_baud->read(), 2))
 	{
@@ -505,7 +500,7 @@ WRITE_LINE_MEMBER(exorterm155_device::write_f5_clock)
 	}
 }
 
-WRITE_LINE_MEMBER(exorterm155_device::write_f6_clock)
+void exorterm155_device::write_f6_clock(int state)
 {
 	if (BIT(m_rs232_baud->read(), 3))
 	{
@@ -514,7 +509,7 @@ WRITE_LINE_MEMBER(exorterm155_device::write_f6_clock)
 	}
 }
 
-WRITE_LINE_MEMBER(exorterm155_device::write_f7_clock)
+void exorterm155_device::write_f7_clock(int state)
 {
 	if (BIT(m_rs232_baud->read(), 4))
 	{
@@ -523,7 +518,7 @@ WRITE_LINE_MEMBER(exorterm155_device::write_f7_clock)
 	}
 }
 
-WRITE_LINE_MEMBER(exorterm155_device::write_f8_clock)
+void exorterm155_device::write_f8_clock(int state)
 {
 	if (BIT(m_rs232_baud->read(), 5))
 	{
@@ -532,7 +527,7 @@ WRITE_LINE_MEMBER(exorterm155_device::write_f8_clock)
 	}
 }
 
-WRITE_LINE_MEMBER(exorterm155_device::write_f9_clock)
+void exorterm155_device::write_f9_clock(int state)
 {
 	if (BIT(m_rs232_baud->read(), 6))
 	{
@@ -541,7 +536,7 @@ WRITE_LINE_MEMBER(exorterm155_device::write_f9_clock)
 	}
 }
 
-WRITE_LINE_MEMBER(exorterm155_device::write_f11_clock)
+void exorterm155_device::write_f11_clock(int state)
 {
 	if (BIT(m_rs232_baud->read(), 7))
 	{
@@ -550,7 +545,7 @@ WRITE_LINE_MEMBER(exorterm155_device::write_f11_clock)
 	}
 }
 
-WRITE_LINE_MEMBER(exorterm155_device::write_f13_clock)
+void exorterm155_device::write_f13_clock(int state)
 {
 	if (BIT(m_rs232_baud->read(), 8))
 	{
@@ -559,38 +554,38 @@ WRITE_LINE_MEMBER(exorterm155_device::write_f13_clock)
 	}
 }
 
-WRITE_LINE_MEMBER(exorterm155_device::acia_txd_w)
+void exorterm155_device::acia_txd_w(int state)
 {
 	m_rs232_conn_txd_handler(state);
 }
 
-WRITE_LINE_MEMBER(exorterm155_device::acia_rts_w)
+void exorterm155_device::acia_rts_w(int state)
 {
 	m_rs232_conn_rts_handler(state);
 }
 
-WRITE_LINE_MEMBER(exorterm155_device::rs232_conn_dcd_w)
+void exorterm155_device::rs232_conn_dcd_w(int state)
 {
 	m_acia->write_dcd(state);
 }
 
-WRITE_LINE_MEMBER(exorterm155_device::rs232_conn_dsr_w)
+void exorterm155_device::rs232_conn_dsr_w(int state)
 {
 	// Input of Display PIA PB5, pulled high.
 	m_dsr = state;
 }
 
-WRITE_LINE_MEMBER(exorterm155_device::rs232_conn_ri_w)
+void exorterm155_device::rs232_conn_ri_w(int state)
 {
-	m_ring = state;
+	m_pia_disp->ca2_w(state);
 }
 
-WRITE_LINE_MEMBER(exorterm155_device::rs232_conn_cts_w)
+void exorterm155_device::rs232_conn_cts_w(int state)
 {
 	m_acia->write_cts(state);
 }
 
-WRITE_LINE_MEMBER(exorterm155_device::rs232_conn_rxd_w)
+void exorterm155_device::rs232_conn_rxd_w(int state)
 {
 	m_acia->write_rxd(state);
 }
@@ -734,13 +729,6 @@ TIMER_CALLBACK_MEMBER(exorterm155_device::kbd_repeat)
 
 
 
-void exorterm155_device::device_resolve_objects()
-{
-	m_rs232_conn_dtr_handler.resolve_safe();
-	m_rs232_conn_rts_handler.resolve_safe();
-	m_rs232_conn_txd_handler.resolve_safe();
-}
-
 void exorterm155_device::device_start()
 {
 	m_online_led.resolve();
@@ -757,12 +745,11 @@ void exorterm155_device::device_start()
 
 	save_item(NAME(m_sys_timer_count));
 	save_item(NAME(m_dsr));
-	save_item(NAME(m_ring));
 	save_item(NAME(m_kbd_start_holdoff));
 
 	// Keyboard
-	m_kbd_scan_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(exorterm155_device::kbd_scan_row), this));
-	m_kbd_repeat_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(exorterm155_device::kbd_repeat), this));
+	m_kbd_scan_timer = timer_alloc(FUNC(exorterm155_device::kbd_scan_row), this);
+	m_kbd_repeat_timer = timer_alloc(FUNC(exorterm155_device::kbd_repeat), this);
 	kbd_reset_state();
 	kbd_repeat_stop();
 
@@ -774,7 +761,6 @@ void exorterm155_device::device_start()
 	save_item(NAME(m_kbd_last_modifiers));
 
 	m_dsr = 1;
-	m_ring = 0;
 }
 
 void exorterm155_device::device_reset()
@@ -877,7 +863,7 @@ void exorterm155_device::device_add_mconfig(machine_config &config)
 	m_pia_disp->writepa_handler().set(FUNC(exorterm155_device::pia_disp_pa_w));
 	m_pia_disp->readpb_handler().set(FUNC(exorterm155_device::pia_disp_pb_r));
 	m_pia_disp->writepb_handler().set(FUNC(exorterm155_device::pia_disp_pb_w));
-	m_pia_disp->readca2_handler().set(FUNC(exorterm155_device::pia_disp_ca2_r));
+	m_pia_disp->ca2_w(0);
 	m_pia_disp->irqa_handler().set(m_irqs, FUNC(input_merger_device::in_w<5>));
 	m_pia_disp->irqb_handler().set(m_irqs, FUNC(input_merger_device::in_w<6>));
 

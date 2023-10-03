@@ -24,12 +24,13 @@
 #include "formats/fs_unformatted.h"
 #include "formats/fsblk_vec.h"
 
-#include "screen.h"
+#include "softlist_dev.h"
 #include "speaker.h"
 
 #include "formats/imageutl.h"
 
 #include "util/ioprocs.h"
+#include "util/ioprocsfilter.h"
 #include "util/zippath.h"
 
 /*
@@ -69,6 +70,7 @@ DEFINE_DEVICE_TYPE(FLOPPY_525_SSDD,     floppy_525_ssdd,     "floppy_525_ssdd", 
 DEFINE_DEVICE_TYPE(FLOPPY_525_DD,       floppy_525_dd,       "floppy_525_dd",       "5.25\" double density floppy drive")
 DEFINE_DEVICE_TYPE(FLOPPY_525_SSQD,     floppy_525_ssqd,     "floppy_525_ssqd",     "5.25\" single-sided quad density floppy drive")
 DEFINE_DEVICE_TYPE(FLOPPY_525_QD,       floppy_525_qd,       "floppy_525_qd",       "5.25\" quad density floppy drive")
+DEFINE_DEVICE_TYPE(FLOPPY_525_QD16,     floppy_525_qd16,     "floppy_525_qd16",     "5.25\" quad density 16 hard sector floppy drive")
 DEFINE_DEVICE_TYPE(FLOPPY_525_HD,       floppy_525_hd,       "floppy_525_hd",       "5.25\" high density floppy drive")
 
 // generic 8" drives
@@ -129,10 +131,8 @@ DEFINE_DEVICE_TYPE(SONY_OA_D32V, sony_oa_d32v, "sony_oa_d32v", "Sony OA-D32V Mic
 DEFINE_DEVICE_TYPE(TEAC_FD_30A, teac_fd_30a, "teac_fd_30a", "TEAC FD-30A FDD")
 
 // TEAC 5.25" drives
-#if 0
 DEFINE_DEVICE_TYPE(TEAC_FD_55A, teac_fd_55a, "teac_fd_55a", "TEAC FD-55A FDD")
 DEFINE_DEVICE_TYPE(TEAC_FD_55B, teac_fd_55b, "teac_fd_55b", "TEAC FD-55B FDD")
-#endif
 DEFINE_DEVICE_TYPE(TEAC_FD_55E, teac_fd_55e, "teac_fd_55e", "TEAC FD-55E FDD")
 DEFINE_DEVICE_TYPE(TEAC_FD_55F, teac_fd_55f, "teac_fd_55f", "TEAC FD-55F FDD")
 DEFINE_DEVICE_TYPE(TEAC_FD_55G, teac_fd_55g, "teac_fd_55g", "TEAC FD-55G FDD")
@@ -154,7 +154,7 @@ format_registration::format_registration()
 	add(FLOPPY_MFI_FORMAT); // Our generic format
 	add(FLOPPY_DFI_FORMAT); // Flux format, dying
 
-	add(FS_UNFORMATTED);
+	add(fs::UNFORMATTED);
 }
 
 void format_registration::add_fm_containers()
@@ -182,12 +182,12 @@ void format_registration::add_pc_formats()
 	add(FLOPPY_IPF_FORMAT);
 }
 
-void format_registration::add(floppy_format_type format)
+void format_registration::add(const floppy_image_format_t &format)
 {
-	m_formats.push_back(format);
+	m_formats.push_back(&format);
 }
 
-void format_registration::add(const filesystem_manager_t &fs)
+void format_registration::add(const fs::manager_t &fs)
 {
 	m_fs.push_back(&fs);
 }
@@ -217,11 +217,6 @@ floppy_connector::floppy_connector(const machine_config &mconfig, const char *ta
 
 floppy_connector::~floppy_connector()
 {
-}
-
-void floppy_connector::set_formats(std::function<void (format_registration &fr)> _formats)
-{
-	formats = _formats;
 }
 
 void floppy_connector::device_start()
@@ -276,7 +271,6 @@ floppy_image_device::floppy_image_device(const machine_config &mconfig, device_t
 		m_flux_screen(*this, "flux")
 {
 	extension_list[0] = '\0';
-	m_err = image_error::INVALIDIMAGE;
 }
 
 //-------------------------------------------------
@@ -285,8 +279,6 @@ floppy_image_device::floppy_image_device(const machine_config &mconfig, device_t
 
 floppy_image_device::~floppy_image_device()
 {
-	for(floppy_image_format_t *format : fif_list)
-		delete format;
 }
 
 void floppy_image_device::setup_load_cb(load_cb cb)
@@ -319,17 +311,31 @@ void floppy_image_device::setup_led_cb(led_cb cb)
 	cur_led_cb = cb;
 }
 
-void floppy_image_device::fs_enum::add(floppy_format_type type, u32 image_size, const char *name, const char *description)
+struct floppy_image_device::fs_enum : public fs::manager_t::floppy_enumerator {
+	floppy_image_device *m_fid;
+	const fs::manager_t *m_manager;
+
+	fs_enum(floppy_image_device *fid);
+
+	virtual void add_raw(const char *name, u32 key, const char *description) override;
+protected:
+	virtual void add_format(const floppy_image_format_t &type, u32 image_size, const char *name, const char *description) override;
+};
+
+floppy_image_device::fs_enum::fs_enum(floppy_image_device *fid)
+	: fs::manager_t::floppy_enumerator(fid->form_factor, fid->variants)
+	, m_fid(fid)
 {
-	if(m_manager->can_format())
-		m_fid->m_create_fs.emplace_back(fs_info(m_manager, type, image_size, name, description));
-	if(m_manager->can_read())
-		m_fid->m_io_fs.emplace_back(fs_info(m_manager, type, image_size, name, description));
+}
+
+void floppy_image_device::fs_enum::add_format(const floppy_image_format_t &type, u32 image_size, const char *name, const char *description)
+{
+	m_fid->m_fs.emplace_back(fs_info(m_manager, &type, image_size, name, description));
 }
 
 void floppy_image_device::fs_enum::add_raw(const char *name, u32 key, const char *description)
 {
-	m_fid->m_create_fs.emplace_back(fs_info(name, key, description));
+	m_fid->m_fs.emplace_back(fs_info(name, key, description));
 }
 
 void floppy_image_device::register_formats()
@@ -339,22 +345,18 @@ void floppy_image_device::register_formats()
 		format_registration_cb(fr);
 
 	extension_list[0] = '\0';
-	fif_list.clear();
-	for(floppy_format_type fft : fr.m_formats)
+	fif_list = std::move(fr.m_formats);
+	for(const floppy_image_format_t *fif : fif_list)
 	{
-		// allocate a new format
-		floppy_image_format_t *fif = fft();
-		fif_list.push_back(fif);
 		add_format(fif->name(), fif->description(), fif->extensions(), "");
-
 		image_specify_extension( extension_list, 256, fif->extensions() );
 	}
 
 	fs_enum fse(this);
-	for(const filesystem_manager_t *fmt : fr.m_fs)
+	for(const fs::manager_t *fmt : fr.m_fs)
 	{
 		fse.m_manager = fmt;
-		fmt->enumerate_f(fse, form_factor, variants);
+		fmt->enumerate_f(fse);
 		m_fs_managers.push_back(fmt);
 	}
 }
@@ -364,12 +366,12 @@ void floppy_image_device::set_formats(std::function<void (format_registration &f
 	format_registration_cb = formats;
 }
 
-const std::vector<floppy_image_format_t *> &floppy_image_device::get_formats() const
+const std::vector<const floppy_image_format_t *> &floppy_image_device::get_formats() const
 {
 	return fif_list;
 }
 
-floppy_image_format_t *floppy_image_device::get_load_format() const
+const floppy_image_format_t *floppy_image_device::get_load_format() const
 {
 	return input_format;
 }
@@ -380,11 +382,11 @@ void floppy_image_device::set_rpm(float _rpm)
 		return;
 
 	rpm = _rpm;
-	rev_time = attotime::from_double(60/rpm);
+	rev_time = attotime::from_double(60.0/rpm);
 	angular_speed = rpm/60.0*2e8;
 }
 
-void floppy_image_device::setup_write(floppy_image_format_t *_output_format)
+void floppy_image_device::setup_write(const floppy_image_format_t *_output_format)
 {
 	output_format = _output_format;
 	if(image)
@@ -403,7 +405,7 @@ void floppy_image_device::commit_image()
 		return;
 
 	check_for_file();
-	auto io = util::core_file_read_write(image_core_file(), 0xff);
+	auto io = util::random_read_write_fill(image_core_file(), 0xff);
 	if(!io) {
 		popmessage("Error, out of memory");
 		return;
@@ -425,6 +427,11 @@ void floppy_image_device::device_config_complete()
 
 	setup_characteristics();
 	register_formats();
+}
+
+const software_list_loader &floppy_image_device::get_software_list_loader() const
+{
+	return image_software_list_loader::instance();
 }
 
 
@@ -450,7 +457,7 @@ void floppy_image_device::device_start()
 	stp = 1;
 	wpt = 0;
 	dskchg = exists() ? 1 : 0;
-	index_timer = timer_alloc(0);
+	index_timer = timer_alloc(FUNC(floppy_image_device::index_resync), this);
 	image_dirty = false;
 	ready = true;
 	ready_counter = 0;
@@ -528,30 +535,21 @@ void floppy_image_device::device_reset()
 	cache_clear();
 }
 
-void floppy_image_device::device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr)
-{
-	index_resync();
-}
-
-floppy_image_format_t *floppy_image_device::identify(std::string filename)
+std::pair<std::error_condition, const floppy_image_format_t *> floppy_image_device::identify(std::string_view filename)
 {
 	util::core_file::ptr fd;
 	std::string revised_path;
 	std::error_condition err = util::zippath_fopen(filename, OPEN_FLAG_READ, fd, revised_path);
-	if(err) {
-		seterror(err, nullptr);
-		return nullptr;
-	}
+	if(err)
+		return{ err, nullptr };
 
-	auto io = util::core_file_read(std::move(fd), 0xff);
-	if(!io) {
-		seterror(std::errc::not_enough_memory, nullptr);
-		return nullptr;
-	}
+	auto io = util::random_read_fill(std::move(fd), 0xff);
+	if(!io)
+		return{ std::errc::not_enough_memory, nullptr };
 
 	int best = 0;
-	floppy_image_format_t *best_format = nullptr;
-	for(floppy_image_format_t *format : fif_list) {
+	const floppy_image_format_t *best_format = nullptr;
+	for(const floppy_image_format_t *format : fif_list) {
 		int score = format->identify(*io, form_factor, variants);
 		if(score > best) {
 			best = score;
@@ -559,7 +557,7 @@ floppy_image_format_t *floppy_image_device::identify(std::string filename)
 		}
 	}
 
-	return best_format;
+	return{ std::error_condition(), best_format };
 }
 
 void floppy_image_device::init_floppy_load(bool write_supported)
@@ -568,7 +566,7 @@ void floppy_image_device::init_floppy_load(bool write_supported)
 	revolution_start_time = mon ? attotime::never : machine().time();
 	revolution_count = 0;
 
-	index_resync();
+	index_resync(0);
 
 	wpt = 1; // disk sleeve is covering the sensor
 	if (!cur_wpt_cb.isnull())
@@ -588,35 +586,32 @@ void floppy_image_device::init_floppy_load(bool write_supported)
 		dskchg = 1;
 }
 
-image_init_result floppy_image_device::call_load()
+std::pair<std::error_condition, std::string> floppy_image_device::call_load()
 {
 	check_for_file();
-	auto io = util::core_file_read(image_core_file(), 0xff);
-	if(!io) {
-		seterror(std::errc::not_enough_memory, nullptr);
-		return image_init_result::FAIL;
-	}
+	auto io = util::random_read_fill(image_core_file(), 0xff);
+	if(!io)
+		return std::make_pair(std::errc::not_enough_memory, std::string());
 
 	int best = 0;
-	floppy_image_format_t *best_format = nullptr;
-	for (floppy_image_format_t *format : fif_list) {
+	const floppy_image_format_t *best_format = nullptr;
+	for (const floppy_image_format_t *format : fif_list) {
 		int score = format->identify(*io, form_factor, variants);
+		if(score && format->extension_matches(filename()))
+			score |= floppy_image_format_t::FIFID_EXT;
 		if(score > best) {
 			best = score;
 			best_format = format;
 		}
 	}
 
-	if (!best_format) {
-		seterror(image_error::INVALIDIMAGE, "Unable to identify the image format");
-		return image_init_result::FAIL;
-	}
+	if (!best_format)
+		return std::make_pair(image_error::INVALIDIMAGE, "Unable to identify image file format");
 
 	image = std::make_unique<floppy_image>(tracks, sides, form_factor);
 	if (!best_format->load(*io, form_factor, variants, image.get())) {
-		seterror(image_error::UNSUPPORTED, "Incompatible image format or corrupted data");
 		image.reset();
-		return image_init_result::FAIL;
+		return std::make_pair(image_error::INVALIDIMAGE, "Incompatible image file format or corrupted data");
 	}
 	output_format = is_readonly() ? nullptr : best_format;
 
@@ -625,11 +620,11 @@ image_init_result floppy_image_device::call_load()
 	init_floppy_load(output_format != nullptr);
 
 	if (!cur_load_cb.isnull())
-		return cur_load_cb(this);
+		cur_load_cb(this);
 
 	flux_image_prepare();
 
-	return image_init_result::PASS;
+	return std::make_pair(std::error_condition(), std::string());
 }
 
 void floppy_image_device::flux_image_prepare()
@@ -798,13 +793,13 @@ void floppy_image_device::call_unload()
 	set_ready(true);
 }
 
-image_init_result floppy_image_device::call_create(int format_type, util::option_resolution *format_options)
+std::pair<std::error_condition, std::string> floppy_image_device::call_create(int format_type, util::option_resolution *format_options)
 {
 	image = std::make_unique<floppy_image>(tracks, sides, form_factor);
 	output_format = nullptr;
 
 	// search for a suitable format based on the extension
-	for(floppy_image_format_t *i : fif_list)
+	for(const floppy_image_format_t *i : fif_list)
 	{
 		// only consider formats that actually support saving
 		if(!i->supports_save())
@@ -825,25 +820,26 @@ image_init_result floppy_image_device::call_create(int format_type, util::option
 
 	flux_image_prepare();
 
-	return image_init_result::PASS;
+	return std::make_pair(std::error_condition(), std::string());
 }
 
-void floppy_image_device::init_fs(const fs_info *fs, const fs_meta_data &meta)
+void floppy_image_device::init_fs(const fs_info *fs, const fs::meta_data &meta)
 {
 	assert(image);
 	if (fs->m_type) {
 		std::vector<u8> img(fs->m_image_size);
-		fsblk_vec_t blockdev(img);
+		fs::fsblk_vec_t blockdev(img);
 		auto cfs = fs->m_manager->mount(blockdev);
 		cfs->format(meta);
 
-		auto source_format = fs->m_type();
 		auto io = util::ram_read(img.data(), img.size(), 0xff);
-		source_format->load(*io, floppy_image::FF_UNKNOWN, variants, image.get());
-		delete source_format;
+		fs->m_type->load(*io, floppy_image::FF_UNKNOWN, variants, image.get());
 	} else {
-		fs_unformatted::format(fs->m_key, image.get());
+		fs::unformatted_image::format(fs->m_key, image.get());
 	}
+
+	// intializing a file system makes the floppy dirty
+	image_dirty = true;
 }
 
 /* write protect, active high
@@ -875,7 +871,7 @@ void floppy_image_device::mon_w(int state)
 		} else {
 			ready_counter = 2;
 		}
-		index_resync();
+		index_resync(0);
 	}
 
 	/* on -> off */
@@ -900,7 +896,7 @@ attotime floppy_image_device::time_next_index()
 }
 
 /* index pulses at rpm/60 Hz, and stays high for ~2ms at 300rpm */
-void floppy_image_device::index_resync()
+TIMER_CALLBACK_MEMBER(floppy_image_device::index_resync)
 {
 	if(revolution_start_time.is_never()) {
 		if(idx) {
@@ -919,13 +915,20 @@ void floppy_image_device::index_resync()
 	}
 	int position = int(delta.as_double()*angular_speed + 0.5);
 
-	int new_idx = position < 2000000;
+	uint32_t last_index = 0, next_index = 200000000;
+	// if hard-sectored floppy, has extra IDX pulses
+	if(image)
+		image->find_index_hole(position, last_index, next_index);
+	bool new_idx = position - last_index < 2000000;
 
 	if(new_idx) {
-		attotime index_up_time = attotime::from_double(2000000/angular_speed);
+		uint32_t index_up = last_index + 2000000;
+		attotime index_up_time = attotime::from_double(index_up/angular_speed);
 		index_timer->adjust(index_up_time - delta);
-	} else
-		index_timer->adjust(rev_time - delta);
+	} else {
+		attotime next_index_time = next_index >= 200000000 ? rev_time : attotime::from_double(next_index/angular_speed);
+		index_timer->adjust(next_index_time - delta);
+	}
 
 	if(new_idx != idx) {
 		idx = new_idx;
@@ -965,7 +968,9 @@ void floppy_image_device::check_led()
 
 double floppy_image_device::get_pos()
 {
-	return index_timer->elapsed().as_double();
+	if(revolution_start_time.is_never())
+		return 0;
+	return (machine().time() - revolution_start_time).as_double();
 }
 
 bool floppy_image_device::twosid_r()
@@ -1129,11 +1134,6 @@ uint32_t floppy_image_device::find_position(attotime &base, const attotime &when
 	return res;
 }
 
-bool floppy_image_device::test_track_last_entry_warps(const std::vector<uint32_t> &buf) const
-{
-	return !((buf[buf.size() - 1]^buf[0]) & floppy_image::MG_MASK);
-}
-
 attotime floppy_image_device::position_to_time(const attotime &base, int position) const
 {
 	return base + attotime::from_double(position/angular_speed);
@@ -1143,19 +1143,13 @@ void floppy_image_device::cache_fill_index(const std::vector<uint32_t> &buf, int
 {
 	int cells = buf.size();
 
-	if(index != 0 || !test_track_last_entry_warps(buf)) {
-		cache_index = index;
-		cache_start_time = position_to_time(base, buf[index] & floppy_image::TIME_MASK);
-	} else {
-		cache_index = cells - 1;
-		cache_start_time = position_to_time(base - rev_time, buf[cache_index] & floppy_image::TIME_MASK);
-	}
-
+	cache_index = index;
+	cache_start_time = position_to_time(base, buf[index] & floppy_image::TIME_MASK);
 	cache_entry = buf[cache_index];
 
 	index ++;
 	if(index >= cells) {
-		index = test_track_last_entry_warps(buf) ? 1 : 0;
+		index = 0;
 		base += rev_time;
 	}
 
@@ -1270,161 +1264,146 @@ void floppy_image_device::write_flux(const attotime &start, const attotime &end,
 	track_dirty = true;
 	cache_clear();
 
-	attotime base;
-	int start_pos = find_position(base, start);
-	int end_pos   = find_position(base, end);
+	std::vector<wspan> wspans(1);
 
-	std::vector<int> trans_pos(transition_count);
+	attotime base;
+	wspans[0].start = find_position(base, start);
+	wspans[0].end   = find_position(base, end);
+
 	for(int i=0; i != transition_count; i++)
-		trans_pos[i] = find_position(base, transitions[i]);
+		wspans[0].flux_change_positions.push_back(find_position(base, transitions[i]));
+
+	wspan_split_on_wrap(wspans);
 
 	std::vector<uint32_t> &buf = image->get_buffer(cyl, ss, subcyl);
 
-	int index;
-	if(!buf.empty())
-		index = find_index(start_pos, buf);
-	else {
-		index = 0;
+	if(buf.empty()) {
 		buf.push_back(floppy_image::MG_N);
+		buf.push_back(floppy_image::MG_E | 199999999);
 	}
 
-	uint32_t cur_mg;
-	if((buf[index] & floppy_image::TIME_MASK) == start_pos) {
-		if(index)
-			cur_mg = buf[index-1];
-		else
-			cur_mg = buf[buf.size() - 1];
-	} else
-			cur_mg = buf[index];
+	wspan_remove_damaged(wspans, buf);
+	wspan_write(wspans, buf);
 
-	cur_mg &= floppy_image::MG_MASK;
-	if(cur_mg == floppy_image::MG_N || cur_mg == floppy_image::MG_D)
-		cur_mg = floppy_image::MG_A;
-
-	uint32_t pos = start_pos;
-	int ti = 0;
-	int cells = buf.size();
-	if(transition_count != 0 && trans_pos[0] == pos) {
-		cur_mg = cur_mg == floppy_image::MG_A ? floppy_image::MG_B : floppy_image::MG_A;
-		ti ++;
-	}
-	while(pos != end_pos) {
-		if(buf.size() < cells+10)
-			buf.resize(cells+200);
-		uint32_t next_pos;
-		if(ti != transition_count)
-			next_pos = trans_pos[ti++];
-		else
-			next_pos = end_pos;
-		if(next_pos > pos)
-			write_zone(&buf[0], cells, index, pos, next_pos, cur_mg);
-		else {
-			write_zone(&buf[0], cells, index, pos, 200000000, cur_mg);
-			index = 0;
-			write_zone(&buf[0], cells, index, 0, next_pos, cur_mg);
-		}
-		pos = next_pos;
-		cur_mg = cur_mg == floppy_image::MG_A ? floppy_image::MG_B : floppy_image::MG_A;
-	}
-
-	buf.resize(cells);
+	cache_clear();
 }
 
-void floppy_image_device::write_zone(uint32_t *buf, int &cells, int &index, uint32_t spos, uint32_t epos, uint32_t mg)
+void floppy_image_device::wspan_split_on_wrap(std::vector<wspan> &wspans)
 {
-	cache_clear();
-	while(spos < epos) {
-		while(index != cells-1 && (buf[index+1] & floppy_image::TIME_MASK) <= spos)
-			index++;
+	int ne = wspans.size();
+	for(int i=0; i != ne; i++)
+		if(wspans[i].end < wspans[i].start) {
+			wspans.resize(wspans.size()+1);
+			auto &ws = wspans[i];
+			auto &we = wspans.back();
+			we.start = 0;
+			we.end = ws.end;
+			ws.end = 200000000;
+			int start = ws.start;
+			int split_index;
+			for(split_index = 0; split_index != ws.flux_change_positions.size(); split_index++)
+				if(ws.flux_change_positions[split_index] < start)
+					break;
+			if(split_index == 0)
+				std::swap(ws.flux_change_positions, we.flux_change_positions);
 
-		uint32_t ref_start = buf[index] & floppy_image::TIME_MASK;
-		uint32_t ref_end   = index == cells-1 ? 200000000 : buf[index+1] & floppy_image::TIME_MASK;
-		uint32_t ref_mg    = buf[index] & floppy_image::MG_MASK;
+			else {
+				we.flux_change_positions.resize(ws.flux_change_positions.size() - split_index);
+				std::copy(ws.flux_change_positions.begin() + split_index, ws.flux_change_positions.end(), we.flux_change_positions.begin());
+				ws.flux_change_positions.erase(ws.flux_change_positions.begin() + split_index, ws.flux_change_positions.end());
+			}
+		}
+}
 
-		// Can't overwrite a damaged zone
-		if(ref_mg == floppy_image::MG_D) {
-			spos = ref_end;
-			continue;
+void floppy_image_device::wspan_remove_damaged(std::vector<wspan> &wspans, const std::vector<uint32_t> &track)
+{
+	for(size_t pos = 0; pos != track.size(); pos++)
+		if((track[pos] & floppy_image::MG_MASK) == floppy_image::MG_D) {
+			int start = track[pos] & floppy_image::TIME_MASK;
+			int end = track[pos+1] & floppy_image::TIME_MASK;
+			int ne = wspans.size();
+			for(int i=0; i != ne; i++) {
+				// D range outside of span range
+				if(wspans[i].start > end || wspans[i].end <= start)
+					continue;
+
+				// D range covers span range
+				if(wspans[i].start >= start && wspans[i].end-1 <= end) {
+					wspans.erase(wspans.begin() + i);
+					i --;
+					ne --;
+					continue;
+				}
+
+				// D range covers the start of the span range
+				if(wspans[i].start >= start && wspans[i].end-1 > end) {
+					wspans[i].start = end+1;
+					while(!wspans[i].flux_change_positions.empty() && wspans[i].flux_change_positions[0] <= end)
+						wspans[i].flux_change_positions.erase(wspans[i].flux_change_positions.begin());
+					continue;
+				}
+
+				// D range covers the end of the span range
+				if(wspans[i].start < start && wspans[i].end-1 <= end) {
+					wspans[i].end = start;
+					while(!wspans[i].flux_change_positions.empty() && wspans[i].flux_change_positions[wspans[i].flux_change_positions.size()-1] >= start)
+						wspans[i].flux_change_positions.erase(wspans[i].flux_change_positions.end()-1);
+					continue;
+				}
+
+				// D range is inside the span range, need to split
+				int id = wspans.size();
+				wspans.resize(id+1);
+				wspans[id].start = end+1;
+				wspans[id].end = wspans[i].end;
+				wspans[id].flux_change_positions = wspans[i].flux_change_positions;
+				wspans[i].end = start;
+				while(!wspans[i].flux_change_positions.empty() && wspans[i].flux_change_positions[wspans[i].flux_change_positions.size()-1] >= start)
+					wspans[i].flux_change_positions.erase(wspans[i].flux_change_positions.end()-1);
+				while(!wspans[id].flux_change_positions.empty() && wspans[id].flux_change_positions[0] <= end)
+					wspans[id].flux_change_positions.erase(wspans[id].flux_change_positions.begin());
+			}
+		}
+}
+
+void floppy_image_device::wspan_write(const std::vector<wspan> &wspans, std::vector<uint32_t> &track)
+{
+	for(const auto &ws : wspans) {
+		unsigned si, ei;
+		for(si = 0; si != track.size(); si++)
+			if((track[si] & floppy_image::TIME_MASK) >= ws.start)
+				break;
+		for(ei = si; ei != track.size(); ei++)
+			if((track[ei] & floppy_image::TIME_MASK) >= ws.end)
+				break;
+
+		// Reduce neutral zone at the start, if there's one
+		if(si != track.size() && (track[si] & floppy_image::MG_MASK) == floppy_image::MG_E) {
+			// Neutral zone is over the whole range, split it and adapt si/ei
+			if(si == ei) {
+				track.insert(track.begin() + si, floppy_image::MG_E | (ws.start-1));
+				track.insert(track.begin() + si + 1, (track[si-1] & floppy_image::MG_MASK) | ws.end);
+				si = ei = si+1;
+			} else {
+				// Reduce the zone size
+				track[si] = floppy_image::MG_E | (ws.start-1);
+				si ++;
+			}
 		}
 
-		// If the zone is of the type we want, we don't need to touch it
-		if(ref_mg == mg) {
-			spos = ref_end;
-			continue;
+		// Check for a neutral zone at the end and reduce it if needed
+		if(ei != track.size() && (track[ei] & floppy_image::MG_MASK) == floppy_image::MG_E) {
+			track[ei-1] = floppy_image::MG_N | ws.end;
+			ei --;
 		}
 
-		//  Check the overlaps, act accordingly
-		if(spos == ref_start) {
-			if(epos >= ref_end) {
-				// Full overlap, that cell is dead, we need to see which ones we can extend
-				uint32_t prev_mg = index != 0       ? buf[index-1] & floppy_image::MG_MASK : ~0;
-				uint32_t next_mg = index != cells-1 ? buf[index+1] & floppy_image::MG_MASK : ~0;
-				if(prev_mg == mg) {
-					if(next_mg == mg) {
-						// Both match, merge all three in one
-						memmove(buf+index, buf+index+2, (cells-index-2)*sizeof(uint32_t));
-						cells -= 2;
-						index--;
+		// Clear the covered zone
+		track.erase(track.begin() + si, track.begin() + ei);
 
-					} else {
-						// Previous matches, drop the current cell
-						memmove(buf+index, buf+index+1, (cells-index-1)*sizeof(uint32_t));
-						cells --;
-					}
-
-				} else {
-					if(next_mg == mg) {
-						// Following matches, extend it
-						memmove(buf+index, buf+index+1, (cells-index-1)*sizeof(uint32_t));
-						cells --;
-						buf[index] = mg | spos;
-					} else {
-						// None match, convert the current cell
-						buf[index] = mg | spos;
-						index++;
-					}
-				}
-				spos = ref_end;
-
-			} else {
-				// Overlap at the start only
-				// Check if we can just extend the previous cell
-				if(index != 0 && (buf[index-1] & floppy_image::MG_MASK) == mg)
-					buf[index] = ref_mg | epos;
-				else {
-					// Otherwise we need to insert a new cell
-					if(index != cells-1)
-						memmove(buf+index+1, buf+index, (cells-index)*sizeof(uint32_t));
-					cells++;
-					buf[index] = mg | spos;
-					buf[index+1] = ref_mg | epos;
-				}
-				spos = epos;
-			}
-
-		} else {
-			if(epos >= ref_end) {
-				// Overlap at the end only
-				// If we can't just extend the following cell, we need to insert a new one
-				if(index == cells-1 || (buf[index+1] & floppy_image::MG_MASK) != mg) {
-					if(index != cells-1)
-						memmove(buf+index+2, buf+index+1, (cells-index-1)*sizeof(uint32_t));
-					cells++;
-				}
-				buf[index+1] = mg | spos;
-				index++;
-				spos = ref_end;
-
-			} else {
-				// Full inclusion
-				// We need to split the zone in 3
-				if(index != cells-1)
-					memmove(buf+index+3, buf+index+1, (cells-index-1)*sizeof(uint32_t));
-				cells += 2;
-				buf[index+1] = mg | spos;
-				buf[index+2] = ref_mg | epos;
-				spos = epos;
-			}
+		// Insert the flux changes
+		for(auto f : ws.flux_change_positions) {
+			track.insert(track.begin() + si, floppy_image::MG_F | f);
+			si ++;
 		}
 	}
 }
@@ -1447,6 +1426,11 @@ uint32_t floppy_image_device::get_form_factor() const
 uint32_t floppy_image_device::get_variant() const
 {
 	return image ? image->get_variant() : 0;
+}
+
+std::vector<uint32_t> &floppy_image_device::get_buffer()
+{
+	return image->get_buffer(cyl, ss, subcyl);
 }
 
 //===================================================================
@@ -1569,7 +1553,7 @@ void floppy_sound_device::device_start()
 {
 	// What kind of drive do we have?
 	bool is525 = strstr(tag(), "525") != nullptr;
-	set_samples_names(is525? floppy525_sample_names : floppy35_sample_names);
+	set_samples_names(is525 ? floppy525_sample_names : floppy35_sample_names);
 
 	m_motor_on = false;
 
@@ -1607,13 +1591,16 @@ void floppy_sound_device::motor(bool running, bool withdisk)
 		if ((m_spin_playback_sample==QUIET || m_spin_playback_sample==SPIN_END) && running) // motor was either off or already spinning down
 		{
 			m_spin_samplepos = 0;
-			m_spin_playback_sample = withdisk? SPIN_START_LOADED : SPIN_START_EMPTY; // (re)start the motor sound
+			m_spin_playback_sample = withdisk ? SPIN_START_LOADED : SPIN_START_EMPTY; // (re)start the motor sound
 		}
 		else
 		{
 			// Motor has been running and is turned off now
 			if ((m_spin_playback_sample == SPIN_EMPTY || m_spin_playback_sample == SPIN_LOADED) && !running)
+			{
+				m_spin_samplepos = 0;
 				m_spin_playback_sample = SPIN_END; // go to spin down sound when loop is finished
+			}
 		}
 	}
 	m_motor_on = running;
@@ -1759,7 +1746,7 @@ void floppy_sound_device::sound_stream_update(sound_stream &stream, std::vector<
 					// Spindown sample over, be quiet or restart if the
 					// motor has been restarted
 					if (m_motor_on)
-						m_spin_playback_sample = m_with_disk? SPIN_START_LOADED : SPIN_START_EMPTY;
+						m_spin_playback_sample = m_with_disk ? SPIN_START_LOADED : SPIN_START_EMPTY;
 					else
 						m_spin_playback_sample = QUIET;
 					break;
@@ -2214,6 +2201,32 @@ void floppy_525_qd::setup_characteristics()
 }
 
 //-------------------------------------------------
+//  5.25" double-sided quad density 16 hard sector
+//-------------------------------------------------
+
+floppy_525_qd16::floppy_525_qd16(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
+	floppy_image_device(mconfig, FLOPPY_525_QD16, tag, owner, clock)
+{
+}
+
+floppy_525_qd16::~floppy_525_qd16()
+{
+}
+
+void floppy_525_qd16::setup_characteristics()
+{
+	form_factor = floppy_image::FF_525;
+	tracks = 84;
+	sides = 2;
+	set_rpm(300);
+
+	variants.push_back(floppy_image::SSDD16);
+	variants.push_back(floppy_image::SSQD16);
+	variants.push_back(floppy_image::DSDD16);
+	variants.push_back(floppy_image::DSQD16);
+}
+
+//-------------------------------------------------
 //  5.25" high density
 //-------------------------------------------------
 
@@ -2608,6 +2621,68 @@ void teac_fd_30a::setup_characteristics()
 	set_rpm(300);
 
 	variants.push_back(floppy_image::SSDD);
+}
+
+//-------------------------------------------------
+//  TEAC FD-55A
+//
+//  track to track: 6 ms
+//  average: 93 ms
+//  setting time: 15 ms
+//  motor start time: 400 ms
+//
+//-------------------------------------------------
+
+teac_fd_55a::teac_fd_55a(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
+	: floppy_image_device(mconfig, TEAC_FD_55A, tag, owner, clock)
+{
+}
+
+teac_fd_55a::~teac_fd_55a()
+{
+}
+
+void teac_fd_55a::setup_characteristics()
+{
+	form_factor = floppy_image::FF_525;
+	tracks = 40;
+	sides = 1;
+	set_rpm(300);
+
+	variants.push_back(floppy_image::SSSD);
+	variants.push_back(floppy_image::SSDD);
+}
+
+//-------------------------------------------------
+//  TEAC FD-55B
+//
+//  track to track: 6 ms
+//  average: 93 ms
+//  setting time: 15 ms
+//  motor start time: 400 ms
+//
+//-------------------------------------------------
+
+teac_fd_55b::teac_fd_55b(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
+		: floppy_image_device(mconfig, TEAC_FD_55B, tag, owner, clock)
+{
+}
+
+teac_fd_55b::~teac_fd_55b()
+{
+}
+
+void teac_fd_55b::setup_characteristics()
+{
+	form_factor = floppy_image::FF_525;
+	tracks = 40;
+	sides = 2;
+	set_rpm(300);
+
+	variants.push_back(floppy_image::SSSD);
+	variants.push_back(floppy_image::SSDD);
+	variants.push_back(floppy_image::DSSD);
+	variants.push_back(floppy_image::DSDD);
 }
 
 //-------------------------------------------------

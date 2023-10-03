@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <!DOCTYPE softwarelist SYSTEM "softwarelist.dtd">
 <!--
-license:CC0
+license:CC0-1.0
 -->
-<softwarelist name="amiga_hdd" description="Amiga hard disk images">
+<softwarelist name="amiga_hdd" description="Commodore Amiga hard disk images">
 	<!--
 	Unless otherwise specified, all images are based on default installs of the
 	corresponding amiga_workbench sets.

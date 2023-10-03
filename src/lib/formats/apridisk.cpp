@@ -10,9 +10,10 @@
 
 #include "apridisk.h"
 
-#include "imageutl.h"
-
 #include "ioprocs.h"
+#include "multibyte.h"
+
+#include "osdcore.h" // osd_printf_error
 
 
 apridisk_format::apridisk_format()
@@ -34,7 +35,7 @@ const char *apridisk_format::extensions() const
 	return "dsk";
 }
 
-int apridisk_format::identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants)
+int apridisk_format::identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants) const
 {
 	uint8_t header[APR_HEADER_SIZE];
 	size_t actual;
@@ -48,7 +49,7 @@ int apridisk_format::identify(util::random_read &io, uint32_t form_factor, const
 		return 0;
 }
 
-bool apridisk_format::load(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants, floppy_image *image)
+bool apridisk_format::load(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants, floppy_image *image) const
 {
 	desc_pc_sector sectors[80][2][18];
 	std::unique_ptr<uint8_t []> sector_data(new uint8_t [MAX_SECTORS * SECTOR_SIZE]);
@@ -69,19 +70,19 @@ bool apridisk_format::load(util::random_read &io, uint32_t form_factor, const st
 		uint8_t sector_header[16];
 		io.read_at(file_offset, sector_header, 16, actual);
 
-		uint32_t type = pick_integer_le(&sector_header, 0, 4);
-		uint16_t compression = pick_integer_le(&sector_header, 4, 2);
-		uint16_t header_size = pick_integer_le(&sector_header, 6, 2);
-		uint32_t data_size = pick_integer_le(&sector_header, 8, 4);
+		uint32_t type = get_u32le(&sector_header[0]);
+		uint16_t compression = get_u16le(&sector_header[4]);
+		uint16_t header_size = get_u16le(&sector_header[6]);
+		uint32_t data_size = get_u32le(&sector_header[8]);
 
 		file_offset += header_size;
 
 		switch (type)
 		{
 		case APR_SECTOR:
-			uint8_t head = pick_integer_le(&sector_header, 12, 1);
-			uint8_t sector = pick_integer_le(&sector_header, 13, 1);
-			uint8_t track = (uint8_t) pick_integer_le(&sector_header, 14, 2);
+			uint8_t head = sector_header[12];
+			uint8_t sector = sector_header[13];
+			uint8_t track = (uint8_t) get_u16le(&sector_header[14]);
 
 			track_count = std::max(track_count, int(unsigned(track)));
 			head_count = std::max(head_count, int(unsigned(head)));
@@ -103,7 +104,7 @@ bool apridisk_format::load(util::random_read &io, uint32_t form_factor, const st
 				{
 					uint8_t comp[3];
 					io.read_at(file_offset, comp, 3, actual);
-					uint16_t length = pick_integer_le(comp, 0, 2);
+					uint16_t length = get_u16le(&comp[0]);
 
 					if (length != SECTOR_SIZE)
 					{
@@ -148,14 +149,9 @@ bool apridisk_format::load(util::random_read &io, uint32_t form_factor, const st
 	return true;
 }
 
-bool apridisk_format::save(util::random_read_write &io, const std::vector<uint32_t> &variants, floppy_image *image)
-{
-	return false;
-}
-
 bool apridisk_format::supports_save() const
 {
 	return false;
 }
 
-const floppy_format_type FLOPPY_APRIDISK_FORMAT = &floppy_image_format_creator<apridisk_format>;
+const apridisk_format FLOPPY_APRIDISK_FORMAT;
