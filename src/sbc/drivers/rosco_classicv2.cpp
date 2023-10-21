@@ -138,6 +138,7 @@ void rosco_classicv2_state::rosco_classicv2(machine_config &config)
 	XR68C681(config, m_duart, 10_MHz_XTAL);
 	m_duart->set_clocks(3.6864_MHz_XTAL, 3.6864_MHz_XTAL, 3.6864_MHz_XTAL, 3.6864_MHz_XTAL);
 	m_duart->a_tx_cb().set("rs232", FUNC(rs232_port_device::write_txd));
+	m_duart->b_tx_cb().set("rs232", FUNC(rs232_port_device::write_txd));
 	// m_duart->out_tdo_cb().set(m_duart, FUNC(xr68c681_device::rc_w));
 	// m_duart->out_tdo_cb().append(m_duart, FUNC(xr68c681_device::tc_w));
 	m_duart->irq_cb().set_inputline(m_maincpu, M68K_IRQ_4);
