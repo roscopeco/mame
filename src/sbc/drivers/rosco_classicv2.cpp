@@ -165,7 +165,7 @@ void rosco_classicv2_state::rosco_classicv2(machine_config &config)
 
 ROM_START( rosco_classicv2 )
 	ROM_REGION16_BE(0x100000, "monitor", 0)
-	ROM_LOAD( "rosco_m68k_mame.rom.bin", 0x00000, 0x100000, CRC(7a4dc8f8) SHA1(1084b8503c5877d229d7b23e4b3fb32697a2a9f7))
+	ROM_LOAD( "rosco_m68k_mame.rom.bin", 0x00000, 0x100000, CRC(01bd9265) SHA1(ca28eeab533951b6080bf8b7028bf534849f7b35))
 ROM_END
 
 COMP( 2022, rosco_classicv2, 0, 0, rosco_classicv2, rosco_classicv2, rosco_classicv2_state, empty_init, "Ross Bamford", "rosco-m68k-classicV2", MACHINE_IS_SKELETON )
