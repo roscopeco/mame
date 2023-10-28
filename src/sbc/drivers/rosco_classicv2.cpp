@@ -26,13 +26,15 @@ private:
 	void rosco_classicv2_map(address_map &map);
 	void cpu_space_map(address_map &map);
 
+	void m68k_reset_callback(int state);
+
 	virtual void machine_start() override;
 	virtual void machine_reset() override;
 
 	DECLARE_QUICKLOAD_LOAD_MEMBER(quickload_cb);
 	DECLARE_QUICKLOAD_LOAD_MEMBER(quickload_rom_cb);
 
-	required_device<cpu_device> m_maincpu;
+	required_device<m68000_base_device> m_maincpu;
 	required_device<xr68c681_device> m_duart;
 	required_shared_ptr<uint16_t> m_ram;
 	required_device<v9958_device> m_v9958;
@@ -54,6 +56,12 @@ void rosco_classicv2_state::cpu_space_map(address_map &map)
 {
     map(0xfffff0, 0xffffff).m(m_maincpu, FUNC(m68010_device::autovectors_map));
     map(0xfffff9, 0xfffff9).r(m_duart, FUNC(xr68c681_device::get_irq_vector));
+}
+
+void rosco_classicv2_state::m68k_reset_callback(int state)
+{
+	m_duart->reset();
+	m_v9958->reset();
 }
 
 /******************************************************************************
@@ -134,6 +142,8 @@ void rosco_classicv2_state::rosco_classicv2(machine_config &config)
 	M68010(config, m_maincpu, 10_MHz_XTAL);
 	m_maincpu->set_addrmap(AS_PROGRAM, &rosco_classicv2_state::rosco_classicv2_map);
 	m_maincpu->set_addrmap(m68000_base_device::AS_CPU_SPACE, &rosco_classicv2_state::cpu_space_map);
+
+	m_maincpu->reset_cb().set(FUNC(rosco_classicv2_state::m68k_reset_callback));
 
 	XR68C681(config, m_duart, 10_MHz_XTAL);
 	m_duart->set_clocks(3.6864_MHz_XTAL, 3.6864_MHz_XTAL, 3.6864_MHz_XTAL, 3.6864_MHz_XTAL);
