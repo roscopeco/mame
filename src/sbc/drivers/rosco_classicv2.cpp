@@ -17,7 +17,7 @@ public:
 		, m_maincpu(*this, "maincpu")
         , m_duart(*this, "duart")
 		, m_ram(*this, "ram")
-		, m_v9958(*this, "v9958")
+		// , m_v9958(*this, "v9958")
 	{
 	}
 
@@ -37,7 +37,7 @@ private:
 	required_device<m68000_base_device> m_maincpu;
 	required_device<xr68c681_device> m_duart;
 	required_shared_ptr<uint16_t> m_ram;
-	required_device<v9958_device> m_v9958;
+	// required_device<v9958_device> m_v9958;
 };
 
 /******************************************************************************
@@ -48,7 +48,7 @@ void rosco_classicv2_state::rosco_classicv2_map(address_map &map)
 {
 	map(0x000000, 0x0fffff).ram().share("ram");
 	map(0xf00001, 0xf0001f).rw(m_duart, FUNC(xr68c681_device::read), FUNC(xr68c681_device::write)).umask16(0x00ff);
-	map(0xf80000, 0xf80007).rw("v9958", FUNC(v9958_device::read), FUNC(v9958_device::write)).umask16(0xff00);
+	// map(0xf80000, 0xf80007).rw("v9958", FUNC(v9958_device::read), FUNC(v9958_device::write)).umask16(0xff00);
 	map(0xe00000, 0xefffff).rom().region("monitor", 0);
 }
 
@@ -61,7 +61,7 @@ void rosco_classicv2_state::cpu_space_map(address_map &map)
 void rosco_classicv2_state::m68k_reset_callback(int state)
 {
 	m_duart->reset();
-	m_v9958->reset();
+	// m_v9958->reset();
 }
 
 /******************************************************************************
@@ -71,15 +71,13 @@ void rosco_classicv2_state::m68k_reset_callback(int state)
 static INPUT_PORTS_START( rosco_classicv2 )
 INPUT_PORTS_END
 
-static const input_device_default terminal_defaults[] =
-{
+static DEVICE_INPUT_DEFAULTS_START( terminal )
 	DEVICE_INPUT_DEFAULTS( "RS232_RXBAUD", 0xff, RS232_BAUD_115200 )
 	DEVICE_INPUT_DEFAULTS( "RS232_TXBAUD", 0xff, RS232_BAUD_115200 )
 	DEVICE_INPUT_DEFAULTS( "RS232_DATABITS", 0xff, RS232_DATABITS_8 )
 	DEVICE_INPUT_DEFAULTS( "RS232_PARITY", 0xff, RS232_PARITY_NONE )
 	DEVICE_INPUT_DEFAULTS( "RS232_STOPBITS", 0xff, RS232_STOPBITS_1 )
-	{ nullptr, 0, 0 }
-};
+DEVICE_INPUT_DEFAULTS_END
 
 /******************************************************************************
  Machine Start/Reset
@@ -145,28 +143,33 @@ void rosco_classicv2_state::rosco_classicv2(machine_config &config)
 
 	m_maincpu->reset_cb().set(FUNC(rosco_classicv2_state::m68k_reset_callback));
 
-	XR68C681(config, m_duart, 10_MHz_XTAL);
+	XR68C681(config, m_duart, 3.6864_MHz_XTAL);
 	m_duart->set_clocks(3.6864_MHz_XTAL, 3.6864_MHz_XTAL, 3.6864_MHz_XTAL, 3.6864_MHz_XTAL);
-	m_duart->a_tx_cb().set("rs232", FUNC(rs232_port_device::write_txd));
-	m_duart->b_tx_cb().set("rs232", FUNC(rs232_port_device::write_txd));
+	m_duart->a_tx_cb().set("rs232a", FUNC(rs232_port_device::write_txd));
+	m_duart->b_tx_cb().set("rs232b", FUNC(rs232_port_device::write_txd));
+	// m_duart->b_tx_cb().set("rs232", FUNC(rs232_port_device::write_txd));
 	// m_duart->out_tdo_cb().set(m_duart, FUNC(xr68c681_device::rc_w));
 	// m_duart->out_tdo_cb().append(m_duart, FUNC(xr68c681_device::tc_w));
 	m_duart->irq_cb().set_inputline(m_maincpu, M68K_IRQ_4);
 
-	rs232_port_device &rs232(RS232_PORT(config, "rs232", default_rs232_devices, "terminal"));
-	rs232.rxd_handler().set(m_duart, FUNC(xr68c681_device::rx_a_w));
-	rs232.set_option_device_input_defaults("terminal", terminal_defaults);
+	rs232_port_device &rs232a(RS232_PORT(config, "rs232a", default_rs232_devices, "terminal"));
+	rs232a.rxd_handler().set(m_duart, FUNC(xr68c681_device::rx_a_w));
+	rs232a.set_option_device_input_defaults("terminal", DEVICE_INPUT_DEFAULTS_NAME( terminal ));
+
+	rs232_port_device &rs232b(RS232_PORT(config, "rs232b", default_rs232_devices, "terminal"));
+	rs232b.rxd_handler().set(m_duart, FUNC(xr68c681_device::rx_b_w));
+	rs232b.set_option_device_input_defaults("terminal", DEVICE_INPUT_DEFAULTS_NAME( terminal ));
 
 	/* quickload */
 	QUICKLOAD(config, "quickload", "bin").set_load_callback(FUNC(rosco_classicv2_state::quickload_cb));
 //	QUICKLOAD(config, "rom", "bin").set_load_callback(FUNC(rosco_classicv2_state::quickload_rom_cb));
 
-	V9958(config, m_v9958, XTAL(21'477'272));
-	m_v9958->set_screen_ntsc("screen");
-	m_v9958->set_vram_size(0x20000);
-	m_v9958->int_cb().set_inputline(m_maincpu, M68K_IRQ_2);
+	// V9958(config, m_v9958, XTAL(21'477'272));
+	// m_v9958->set_screen_ntsc("screen");
+	// m_v9958->set_vram_size(0x20000);
+	// m_v9958->int_cb().set_inputline(m_maincpu, M68K_IRQ_2);
 
-	SCREEN(config, "screen", SCREEN_TYPE_RASTER);
+	// SCREEN(config, "screen", SCREEN_TYPE_RASTER);
 }
 
 /******************************************************************************
