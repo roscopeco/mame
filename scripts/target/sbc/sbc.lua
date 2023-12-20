@@ -11,7 +11,6 @@ VIDEOS["V9938"] = true
 
 CPUS["M6502"] = true
 CPUS["M6809"] = true
-
 MACHINES["68681"] = true
 
 --------------------------------------
@@ -20,11 +19,16 @@ MACHINES["68681"] = true
 BUSES["ATA"] = true
 SOUNDS["CDDA"] = true
 CPUS["FR"] = true
+CPUS["MCS51"] = true
+CPUS["MC68HC11"] = true
+MACHINES["ATASTORAGE"] = true
+MACHINES["ATAHLE"] = true
 
 --------------------------------------
 -- To be able to use serial devices --
 --------------------------------------
 CPUS["IE15"] = true
+SOUNDS["AY8910"] = true
 SOUNDS["BEEP"] = true
 MACHINES["IE15"] = true
 MACHINES["SWTPC8212"] = true
@@ -60,6 +64,7 @@ files{
 	MAME_DIR .. "src/sbc/drivers/rc2014_sio.cpp",
 	MAME_DIR .. "src/sbc/drivers/rc2014_wbw.cpp",
 	MAME_DIR .. "src/sbc/drivers/rosco.cpp",
+	MAME_DIR .. "src/sbc/drivers/rosco_classicv2.cpp",
 	MAME_DIR .. "src/sbc/drivers/grantz80.cpp",
 	MAME_DIR .. "src/sbc/drivers/grant6809.cpp",
 	MAME_DIR .. "src/sbc/drivers/grant6502.cpp",

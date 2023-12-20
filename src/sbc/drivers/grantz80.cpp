@@ -15,7 +15,8 @@ public:
 	void grantz80(machine_config &config);
 
 private:
-	DECLARE_WRITE_LINE_MEMBER( acia_irq_w );
+//	DECLARE_WRITE_LINE_MEMBER( acia_irq_w );
+        void acia_irq_w(int state);
 
 	void mem_map(address_map &map);
 	void mem_io(address_map &map);
@@ -24,7 +25,8 @@ private:
 };
 
 
-WRITE_LINE_MEMBER( grantz80_state::acia_irq_w )
+//WRITE_LINE_MEMBER( grantz80_state::acia_irq_w )
+void grantz80_state::acia_irq_w(int state)
 {
 	m_maincpu->set_input_line(0, state);
 }

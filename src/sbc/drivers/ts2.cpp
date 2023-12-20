@@ -21,7 +21,7 @@ private:
 	virtual void machine_reset() override;
 
 	void duart_output(uint8_t data);
-	DECLARE_WRITE_LINE_MEMBER(duart_irq_handler);
+	void duart_irq_handler(int state);
 
 	void cpu_space_map(address_map &map);
 

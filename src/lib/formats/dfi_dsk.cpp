@@ -83,7 +83,7 @@ bool dfi_format::load(util::random_read &io, uint32_t form_factor, const std::ve
 	std::vector<uint8_t> data;
 	int onerev_time = 0; // time for one revolution, used to guess clock and rpm for DFE2 files
 	unsigned long clock_rate = 100000000; // sample clock rate in megahertz
-	int rpm=360; // drive rpm
+	//int rpm=360; // drive rpm
 	while(pos < size) {
 		uint8_t h[10];
 		io.read_at(pos, h, 10, actual);
@@ -138,28 +138,28 @@ bool dfi_format::load(util::random_read &io, uint32_t form_factor, const std::ve
 			osd_printf_verbose("dfi_dsk: index_count: %d, onerev_time: %d\n", index_count, onerev_time);
 			if ((onerev_time > REV25_MIN) && (onerev_time < REV25_MAX)) {
 				osd_printf_verbose("dfi_dsk: Guess: speed: 360rpm, clock 25MHz\n");
-				clock_rate = 25000000; rpm = 360;
+				clock_rate = 25000000; //rpm = 360;
 			} else if ((onerev_time > REV25_MIN*1.2) && (onerev_time < REV25_MAX*1.2)) {
 				osd_printf_verbose("dfi_dsk: Guess: speed: 300rpm, clock 25MHz\n");
-				clock_rate = 25000000; rpm = 300;
+				clock_rate = 25000000; //rpm = 300;
 			} else if ((onerev_time > REV25_MIN*2) && (onerev_time < REV25_MAX*2)) {
 				osd_printf_verbose("dfi_dsk: Guess: speed: 360rpm, clock 50MHz\n");
-				clock_rate = 50000000; rpm = 360;
+				clock_rate = 50000000; //rpm = 360;
 			} else if ((onerev_time > (REV25_MIN*2)*1.2) && (onerev_time < (REV25_MAX*2)*1.2)) {
 				osd_printf_verbose("dfi_dsk: Guess: speed: 300rpm, clock 50MHz\n");
-				clock_rate = 50000000; rpm = 300;
+				clock_rate = 50000000; //rpm = 300;
 			} else if ((onerev_time > REV25_MIN*4) && (onerev_time < REV25_MAX*4)) {
 				osd_printf_verbose("dfi_dsk: Guess: speed: 360rpm, clock 100MHz\n");
-				clock_rate = 100000000; rpm = 360;
+				clock_rate = 100000000; //rpm = 360;
 			} else if ((onerev_time > (REV25_MIN*4)*1.2) && (onerev_time < (REV25_MAX*4)*1.2)) {
 				osd_printf_verbose("dfi_dsk: Guess: speed: 300rpm, clock 100MHz\n");
-				clock_rate = 100000000; rpm = 300;
+				clock_rate = 100000000; //rpm = 300;
 			} else
 				osd_printf_warning("dfi_dsk: WARNING: Cannot Guess Speed! Assuming 360rpm, 100Mhz clock!\n");
 			osd_printf_verbose("dfi_dsk: Actual rpm based on index: %f\n", ((double)clock_rate/(double)onerev_time)*60);
 		}
 
-		rpm += 0;   // HACK: prevent GCC 4.6+ from warning "variable set but unused"
+		//rpm += 0;   // HACK: prevent GCC 4.6+ from warning "variable set but unused"
 
 		if(!index_time)
 			index_time = total_time;
