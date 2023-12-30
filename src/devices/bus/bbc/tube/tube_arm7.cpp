@@ -63,6 +63,7 @@ void bbc_tube_arm7_device::device_add_mconfig(machine_config &config)
 	TUBE(config, m_ula);
 	m_ula->pnmi_handler().set(FUNC(bbc_tube_arm7_device::efiq_w));
 	m_ula->pirq_handler().set(FUNC(bbc_tube_arm7_device::exint3_w));
+	m_ula->prst_handler().set(FUNC(bbc_tube_arm7_device::prst_w));
 
 	RAM(config, m_ram).set_default_size("32M").set_extra_options("16M,64M");
 }
@@ -131,6 +132,13 @@ void bbc_tube_arm7_device::device_reset()
 //  IMPLEMENTATION
 //**************************************************************************
 
+void bbc_tube_arm7_device::prst_w(int state)
+{
+	device_reset();
+
+	m_maincpu->set_input_line(INPUT_LINE_RESET, state);
+}
+
 uint8_t bbc_tube_arm7_device::host_r(offs_t offset)
 {
 	return m_ula->host_r(offset);
@@ -151,13 +159,13 @@ void bbc_tube_arm7_device::update_interrupts()
 	m_maincpu->set_input_line(ARM7_IRQ_LINE, irq ? ASSERT_LINE : CLEAR_LINE);
 }
 
-WRITE_LINE_MEMBER(bbc_tube_arm7_device::efiq_w)
+void bbc_tube_arm7_device::efiq_w(int state)
 {
 	m_efiq_state = state;
 	update_interrupts();
 }
 
-WRITE_LINE_MEMBER(bbc_tube_arm7_device::exint3_w)
+void bbc_tube_arm7_device::exint3_w(int state)
 {
 	m_exint3_state = state;
 	if (state)

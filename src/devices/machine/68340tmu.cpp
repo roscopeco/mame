@@ -14,18 +14,16 @@
 //  MACROS / CONSTANTS
 //**************************************************************************
 
-//#define LOG_GENERAL (1U <<  0) // Already defined in logmacro.h
-#define LOG_SETUP   (1U <<  1)
-#define LOG_READ    (1U <<  2)
-#define LOG_TIMER   (1U <<  3)
-#define LOG_INT     (1U <<  4)
-#define LOG_COUNT   (1U <<  5)
+#define LOG_SETUP   (1U << 1)
+#define LOG_READ    (1U << 2)
+#define LOG_TIMER   (1U << 3)
+#define LOG_INT     (1U << 4)
+#define LOG_COUNT   (1U << 5)
 
 //#define VERBOSE  (LOG_SETUP|LOG_INT|LOG_TIMER)
 
 #include "logmacro.h"
 
-//#define LOG(...) LOGMASKED(LOG_GENERAL,   __VA_ARGS__) // Already defined in logmacro.h
 #define LOGSETUP(...) LOGMASKED(LOG_SETUP, __VA_ARGS__)
 #define LOGR(...)     LOGMASKED(LOG_READ,  __VA_ARGS__)
 #define LOGTIMER(...) LOGMASKED(LOG_TIMER, __VA_ARGS__)
@@ -156,7 +154,7 @@ void mc68340_timer_module_device::write(offs_t offset, uint16_t data, uint16_t m
 				   "Period Measurement - not implemented",
 				   "Event Count - not implemented",
 				   "Timer Bypass (Simple Test Method) - not implemented"
-			 }}[data & REG_CR_MODE_MASK]);
+			 }}[(data & REG_CR_MODE_MASK) >> 2]);
 
 		LOGTIMER("- OC: %s mode\n", std::array<char const *, 4>{{"Disabled", "Toggle", "Zero", "One"}}[data & REG_CR_OC_MASK]);
 
@@ -265,14 +263,14 @@ void mc68340_timer_module_device::write(offs_t offset, uint16_t data, uint16_t m
 	LOG("%08x m68340_internal_timer_w %08x, %08x (%08x)\n", m_cpu->pcbase(), offset * 2, data, mem_mask);
 }
 
-WRITE_LINE_MEMBER( mc68340_timer_module_device::tin_w)
+void mc68340_timer_module_device::tin_w(int state)
 {
 	LOGTIMER("%s\n", FUNCNAME);
 
 	m_tin = state;
 }
 
-WRITE_LINE_MEMBER( mc68340_timer_module_device::tgate_w)
+void mc68340_timer_module_device::tgate_w(int state)
 {
 	LOGTIMER("%s\n", FUNCNAME);
 
@@ -312,12 +310,9 @@ void mc68340_timer_module_device::device_start()
 
 	m_cpu = downcast<m68340_cpu_device *>(owner());
 
-	m_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(mc68340_timer_module_device::timer_callback),this));
+	m_timer = timer_alloc(FUNC(mc68340_timer_module_device::timer_callback), this);
 
-	// Resolve Timer callbacks
-	m_tout_out_cb.resolve_safe();
-	m_tgate_in_cb.resolve_safe();
-	m_tin_in_cb.resolve_safe();
+	m_ir = 0x000f;
 }
 
 void mc68340_timer_module_device::device_reset()
@@ -517,7 +512,6 @@ void mc68340_timer_module_device::tout_clear()
 mc68340_timer_module_device::mc68340_timer_module_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
   : device_t(mconfig, MC68340_TIMER_MODULE, tag, owner, clock)
   , m_tout_out_cb(*this)
-  , m_tin_in_cb(*this)
   , m_tgate_in_cb(*this)
 {
 }

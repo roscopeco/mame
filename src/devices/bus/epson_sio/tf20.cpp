@@ -149,8 +149,8 @@ void epson_tf20_device::device_start()
 	if (!m_ram->started())
 		throw device_missing_dependencies();
 
-	m_timer_serial = timer_alloc(0, nullptr);
-	m_timer_tc = timer_alloc(1, nullptr);
+	m_timer_serial = timer_alloc(FUNC(epson_tf20_device::serial_tick), this);
+	m_timer_tc = timer_alloc(FUNC(epson_tf20_device::tc_tick), this);
 
 	// enable second half of ram
 	m_cpu->space(AS_PROGRAM).install_ram(0x8000, 0xffff, m_ram->pointer() + 0x8000);
@@ -175,30 +175,31 @@ void epson_tf20_device::device_reset()
 }
 
 //-------------------------------------------------
-//  device_timer - handler timer events
+//  serial_tick - update serial clocks
 //-------------------------------------------------
 
-void epson_tf20_device::device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr)
+TIMER_CALLBACK_MEMBER( epson_tf20_device::serial_tick )
 {
-	switch (id)
-	{
-	case 0:
-		m_mpsc->rxca_w(1);
-		m_mpsc->rxca_w(0);
-		m_mpsc->txca_w(1);
-		m_mpsc->txca_w(0);
-		m_mpsc->rxcb_w(1);
-		m_mpsc->rxcb_w(0);
-		m_mpsc->txcb_w(1);
-		m_mpsc->txcb_w(0);
-		break;
-
-	case 1:
-		logerror("%s: tc off\n", tag());
-		m_fdc->tc_w(false);
-		break;
-	}
+	m_mpsc->rxca_w(1);
+	m_mpsc->rxca_w(0);
+	m_mpsc->txca_w(1);
+	m_mpsc->txca_w(0);
+	m_mpsc->rxcb_w(1);
+	m_mpsc->rxcb_w(0);
+	m_mpsc->txcb_w(1);
+	m_mpsc->txcb_w(0);
 }
+
+//-------------------------------------------------
+//  tc_tick - update the FDC terminal count flag
+//-------------------------------------------------
+
+TIMER_CALLBACK_MEMBER( epson_tf20_device::tc_tick )
+{
+	logerror("%s: tc off\n", tag());
+	m_fdc->tc_w(false);
+}
+
 
 
 //**************************************************************************
@@ -261,7 +262,7 @@ void epson_tf20_device::fdc_control_w(uint8_t data)
 //  rxc_w - rx input
 //-------------------------------------------------
 
-WRITE_LINE_MEMBER( epson_tf20_device::rxc_w )
+void epson_tf20_device::rxc_w(int state)
 {
 	m_rxc = state;
 	m_sio_input->rx_w(m_txda && m_rxc);
@@ -271,7 +272,7 @@ WRITE_LINE_MEMBER( epson_tf20_device::rxc_w )
 //  pinc_w - pin input
 //-------------------------------------------------
 
-WRITE_LINE_MEMBER( epson_tf20_device::pinc_w )
+void epson_tf20_device::pinc_w(int state)
 {
 	m_pinc = state;
 	m_sio_input->pin_w(!m_dtra || m_pinc);
@@ -281,7 +282,7 @@ WRITE_LINE_MEMBER( epson_tf20_device::pinc_w )
 //  txda_w - rx output
 //-------------------------------------------------
 
-WRITE_LINE_MEMBER( epson_tf20_device::txda_w )
+void epson_tf20_device::txda_w(int state)
 {
 	m_txda = state;
 	m_sio_input->rx_w(m_txda && m_rxc);
@@ -291,7 +292,7 @@ WRITE_LINE_MEMBER( epson_tf20_device::txda_w )
 //  dtra_w - pin output
 //-------------------------------------------------
 
-WRITE_LINE_MEMBER( epson_tf20_device::dtra_w )
+void epson_tf20_device::dtra_w(int state)
 {
 	m_dtra = state;
 	m_sio_input->pin_w(!m_dtra || m_pinc);

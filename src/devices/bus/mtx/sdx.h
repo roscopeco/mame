@@ -6,7 +6,6 @@
 
 **********************************************************************/
 
-
 #ifndef MAME_BUS_MTX_EXP_SDX_H
 #define MAME_BUS_MTX_EXP_SDX_H
 
@@ -14,7 +13,6 @@
 #include "imagedev/floppy.h"
 #include "machine/wd_fdc.h"
 #include "video/mc6845.h"
-#include "formats/mtx_dsk.h"
 #include "emupal.h"
 #include "screen.h"
 
@@ -34,7 +32,7 @@ public:
 
 	uint8_t sdx_status_r();
 	void sdx_control_w(uint8_t data);
-	DECLARE_WRITE_LINE_MEMBER(motor_w);
+	void motor_w(int state);
 
 protected:
 	// construction/destruction
@@ -42,10 +40,8 @@ protected:
 
 	required_memory_region m_sdx_rom;
 	required_device<mb8877_device> m_fdc;
-	required_device<floppy_connector> m_floppy0;
-	required_device<floppy_connector> m_floppy1;
+	required_device_array<floppy_connector, 2> m_floppy;
 	required_ioport_array<2> m_dsw;
-	floppy_image_device *m_floppy;
 	uint8_t m_control;
 };
 
@@ -87,7 +83,7 @@ private:
 
 	required_device<screen_device> m_screen;
 	required_device<palette_device> m_palette;
-	required_device<mc6845_device> m_crtc;
+	required_device<hd6845s_device> m_crtc;
 	required_memory_region m_char_rom;
 	uint8_t m_80col_char_ram[0x800];
 	uint8_t m_80col_attr_ram[0x800];

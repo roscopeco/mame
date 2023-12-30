@@ -9,11 +9,17 @@
 ***************************************************************************/
 
 #include "imgtool.h"
+#include "filter.h"
 #include "main.h"
 #include "modules.h"
 
-#include "corefile.h"
+#include "corestr.h"
+#include "opresolv.h"
+#include "path.h"
 #include "strformat.h"
+#include "unicode.h"
+
+#include "osdcore.h" // osd_get_command_line
 
 #include <cstdio>
 #include <cstring>
@@ -109,6 +115,9 @@ static int parse_options(int argc, char *argv[], int minunnamed, int maxunnamed,
 					goto error; /* Too few unnamed */
 
 				util::option_resolution::entry *entry = resolution->find(name);
+				if (entry == nullptr)
+					goto error; /* Unknown option */
+
 				if (entry->option_type() == util::option_guide::entry::option_type::ENUM_BEGIN)
 				{
 					const util::option_guide::entry *enum_value;

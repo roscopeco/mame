@@ -55,11 +55,6 @@ namespace {
 	}
 }
 
-// Timers
-enum {
-	TMR_ID_CLK
-};
-
 rs232_sync_io_device::rs232_sync_io_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
 	: device_t(mconfig , RS232_SYNC_IO , tag , owner , clock)
 	, device_rs232_port_interface(mconfig , *this)
@@ -75,13 +70,13 @@ rs232_sync_io_device:: ~rs232_sync_io_device()
 {
 }
 
-WRITE_LINE_MEMBER(rs232_sync_io_device::input_txd)
+void rs232_sync_io_device::input_txd(int state)
 {
 	m_txd = state;
 	LOG("TxD %d %u\n" , state , m_tx_counter);
 }
 
-WRITE_LINE_MEMBER(rs232_sync_io_device::input_rts)
+void rs232_sync_io_device::input_rts(int state)
 {
 	m_rts = state;
 }
@@ -118,7 +113,7 @@ void rs232_sync_io_device::device_add_mconfig(machine_config &config)
 
 void rs232_sync_io_device::device_start()
 {
-	m_clk_timer = timer_alloc(TMR_ID_CLK);
+	m_clk_timer = timer_alloc(FUNC(rs232_sync_io_device::clock_tick), this);
 }
 
 void rs232_sync_io_device::device_reset()
@@ -141,69 +136,62 @@ void rs232_sync_io_device::device_reset()
 	output_rxc(1);
 }
 
-void rs232_sync_io_device::device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr)
+TIMER_CALLBACK_MEMBER(rs232_sync_io_device::clock_tick)
 {
-	switch (id) {
-	case TMR_ID_CLK:
-		m_clk = !m_clk;
-		if (m_clk) {
-			output_txc(1);
-			output_rxc(1);
-			if (m_tx_enabled) {
-				// Rising edge: capture TxD
-				m_tx_byte = (m_tx_byte >> 1) & 0x7f;
-				if (m_txd) {
-					BIT_SET(m_tx_byte , 7);
-				}
-				if (++m_tx_counter >= 8) {
-					LOG("Tx %02x @%s\n" , m_tx_byte , machine().time().to_string());
-					m_tx_counter = 0;
-					m_stream->output(m_tx_byte);
-					m_tx_enabled = false;
-				}
+	m_clk = !m_clk;
+	if (m_clk) {
+		output_txc(1);
+		output_rxc(1);
+		if (m_tx_enabled) {
+			// Rising edge: capture TxD
+			m_tx_byte = (m_tx_byte >> 1) & 0x7f;
+			if (m_txd) {
+				BIT_SET(m_tx_byte , 7);
 			}
-		} else {
-			if (!m_tx_enabled) {
-				m_tx_enabled = !m_rts || !m_rts_duplex->read();
-				output_cts(!m_tx_enabled);
+			if (++m_tx_counter >= 8) {
+				LOG("Tx %02x @%s\n" , m_tx_byte , machine().time().to_string());
+				m_tx_counter = 0;
+				m_stream->output(m_tx_byte);
+				m_tx_enabled = false;
 			}
-			if (m_tx_enabled || m_txc_setting->read() == 0) {
-				output_txc(0);
-			}
-			if (!m_rx_enabled) {
-				m_rx_enabled = m_rts || !m_rts_duplex->read();
-				if (m_rx_enabled) {
-					if (m_stream->input(&m_rx_byte , 1) == 0) {
-						m_rx_byte = ~0;
-						if (m_rxc_setting->read() == 2) {
-							m_rx_enabled = false;
-						}
-					} else {
-						LOG("Rx %02x @%s\n" , m_rx_byte , machine().time().to_string());
-					}
-				}
-			}
-			if (m_rx_enabled || m_rxc_setting->read() == 0) {
-				output_rxc(0);
-			}
+		}
+	} else {
+		if (!m_tx_enabled) {
+			m_tx_enabled = !m_rts || !m_rts_duplex->read();
+			output_cts(!m_tx_enabled);
+		}
+		if (m_tx_enabled || m_txc_setting->read() == 0) {
+			output_txc(0);
+		}
+		if (!m_rx_enabled) {
+			m_rx_enabled = m_rts || !m_rts_duplex->read();
 			if (m_rx_enabled) {
-				// Falling edge: update RxD
-				output_rxd(BIT(m_rx_byte , 0));
-				m_rx_byte >>= 1;
-				if (++m_rx_counter >= 8) {
-					m_rx_counter = 0;
-					m_rx_enabled = false;
+				if (m_stream->input(&m_rx_byte , 1) == 0) {
+					m_rx_byte = ~0;
+					if (m_rxc_setting->read() == 2) {
+						m_rx_enabled = false;
+					}
+				} else {
+					LOG("Rx %02x @%s\n" , m_rx_byte , machine().time().to_string());
 				}
 			}
 		}
-		break;
-
-	default:
-		break;
+		if (m_rx_enabled || m_rxc_setting->read() == 0) {
+			output_rxc(0);
+		}
+		if (m_rx_enabled) {
+			// Falling edge: update RxD
+			output_rxd(BIT(m_rx_byte , 0));
+			m_rx_byte >>= 1;
+			if (++m_rx_counter >= 8) {
+				m_rx_counter = 0;
+				m_rx_enabled = false;
+			}
+		}
 	}
 }
 
-WRITE_LINE_MEMBER(rs232_sync_io_device::update_serial)
+void rs232_sync_io_device::update_serial(int state)
 {
 	auto baud_rate = convert_baud(m_rs232_baud->read());
 	auto period = attotime::from_hz(baud_rate * 2);

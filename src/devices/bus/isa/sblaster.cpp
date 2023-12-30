@@ -69,7 +69,7 @@ static const int m_cmd_fifo_length[256] =
 	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, /* Ax */
 		4, -1,  4, -1,  4, -1,  4, -1,  4, -1, -1,  -1, -1, -1,  4, -1, /* Bx */
 		4, -1,  4, -1,  4, -1,  4, -1,  4, -1, -1,  -1, -1, -1,  4, -1, /* Cx */
-		1,  1, -1,  1, -1,  1,  1, -1,  1,  1,  1,  -1, -1, -1, -1, -1, /* Dx */
+		1,  1, -1,  1,  1,  1,  1, -1,  1,  1,  1,  -1, -1, -1, -1, -1, /* Dx */
 		2,  1,  2,  1,  2, -1, -1, -1,  1, -1, -1,  -1, -1, -1, -1, -1, /* Ex */
 	-1, -1,  1, -1, -1, -1, -1, -1,  1, -1, -1, -1,  1, -1, -1, -1  /* Fx */
 };
@@ -569,13 +569,16 @@ void sb_device::process_fifo(uint8_t cmd)
 						case 0x42: // set input sample rate
 							m_dsp.adc_freq = m_dsp.fifo[2] + (m_dsp.fifo[1] << 8);
 							break;
+						case 0xd4: // continue 8-bit dma
+							drq_w(1);
+							break;
 						case 0xd5: // pause 16-bit dma
 							m_timer->adjust(attotime::never, 0);
 							drq16_w(0);   // drop DRQ
 							m_dsp.dma_throttled = false;
 							m_dsp.dma_timer_started = false;
 							break;
-						case 0xd6: // resume 16-bit dma
+						case 0xd6: // continue 16-bit dma
 							logerror("SB: 16-bit dma resume\n");
 							break;
 						case 0xd9: // stop 16-bit autoinit
@@ -1341,7 +1344,7 @@ void isa16_sblaster16_device::device_start()
 
 void sb_device::device_start()
 {
-	m_timer = timer_alloc(0, nullptr);
+	m_timer = timer_alloc(FUNC(sb_device::timer_tick), this);
 
 	save_item(NAME(m_dack_out));
 	save_item(NAME(m_onebyte_midi));
@@ -1559,11 +1562,8 @@ void sb_device::dack_w(int line, uint8_t data)
 	}
 }
 
-void sb_device::device_timer(emu_timer &timer, device_timer_id tid, int param, void *ptr)
+TIMER_CALLBACK_MEMBER(sb_device::timer_tick)
 {
-	if (tid)
-		return;
-
 //    printf("DMA timer expire\n");
 	uint16_t lsample, rsample;
 	switch (m_dsp.flags) {

@@ -9,7 +9,7 @@ class topcat_device : public device_t
 {
 public:
 	topcat_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
-	bool has_changed() { bool ret = m_changed; m_changed = false; return ret; };
+	bool has_changed() { bool ret = m_changed; m_changed = false; return ret; }
 	void set_fb_width(int _pixels) { m_fb_width = _pixels; }
 	void set_fb_height(int _pixels) { m_fb_height = _pixels; }
 	void set_planemask(int _mask) { m_plane_mask = _mask; }
@@ -20,7 +20,7 @@ public:
 	uint16_t ctrl_r(address_space &space, offs_t offset, uint16_t mem_mask = ~0);
 	void ctrl_w(address_space &space, offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
 
-	WRITE_LINE_MEMBER(vblank_w);
+	void vblank_w(int state);
 	void topcat_mem(address_map &map);
 
 	bool plane_enabled();

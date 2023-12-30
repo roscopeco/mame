@@ -16,14 +16,14 @@
 #include "emu.h"
 #include "busmouse.h"
 
-#define LOG_BUTTON         (1U<<1)   // Buttons
-#define LOG_MOVEX          (1U<<2)   // x movement
-#define LOG_MOVEY          (1U<<3)   // y movement
+#define LOG_BUTTON         (1U << 1)   // Buttons
+#define LOG_MOVEX          (1U << 2)   // x movement
+#define LOG_MOVEY          (1U << 3)   // y movement
 
-#define VERBOSE ( LOG_GENERAL )
+#define VERBOSE (LOG_GENERAL)
 #include "logmacro.h"
 
-DEFINE_DEVICE_TYPE_NS(V9938_BUSMOUSE, bus::ti99::colorbus, v9938_busmouse_device, "v9938_busmouse", "V9938 Bus Mouse")
+DEFINE_DEVICE_TYPE(V9938_BUSMOUSE, bus::ti99::colorbus::v9938_busmouse_device, "v9938_busmouse", "V9938 Bus Mouse")
 
 namespace bus::ti99::colorbus {
 

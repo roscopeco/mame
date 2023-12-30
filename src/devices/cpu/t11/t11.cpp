@@ -14,7 +14,6 @@
 #include "emu.h"
 #include "t11.h"
 #include "t11dasm.h"
-#include "debugger.h"
 
 
 /*************************************
@@ -52,9 +51,10 @@ t11_device::t11_device(const machine_config &mconfig, device_type type, const ch
 	, m_cp_state(0)
 	, m_vec_active(false)
 	, m_pf_active(false)
+	, m_berr_active(false)
 	, m_hlt_active(false)
 	, m_out_reset_func(*this)
-	, m_in_iack_func(*this)
+	, m_in_iack_func(*this, 0) // default vector (T-11 User's Guide, p. A-11)
 {
 	m_program_config.m_is_octal = true;
 	for (auto &reg : m_reg)
@@ -222,9 +222,14 @@ void t11_device::t11_check_irqs()
 		return;
 	}
 
-	// PF has next-highest priority
-	int priority = PSW & 0340;
-	if (m_power_fail && priority != 0340)
+	// non-maskable hardware traps
+	if (m_bus_error)
+	{
+		m_bus_error = false;
+		take_interrupt(T11_TIMEOUT);
+		return;
+	}
+	else if (m_power_fail)
 	{
 		m_power_fail = false;
 		take_interrupt(T11_PWRFAIL);
@@ -233,10 +238,10 @@ void t11_device::t11_check_irqs()
 
 	// compare the priority of the CP interrupt to the PSW
 	const struct irq_table_entry *irq = &irq_table[m_cp_state & 15];
-	if (irq->priority > priority)
+	if (irq->priority > (PSW & 0340))
 	{
 		// call the callback
-		standard_irq_callback(m_cp_state & 15);
+		standard_irq_callback(m_cp_state & 15, PC);
 
 		// T11 encodes the interrupt level on DAL<12:8>
 		uint8_t iaddr = bitswap<4>(~m_cp_state & 15, 0, 1, 2, 3);
@@ -305,8 +310,6 @@ void t11_device::device_start()
 	m_initial_pc = initial_pc[c_initial_mode >> 13];
 	space(AS_PROGRAM).cache(m_cache);
 	space(AS_PROGRAM).specific(m_program);
-	m_out_reset_func.resolve_safe();
-	m_in_iack_func.resolve_safe(0); // default vector (T-11 User's Guide, p. A-11)
 
 	save_item(NAME(m_ppc.w.l));
 	save_item(NAME(m_reg[0].w.l));
@@ -404,6 +407,7 @@ void t11_device::device_reset()
 
 	m_wait_state = 0;
 	m_power_fail = false;
+	m_bus_error = false;
 	m_ext_halt = false;
 }
 
@@ -445,6 +449,12 @@ void t11_device::execute_set_input(int irqline, int state)
 		if (state != CLEAR_LINE && !m_pf_active)
 			m_power_fail = true;
 		m_pf_active = (state != CLEAR_LINE);
+		break;
+
+	case BUS_ERROR:
+		if (state != CLEAR_LINE && !m_berr_active)
+			m_bus_error = true;
+		m_berr_active = (state != CLEAR_LINE);
 		break;
 
 	case HLT_LINE:

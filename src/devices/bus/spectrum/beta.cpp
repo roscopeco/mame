@@ -96,6 +96,8 @@
 #include "emu.h"
 #include "beta.h"
 
+#include "formats/trd_dsk.h"
+
 
 /***************************************************************************
     DEVICE DEFINITIONS
@@ -121,7 +123,7 @@ static void beta_floppies(device_slot_interface &device)
 }
 
 //-------------------------------------------------
-//  floppy_format_type floppy_formats
+//  floppy_formats
 //-------------------------------------------------
 
 void spectrum_betav2_device::floppy_formats(format_registration &fr)
@@ -264,6 +266,7 @@ void spectrum_betav2_device::device_add_mconfig_base(machine_config& config)
 	SPECTRUM_EXPANSION_SLOT(config, m_exp, spectrum_expansion_devices, nullptr);
 	m_exp->irq_handler().set(DEVICE_SELF_OWNER, FUNC(spectrum_expansion_slot_device::irq_w));
 	m_exp->nmi_handler().set(DEVICE_SELF_OWNER, FUNC(spectrum_expansion_slot_device::nmi_w));
+	m_exp->fb_r_handler().set(DEVICE_SELF_OWNER, FUNC(spectrum_expansion_slot_device::fb_r));
 }
 
 void spectrum_betav2_device::device_add_mconfig(machine_config &config)
@@ -474,7 +477,7 @@ void spectrum_betav2_device::device_reset()
 //  IMPLEMENTATION
 //**************************************************************************
 
-READ_LINE_MEMBER(spectrum_betav2_device::romcs)
+int spectrum_betav2_device::romcs()
 {
 	return m_romcs | m_exp->romcs();
 }

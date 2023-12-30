@@ -92,7 +92,7 @@ void InlinePass::AddStore(uint32_t ptr_id, uint32_t val_id,
                       {{spv_operand_type_t::SPV_OPERAND_TYPE_ID, {ptr_id}},
                        {spv_operand_type_t::SPV_OPERAND_TYPE_ID, {val_id}}}));
   if (line_inst != nullptr) {
-    newStore->dbg_line_insts().push_back(*line_inst);
+    newStore->AddDebugLine(line_inst);
   }
   newStore->SetDebugScope(dbg_scope);
   (*block_ptr)->AddInstruction(std::move(newStore));
@@ -106,7 +106,7 @@ void InlinePass::AddLoad(uint32_t type_id, uint32_t resultId, uint32_t ptr_id,
       new Instruction(context(), SpvOpLoad, type_id, resultId,
                       {{spv_operand_type_t::SPV_OPERAND_TYPE_ID, {ptr_id}}}));
   if (line_inst != nullptr) {
-    newLoad->dbg_line_insts().push_back(*line_inst);
+    newLoad->AddDebugLine(line_inst);
   }
   newLoad->SetDebugScope(dbg_scope);
   (*block_ptr)->AddInstruction(std::move(newLoad));
@@ -405,8 +405,8 @@ bool InlinePass::InlineEntryBlock(
   while (callee_inst_itr != callee_first_block->end()) {
     // Don't inline function definition links, the calling function is not a
     // definition.
-    if (callee_inst_itr->GetVulkan100DebugOpcode() ==
-        NonSemanticVulkanDebugInfo100DebugFunctionDefinition) {
+    if (callee_inst_itr->GetShader100DebugOpcode() ==
+        NonSemanticShaderDebugInfo100DebugFunctionDefinition) {
       ++callee_inst_itr;
       continue;
     }
@@ -441,6 +441,11 @@ std::unique_ptr<BasicBlock> InlinePass::InlineBasicBlocks(
     auto tail_inst_itr = callee_block_itr->end();
     for (auto inst_itr = callee_block_itr->begin(); inst_itr != tail_inst_itr;
          ++inst_itr) {
+      // Don't inline function definition links, the calling function is not a
+      // definition
+      if (inst_itr->GetShader100DebugOpcode() ==
+          NonSemanticShaderDebugInfo100DebugFunctionDefinition)
+        continue;
       if (!InlineSingleInstruction(
               callee2caller, new_blk_ptr.get(), &*inst_itr,
               context()->get_debug_info_mgr()->BuildDebugInlinedAtChain(
@@ -501,6 +506,37 @@ void InlinePass::MoveLoopMergeInstToFirstBlock(
   // Remove the loop merge from the last block.
   loop_merge_itr->RemoveFromList();
   delete &*loop_merge_itr;
+}
+
+void InlinePass::UpdateSingleBlockLoopContinueTarget(
+    uint32_t new_id, std::vector<std::unique_ptr<BasicBlock>>* new_blocks) {
+  auto& header = new_blocks->front();
+  auto* merge_inst = header->GetLoopMergeInst();
+
+  // The back-edge block is split at the branch to create a new back-edge
+  // block. The old block is modified to branch to the new block. The loop
+  // merge instruction is updated to declare the new block as the continue
+  // target. This has the effect of changing the loop from being a large
+  // continue construct and an empty loop construct to being a loop with a loop
+  // construct and a trivial continue construct. This change is made to satisfy
+  // structural dominance.
+
+  // Add the new basic block.
+  std::unique_ptr<BasicBlock> new_block =
+      MakeUnique<BasicBlock>(NewLabel(new_id));
+  auto& old_backedge = new_blocks->back();
+  auto old_branch = old_backedge->tail();
+
+  // Move the old back edge into the new block.
+  std::unique_ptr<Instruction> br(&*old_branch);
+  new_block->AddInstruction(std::move(br));
+
+  // Add a branch to the new block from the old back-edge block.
+  AddBranch(new_id, &old_backedge);
+  new_blocks->push_back(std::move(new_block));
+
+  // Update the loop's continue target to the new block.
+  merge_inst->SetInOperand(1u, {new_id});
 }
 
 bool InlinePass::GenInlineCode(
@@ -634,8 +670,18 @@ bool InlinePass::GenInlineCode(
   // Finalize inline code.
   new_blocks->push_back(std::move(new_blk_ptr));
 
-  if (caller_is_loop_header && (new_blocks->size() > 1))
+  if (caller_is_loop_header && (new_blocks->size() > 1)) {
     MoveLoopMergeInstToFirstBlock(new_blocks);
+
+    // If the loop was a single basic block previously, update it's structure.
+    auto& header = new_blocks->front();
+    auto* merge_inst = header->GetLoopMergeInst();
+    if (merge_inst->GetSingleWordInOperand(1u) == header->id()) {
+      auto new_id = context()->TakeNextId();
+      if (new_id == 0) return false;
+      UpdateSingleBlockLoopContinueTarget(new_id, new_blocks);
+    }
+  }
 
   // Update block map given replacement blocks.
   for (auto& blk : *new_blocks) {
@@ -748,22 +794,25 @@ bool InlinePass::IsInlinableFunction(Function* func) {
     return false;
   }
 
-  // Do not inline functions with an OpKill if they are called from a continue
-  // construct. If it is inlined into a continue construct it will generate
-  // invalid code.
+  // Do not inline functions with an abort instruction if they are called from a
+  // continue construct. If it is inlined into a continue construct the backedge
+  // will no longer post-dominate the continue target, which is invalid.  An
+  // `OpUnreachable` is acceptable because it will not change post-dominance if
+  // it is statically unreachable.
   bool func_is_called_from_continue =
       funcs_called_from_continue_.count(func->result_id()) != 0;
 
-  if (func_is_called_from_continue && ContainsKillOrTerminateInvocation(func)) {
+  if (func_is_called_from_continue && ContainsAbortOtherThanUnreachable(func)) {
     return false;
   }
 
   return true;
 }
 
-bool InlinePass::ContainsKillOrTerminateInvocation(Function* func) const {
+bool InlinePass::ContainsAbortOtherThanUnreachable(Function* func) const {
   return !func->WhileEachInst([](Instruction* inst) {
-    return !spvOpcodeTerminatesExecution(inst->opcode());
+    return inst->opcode() == SpvOpUnreachable ||
+           !spvOpcodeIsAbort(inst->opcode());
   });
 }
 

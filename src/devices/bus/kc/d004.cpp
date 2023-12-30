@@ -131,7 +131,7 @@ void kc_d004_device::device_start()
 {
 	m_rom  = memregion(Z80_TAG)->base();
 
-	m_reset_timer = timer_alloc(TIMER_RESET);
+	m_reset_timer = timer_alloc(FUNC(kc_d004_device::reset_tick), this);
 }
 
 //-------------------------------------------------
@@ -185,17 +185,12 @@ const tiny_rom_entry *kc_d004_device::device_rom_region() const
 }
 
 //-------------------------------------------------
-//  device_timer - handler timer events
+//  reset_tick - reset the main CPU when needed
 //-------------------------------------------------
 
-void kc_d004_device::device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr)
+TIMER_CALLBACK_MEMBER(kc_d004_device::reset_tick)
 {
-	switch(id)
-	{
-		case TIMER_RESET:
-			m_cpu->set_input_line(INPUT_LINE_RESET, ASSERT_LINE);
-			break;
-	}
+	m_cpu->set_input_line(INPUT_LINE_RESET, ASSERT_LINE);
 }
 
 /*-------------------------------------------------
@@ -353,7 +348,7 @@ void kc_d004_device::hw_terminal_count_w(uint8_t data)
 	m_fdc->tc_w(true);
 }
 
-WRITE_LINE_MEMBER(kc_d004_device::fdc_irq)
+void kc_d004_device::fdc_irq(int state)
 {
 	if (state)
 		m_fdc->tc_w(false);

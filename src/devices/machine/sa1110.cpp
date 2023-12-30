@@ -9,25 +9,25 @@
 #include "emu.h"
 #include "sa1110.h"
 
-#define LOG_UNKNOWN     (1 << 1)
-#define LOG_ICP         (1 << 2)
-#define LOG_UART3       (1 << 3)
-#define LOG_UART3_HF    (1 << 4)
-#define LOG_MCP         (1 << 5)
-#define LOG_SSP         (1 << 6)
-#define LOG_OSTIMER     (1 << 7)
-#define LOG_OSTIMER_HF  (1 << 8)
-#define LOG_RTC         (1 << 9)
-#define LOG_RTC_HF      (1 << 10)
-#define LOG_POWER       (1 << 11)
-#define LOG_POWER_HF    (1 << 12)
-#define LOG_RESET       (1 << 13)
-#define LOG_GPIO        (1 << 14)
-#define LOG_GPIO_HF     (1 << 15)
-#define LOG_INTC        (1 << 16)
-#define LOG_PPC         (1 << 17)
-#define LOG_DMA         (1 << 18)
-#define LOG_UDC         (1 << 19)
+#define LOG_UNKNOWN     (1U << 1)
+#define LOG_ICP         (1U << 2)
+#define LOG_UART3       (1U << 3)
+#define LOG_UART3_HF    (1U << 4)
+#define LOG_MCP         (1U << 5)
+#define LOG_SSP         (1U << 6)
+#define LOG_OSTIMER     (1U << 7)
+#define LOG_OSTIMER_HF  (1U << 8)
+#define LOG_RTC         (1U << 9)
+#define LOG_RTC_HF      (1U << 10)
+#define LOG_POWER       (1U << 11)
+#define LOG_POWER_HF    (1U << 12)
+#define LOG_RESET       (1U << 13)
+#define LOG_GPIO        (1U << 14)
+#define LOG_GPIO_HF     (1U << 15)
+#define LOG_INTC        (1U << 16)
+#define LOG_PPC         (1U << 17)
+#define LOG_DMA         (1U << 18)
+#define LOG_UDC         (1U << 19)
 #define LOG_ALL         (LOG_UNKNOWN | LOG_ICP | LOG_UART3 | LOG_MCP | LOG_OSTIMER | LOG_RTC | LOG_POWER | LOG_RESET | LOG_GPIO | LOG_INTC | LOG_PPC | LOG_DMA | LOG_UDC)
 
 #define VERBOSE         (0)
@@ -405,7 +405,7 @@ void sa1110_periphs_device::icp_w(offs_t offset, uint32_t data, uint32_t mem_mas
 
 */
 
-WRITE_LINE_MEMBER(sa1110_periphs_device::uart3_irq_callback)
+void sa1110_periphs_device::uart3_irq_callback(int state)
 {
 	set_irq_line(INT_UART3, state);
 }
@@ -792,7 +792,7 @@ void sa1110_periphs_device::uart3_w(offs_t offset, uint32_t data, uint32_t mem_m
 
 */
 
-WRITE_LINE_MEMBER(sa1110_periphs_device::mcp_irq_callback)
+void sa1110_periphs_device::mcp_irq_callback(int state)
 {
 	set_irq_line(INT_MCP, state);
 }
@@ -2314,12 +2314,12 @@ void sa1110_periphs_device::device_start()
 	save_item(NAME(m_icp_regs.uart.rx_fifo_read_idx));
 	save_item(NAME(m_icp_regs.uart.rx_fifo_write_idx));
 	save_item(NAME(m_icp_regs.uart.rx_fifo_count));
-	m_icp_regs.uart_rx_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(sa1110_periphs_device::icp_rx_callback), this));
+	m_icp_regs.uart_rx_timer = timer_alloc(FUNC(sa1110_periphs_device::icp_rx_callback), this);
 	save_item(NAME(m_icp_regs.uart.tx_fifo));
 	save_item(NAME(m_icp_regs.uart.tx_fifo_read_idx));
 	save_item(NAME(m_icp_regs.uart.tx_fifo_write_idx));
 	save_item(NAME(m_icp_regs.uart.tx_fifo_count));
-	m_icp_regs.uart_tx_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(sa1110_periphs_device::icp_tx_callback), this));
+	m_icp_regs.uart_tx_timer = timer_alloc(FUNC(sa1110_periphs_device::icp_tx_callback), this);
 	save_item(NAME(m_icp_regs.uart.rx_break_interlock));
 
 	save_item(NAME(m_icp_regs.utcr4));
@@ -2331,12 +2331,12 @@ void sa1110_periphs_device::device_start()
 	save_item(NAME(m_icp_regs.hssp.rx_fifo_read_idx));
 	save_item(NAME(m_icp_regs.hssp.rx_fifo_write_idx));
 	save_item(NAME(m_icp_regs.hssp.rx_fifo_count));
-	m_icp_regs.hssp.rx_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(sa1110_periphs_device::hssp_rx_callback), this));
+	m_icp_regs.hssp.rx_timer = timer_alloc(FUNC(sa1110_periphs_device::hssp_rx_callback), this);
 	save_item(NAME(m_icp_regs.hssp.tx_fifo));
 	save_item(NAME(m_icp_regs.hssp.tx_fifo_read_idx));
 	save_item(NAME(m_icp_regs.hssp.tx_fifo_write_idx));
 	save_item(NAME(m_icp_regs.hssp.tx_fifo_count));
-	m_icp_regs.hssp.tx_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(sa1110_periphs_device::hssp_tx_callback), this));
+	m_icp_regs.hssp.tx_timer = timer_alloc(FUNC(sa1110_periphs_device::hssp_tx_callback), this);
 
 	save_item(NAME(m_uart_regs.utcr));
 	save_item(NAME(m_uart_regs.utsr0));
@@ -2363,7 +2363,7 @@ void sa1110_periphs_device::device_start()
 	save_item(NAME(m_mcp_regs.audio_tx_fifo_read_idx));
 	save_item(NAME(m_mcp_regs.audio_tx_fifo_write_idx));
 	save_item(NAME(m_mcp_regs.audio_tx_fifo_count));
-	m_mcp_regs.audio_tx_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(sa1110_periphs_device::mcp_audio_tx_callback), this));
+	m_mcp_regs.audio_tx_timer = timer_alloc(FUNC(sa1110_periphs_device::mcp_audio_tx_callback), this);
 	save_item(NAME(m_mcp_regs.telecom_rx_fifo));
 	save_item(NAME(m_mcp_regs.telecom_rx_fifo_read_idx));
 	save_item(NAME(m_mcp_regs.telecom_rx_fifo_write_idx));
@@ -2372,7 +2372,7 @@ void sa1110_periphs_device::device_start()
 	save_item(NAME(m_mcp_regs.telecom_tx_fifo_read_idx));
 	save_item(NAME(m_mcp_regs.telecom_tx_fifo_write_idx));
 	save_item(NAME(m_mcp_regs.telecom_tx_fifo_count));
-	m_mcp_regs.telecom_tx_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(sa1110_periphs_device::mcp_telecom_tx_callback), this));
+	m_mcp_regs.telecom_tx_timer = timer_alloc(FUNC(sa1110_periphs_device::mcp_telecom_tx_callback), this);
 
 	save_item(NAME(m_ssp_regs.sscr0));
 	save_item(NAME(m_ssp_regs.sscr1));
@@ -2381,12 +2381,12 @@ void sa1110_periphs_device::device_start()
 	save_item(NAME(m_ssp_regs.rx_fifo_read_idx));
 	save_item(NAME(m_ssp_regs.rx_fifo_write_idx));
 	save_item(NAME(m_ssp_regs.rx_fifo_count));
-	m_ssp_regs.rx_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(sa1110_periphs_device::ssp_rx_callback), this));
+	m_ssp_regs.rx_timer = timer_alloc(FUNC(sa1110_periphs_device::ssp_rx_callback), this);
 	save_item(NAME(m_ssp_regs.tx_fifo));
 	save_item(NAME(m_ssp_regs.tx_fifo_read_idx));
 	save_item(NAME(m_ssp_regs.tx_fifo_write_idx));
 	save_item(NAME(m_ssp_regs.tx_fifo_count));
-	m_ssp_regs.tx_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(sa1110_periphs_device::ssp_tx_callback), this));
+	m_ssp_regs.tx_timer = timer_alloc(FUNC(sa1110_periphs_device::ssp_tx_callback), this);
 
 	save_item(NAME(m_ostmr_regs.osmr));
 	save_item(NAME(m_ostmr_regs.oscr));
@@ -2395,14 +2395,14 @@ void sa1110_periphs_device::device_start()
 	save_item(NAME(m_ostmr_regs.oier));
 	for (int i = 0; i < 4; i++)
 	{
-		m_ostmr_regs.timer[i] = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(sa1110_periphs_device::ostimer_tick_cb), this));
+		m_ostmr_regs.timer[i] = timer_alloc(FUNC(sa1110_periphs_device::ostimer_tick_cb), this);
 	}
 
 	save_item(NAME(m_rtc_regs.rtar));
 	save_item(NAME(m_rtc_regs.rcnr));
 	save_item(NAME(m_rtc_regs.rttr));
 	save_item(NAME(m_rtc_regs.rtsr));
-	m_rtc_regs.tick_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(sa1110_periphs_device::rtc_tick_cb), this));
+	m_rtc_regs.tick_timer = timer_alloc(FUNC(sa1110_periphs_device::rtc_tick_cb), this);
 
 	save_item(NAME(m_power_regs.pmcr));
 	save_item(NAME(m_power_regs.pssr));
@@ -2445,10 +2445,6 @@ void sa1110_periphs_device::device_start()
 	save_item(STRUCT_MEMBER(m_dma_regs, dbs));
 	save_item(STRUCT_MEMBER(m_dma_regs, dbt));
 	save_item(NAME(m_dma_active_mask));
-
-	m_gpio_out.resolve_all_safe();
-	m_ssp_out.resolve_safe();
-	m_uart3_tx_out.resolve_safe();
 }
 
 void sa1110_periphs_device::device_reset()

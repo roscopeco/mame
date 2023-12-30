@@ -121,22 +121,22 @@
 #include "emu.h"
 #include "hsgpl.h"
 
-#define LOG_WARN        (1U<<1)   // Warnings
-#define LOG_CONFIG      (1U<<2)   // Configuration
-#define LOG_PORT        (1U<<3)
-#define LOG_DSR         (1U<<4)
-#define LOG_BANKING     (1U<<5)
-#define LOG_CRU         (1U<<6)
-#define LOG_ADDRESS     (1U<<7)
-#define LOG_READ        (1U<<8)
-#define LOG_WRITE       (1U<<9)
-#define LOG_IGNORE      (1U<<10)
+#define LOG_WARN        (1U << 1)   // Warnings
+#define LOG_CONFIG      (1U << 2)   // Configuration
+#define LOG_PORT        (1U << 3)
+#define LOG_DSR         (1U << 4)
+#define LOG_BANKING     (1U << 5)
+#define LOG_CRU         (1U << 6)
+#define LOG_ADDRESS     (1U << 7)
+#define LOG_READ        (1U << 8)
+#define LOG_WRITE       (1U << 9)
+#define LOG_IGNORE      (1U << 10)
 
-#define VERBOSE ( LOG_CONFIG | LOG_WARN )
+#define VERBOSE (LOG_CONFIG | LOG_WARN)
 
 #include "logmacro.h"
 
-DEFINE_DEVICE_TYPE_NS(TI99_HSGPL, bus::ti99::peb, snug_high_speed_gpl_device, "ti99_hsgpl", "SNUG High-speed GPL card")
+DEFINE_DEVICE_TYPE(TI99_HSGPL, bus::ti99::peb::snug_high_speed_gpl_device, "ti99_hsgpl", "SNUG High-speed GPL card")
 
 namespace bus::ti99::peb {
 

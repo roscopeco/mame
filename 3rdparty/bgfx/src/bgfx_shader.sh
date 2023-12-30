@@ -1,6 +1,6 @@
 /*
- * Copyright 2011-2021 Branimir Karadzic. All rights reserved.
- * License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause
+ * Copyright 2011-2022 Branimir Karadzic. All rights reserved.
+ * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
  */
 
 #ifndef BGFX_SHADER_H_HEADER_GUARD
@@ -22,7 +22,7 @@
 #	define UNROLL
 #endif // BGFX_SHADER_LANGUAGE_HLSL > 300
 
-#if BGFX_SHADER_LANGUAGE_HLSL > 300 && BGFX_SHADER_TYPE_FRAGMENT
+#if (BGFX_SHADER_LANGUAGE_HLSL > 300 || BGFX_SHADER_LANGUAGE_METAL || BGFX_SHADER_LANGUAGE_SPIRV) && BGFX_SHADER_TYPE_FRAGMENT
 #	define EARLY_DEPTH_STENCIL [earlydepthstencil]
 #else
 #	define EARLY_DEPTH_STENCIL
@@ -52,7 +52,7 @@
 
 // To be able to patch the uav registers on the DXBC SPDB Chunk (D3D11 renderer) the whitespaces around
 // '_type[_reg]' are necessary. This only affects shaders with debug info (i.e., those that have the SPDB Chunk).
-#	if BGFX_SHADER_LANGUAGE_HLSL > 400
+#	if BGFX_SHADER_LANGUAGE_HLSL > 400 || BGFX_SHADER_LANGUAGE_PSSL || BGFX_SHADER_LANGUAGE_SPIRV || BGFX_SHADER_LANGUAGE_METAL
 #		define REGISTER(_type, _reg) register( _type[_reg] )
 #	else
 #		define REGISTER(_type, _reg) register(_type ## _reg)
@@ -315,17 +315,55 @@ vec2 bgfxTextureSize(BgfxUSampler2D _sampler, int _lod)
 	return result;
 }
 
-vec4 bgfxTextureGather(BgfxSampler2D _sampler, vec2 _coord)
+vec4 bgfxTextureGather0(BgfxSampler2D _sampler, vec2 _coord)
 {
-	return _sampler.m_texture.GatherRed(_sampler.m_sampler, _coord );
+	return _sampler.m_texture.GatherRed(_sampler.m_sampler, _coord);
 }
-vec4 bgfxTextureGatherOffset(BgfxSampler2D _sampler, vec2 _coord, ivec2 _offset)
+vec4 bgfxTextureGather1(BgfxSampler2D _sampler, vec2 _coord)
 {
-	return _sampler.m_texture.GatherRed(_sampler.m_sampler, _coord, _offset );
+	return _sampler.m_texture.GatherGreen(_sampler.m_sampler, _coord);
 }
-vec4 bgfxTextureGather(BgfxSampler2DArray _sampler, vec3 _coord)
+vec4 bgfxTextureGather2(BgfxSampler2D _sampler, vec2 _coord)
 {
-	return _sampler.m_texture.GatherRed(_sampler.m_sampler, _coord );
+	return _sampler.m_texture.GatherBlue(_sampler.m_sampler, _coord);
+}
+vec4 bgfxTextureGather3(BgfxSampler2D _sampler, vec2 _coord)
+{
+	return _sampler.m_texture.GatherAlpha(_sampler.m_sampler, _coord);
+}
+
+vec4 bgfxTextureGatherOffset0(BgfxSampler2D _sampler, vec2 _coord, ivec2 _offset)
+{
+	return _sampler.m_texture.GatherRed(_sampler.m_sampler, _coord, _offset);
+}
+vec4 bgfxTextureGatherOffset1(BgfxSampler2D _sampler, vec2 _coord, ivec2 _offset)
+{
+	return _sampler.m_texture.GatherGreen(_sampler.m_sampler, _coord, _offset);
+}
+vec4 bgfxTextureGatherOffset2(BgfxSampler2D _sampler, vec2 _coord, ivec2 _offset)
+{
+	return _sampler.m_texture.GatherBlue(_sampler.m_sampler, _coord, _offset);
+}
+vec4 bgfxTextureGatherOffset3(BgfxSampler2D _sampler, vec2 _coord, ivec2 _offset)
+{
+	return _sampler.m_texture.GatherAlpha(_sampler.m_sampler, _coord, _offset);
+}
+
+vec4 bgfxTextureGather0(BgfxSampler2DArray _sampler, vec3 _coord)
+{
+	return _sampler.m_texture.GatherRed(_sampler.m_sampler, _coord);
+}
+vec4 bgfxTextureGather1(BgfxSampler2DArray _sampler, vec3 _coord)
+{
+	return _sampler.m_texture.GatherGreen(_sampler.m_sampler, _coord);
+}
+vec4 bgfxTextureGather2(BgfxSampler2DArray _sampler, vec3 _coord)
+{
+	return _sampler.m_texture.GatherBlue(_sampler.m_sampler, _coord);
+}
+vec4 bgfxTextureGather3(BgfxSampler2DArray _sampler, vec3 _coord)
+{
+	return _sampler.m_texture.GatherAlpha(_sampler.m_sampler, _coord);
 }
 
 ivec4 bgfxTexelFetch(BgfxISampler2D _sampler, ivec2 _coord, int _lod)
@@ -440,8 +478,8 @@ vec3 bgfxTextureSize(BgfxSampler3D _sampler, int _lod)
 #		define texelFetch(_sampler, _coord, _lod) bgfxTexelFetch(_sampler, _coord, _lod)
 #		define texelFetchOffset(_sampler, _coord, _lod, _offset) bgfxTexelFetchOffset(_sampler, _coord, _lod, _offset)
 #		define textureSize(_sampler, _lod) bgfxTextureSize(_sampler, _lod)
-#		define textureGather(_sampler, _coord) bgfxTextureGather(_sampler, _coord)
-#		define textureGatherOffset(_sampler, _coord, _offset) bgfxTextureGatherOffset(_sampler, _coord, _offset)
+#		define textureGather(_sampler, _coord, _comp) bgfxTextureGather ## _comp(_sampler, _coord)
+#		define textureGatherOffset(_sampler, _coord, _offset, _comp) bgfxTextureGatherOffset ## _comp(_sampler, _coord, _offset)
 #	else
 
 #		define sampler2DShadow sampler2D
@@ -563,15 +601,18 @@ vec4  mod(vec4  _a, vec4  _b) { return _a - _b * floor(_a / _b); }
 #	define ISAMPLER3D(_name, _reg) uniform isampler3D _name
 #	define USAMPLER3D(_name, _reg) uniform usampler3D _name
 
-#	define texture2DBias(_sampler, _coord, _bias)      texture2D(_sampler, _coord, _bias)
-#	define textureCubeBias(_sampler, _coord, _bias)    textureCube(_sampler, _coord, _bias)
-
 #	if BGFX_SHADER_LANGUAGE_GLSL >= 130
 #		define texture2D(_sampler, _coord)      texture(_sampler, _coord)
 #		define texture2DArray(_sampler, _coord) texture(_sampler, _coord)
 #		define texture3D(_sampler, _coord)      texture(_sampler, _coord)
+#		define textureCube(_sampler, _coord)    texture(_sampler, _coord)
 #		define texture2DLod(_sampler, _coord, _lod)                textureLod(_sampler, _coord, _lod)
 #		define texture2DLodOffset(_sampler, _coord, _lod, _offset) textureLodOffset(_sampler, _coord, _lod, _offset)
+#		define texture2DBias(_sampler, _coord, _bias)      texture(_sampler, _coord, _bias)
+#		define textureCubeBias(_sampler, _coord, _bias)    texture(_sampler, _coord, _bias)
+#	else
+#		define texture2DBias(_sampler, _coord, _bias)      texture2D(_sampler, _coord, _bias)
+#		define textureCubeBias(_sampler, _coord, _bias)    textureCube(_sampler, _coord, _bias)
 #	endif // BGFX_SHADER_LANGUAGE_GLSL >= 130
 
 vec3 instMul(vec3 _vec, mat3 _mtx) { return mul(_vec, _mtx); }

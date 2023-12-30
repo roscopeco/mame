@@ -2,7 +2,7 @@
 // copyright-holders:Miodrag Milanovic
 /*********************************************************************
 
-    formats/trd_dsk.c
+    formats/trd_dsk.cpp
 
     TRD disk images
 
@@ -17,22 +17,22 @@ trd_format::trd_format() : wd177x_format(formats)
 {
 }
 
-const char *trd_format::name() const
+const char *trd_format::name() const noexcept
 {
 	return "trd";
 }
 
-const char *trd_format::description() const
+const char *trd_format::description() const noexcept
 {
 	return "TRD floppy disk image";
 }
 
-const char *trd_format::extensions() const
+const char *trd_format::extensions() const noexcept
 {
 	return "trd";
 }
 
-int trd_format::find_size(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants)
+int trd_format::find_size(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants) const
 {
 	uint64_t size;
 	if (io.length(size))
@@ -110,4 +110,4 @@ const trd_format::format trd_format::formats[] = {
 	{}
 };
 
-const floppy_format_type FLOPPY_TRD_FORMAT = &floppy_image_format_creator<trd_format>;
+const trd_format FLOPPY_TRD_FORMAT;

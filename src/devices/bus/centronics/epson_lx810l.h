@@ -13,6 +13,7 @@
 #include "cpu/upd7810/upd7810.h"
 #include "machine/e05a30.h"
 #include "machine/eepromser.h"
+#include "machine/bitmap_printer.h"
 #include "machine/steppers.h"
 #include "sound/dac.h"
 #include "screen.h"
@@ -33,16 +34,16 @@ public:
 	epson_lx810l_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
 
 	/* Centronics stuff */
-	virtual DECLARE_WRITE_LINE_MEMBER( input_strobe ) override { m_e05a30->centronics_input_strobe(state); }
-	virtual DECLARE_WRITE_LINE_MEMBER( input_data0 ) override { m_e05a30->centronics_input_data0(state); }
-	virtual DECLARE_WRITE_LINE_MEMBER( input_data1 ) override { m_e05a30->centronics_input_data1(state); }
-	virtual DECLARE_WRITE_LINE_MEMBER( input_data2 ) override { m_e05a30->centronics_input_data2(state); }
-	virtual DECLARE_WRITE_LINE_MEMBER( input_data3 ) override { m_e05a30->centronics_input_data3(state); }
-	virtual DECLARE_WRITE_LINE_MEMBER( input_data4 ) override { m_e05a30->centronics_input_data4(state); }
-	virtual DECLARE_WRITE_LINE_MEMBER( input_data5 ) override { m_e05a30->centronics_input_data5(state); }
-	virtual DECLARE_WRITE_LINE_MEMBER( input_data6 ) override { m_e05a30->centronics_input_data6(state); }
-	virtual DECLARE_WRITE_LINE_MEMBER( input_data7 ) override { m_e05a30->centronics_input_data7(state); }
-	virtual DECLARE_WRITE_LINE_MEMBER( input_init ) override { m_e05a30->centronics_input_init(state); }
+	virtual void input_strobe(int state) override { m_e05a30->centronics_input_strobe(state); }
+	virtual void input_data0(int state) override { m_e05a30->centronics_input_data0(state); }
+	virtual void input_data1(int state) override { m_e05a30->centronics_input_data1(state); }
+	virtual void input_data2(int state) override { m_e05a30->centronics_input_data2(state); }
+	virtual void input_data3(int state) override { m_e05a30->centronics_input_data3(state); }
+	virtual void input_data4(int state) override { m_e05a30->centronics_input_data4(state); }
+	virtual void input_data5(int state) override { m_e05a30->centronics_input_data5(state); }
+	virtual void input_data6(int state) override { m_e05a30->centronics_input_data6(state); }
+	virtual void input_data7(int state) override { m_e05a30->centronics_input_data7(state); }
+	virtual void input_init(int state) override { m_e05a30->centronics_input_init(state); }
 
 	/* Panel buttons */
 	DECLARE_INPUT_CHANGED_MEMBER(online_sw);
@@ -56,7 +57,6 @@ protected:
 	// device-level overrides
 	virtual void device_start() override;
 	virtual void device_reset() override;
-	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
 
 	// optional information overrides
 	virtual const tiny_rom_entry *device_rom_region() const override;
@@ -73,12 +73,14 @@ private:
 	uint8_t portc_r(offs_t offset);
 	void portc_w(offs_t offset, uint8_t data);
 
+	TIMER_CALLBACK_MEMBER(cr_tick);
+
 	/* fake memory I/O to get past memory reset check */
 	uint8_t fakemem_r();
 	void fakemem_w(uint8_t data);
 
 	/* Extended Timer Output */
-	DECLARE_WRITE_LINE_MEMBER(co0_w);
+	void co0_w(int state);
 
 	/* ADC */
 	uint8_t an0_r();
@@ -95,42 +97,47 @@ private:
 	void printhead(uint16_t data);
 	void pf_stepper(uint8_t data);
 	void cr_stepper(uint8_t data);
-	DECLARE_WRITE_LINE_MEMBER(e05a30_ready);
+	void e05a30_ready(int state);
 
-	DECLARE_WRITE_LINE_MEMBER(e05a30_centronics_ack) { output_ack(state); }
-	DECLARE_WRITE_LINE_MEMBER(e05a30_centronics_busy) { output_busy(state); }
-	DECLARE_WRITE_LINE_MEMBER(e05a30_centronics_perror) { output_perror(state); }
-	DECLARE_WRITE_LINE_MEMBER(e05a30_centronics_fault) { output_fault(state); }
-	DECLARE_WRITE_LINE_MEMBER(e05a30_centronics_select) { output_select(state); }
+	void e05a30_centronics_ack(int state) { output_ack(state); }
+	void e05a30_centronics_busy(int state) { output_busy(state); }
+	void e05a30_centronics_perror(int state) { output_perror(state); }
+	void e05a30_centronics_fault(int state) { output_fault(state); }
+	void e05a30_centronics_select(int state) { output_select(state); }
 
-	DECLARE_WRITE_LINE_MEMBER(e05a30_cpu_reset) { if (!state) m_maincpu->pulse_input_line(INPUT_LINE_RESET, attotime::zero); } // reset cpu
+	void e05a30_cpu_reset(int state) { if (!state) m_maincpu->pulse_input_line(INPUT_LINE_RESET, attotime::zero); } // reset cpu
+
+	void e05a30_ready_led(int state)
+	{
+		m_ready_led = state;
+		m_bitmap_printer->set_led_state(bitmap_printer_device::LED_READY, m_ready_led);
+	}
 
 	void lx810l_mem(address_map &map);
 
-	/* Video hardware (simulates paper) */
-	uint32_t screen_update_lx810l(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect);
-
-	unsigned int bitmap_line(int i) { return ((std::abs(m_pf_pos_abs) / 6) + i) % m_bitmap.height(); }
-
 	required_device<cpu_device> m_maincpu;
-	required_device<stepper_device> m_pf_stepper;
-	required_device<stepper_device> m_cr_stepper;
+	required_device<bitmap_printer_device> m_bitmap_printer;
 	required_device<eeprom_serial_93cxx_device> m_eeprom;
 	required_device<e05a30_device> m_e05a30;
-	required_device<screen_device> m_screen;
 
 	output_finder<> m_online_led;
+	output_finder<> m_ready_led;
+
+	required_ioport m_online_ioport;
+	required_ioport m_formfeed_ioport;
+	required_ioport m_linefeed_ioport;
+	required_ioport m_loadeject_ioport;
+	required_ioport m_paperend_ioport;
+	required_ioport m_dipsw1_ioport;
+	required_ioport m_dipsw2_ioport;
 
 	int m_93c06_clk;
 	int m_93c06_cs;
 	uint16_t m_printhead;
-	int m_pf_pos_abs;
-	int m_cr_pos_abs;
-	int m_real_cr_pos;
 	int m_real_cr_steps;
-	int m_real_cr_dir; /* 1 is going right, -1 is going left */
 	uint8_t m_fakemem;
-	bitmap_rgb32 m_bitmap;
+	int m_in_between_offset; // in between cr_stepper phases
+	int m_rightward_offset; // offset pixels when stepper moving rightward
 
 	enum {
 		TIMER_CR

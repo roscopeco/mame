@@ -25,9 +25,9 @@ DEFINE_DEVICE_TYPE(ACORN_IOC, acorn_ioc_device, "ioc", "Acorn IOC")
 acorn_ioc_device::acorn_ioc_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
 	: device_t(mconfig, ACORN_IOC, tag, owner, clock)
 	, device_serial_interface(mconfig, *this)
-	, m_peripherals_r(*this)
+	, m_peripherals_r(*this, 0xffffffff)
 	, m_peripherals_w(*this)
-	, m_giop_r(*this)
+	, m_giop_r(*this, 1)
 	, m_giop_w(*this)
 	, m_irq_w(*this)
 	, m_fiq_w(*this)
@@ -36,22 +36,10 @@ acorn_ioc_device::acorn_ioc_device(const machine_config &mconfig, const char *ta
 {
 }
 
-void acorn_ioc_device::device_resolve_objects()
-{
-	m_peripherals_r.resolve_all_safe(0xffffffff);
-	m_peripherals_w.resolve_all_safe();
-	m_giop_r.resolve_all_safe(1);
-	m_giop_w.resolve_all_safe();
-	m_irq_w.resolve_safe();
-	m_fiq_w.resolve_safe();
-	m_kout_w.resolve_safe();
-	m_baud_w.resolve();
-}
-
 void acorn_ioc_device::device_start()
 {
 	for (int i=0; i <4; i++)
-		m_timers[i] = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(acorn_ioc_device::timer_tick), this));
+		m_timers[i] = timer_alloc(FUNC(acorn_ioc_device::timer_tick), this);
 
 	save_item(NAME(m_ir));
 	save_item(NAME(m_if));
@@ -173,7 +161,7 @@ void acorn_ioc_device::set_timer(int tmr)
 
 		case 2: // Baud generator
 			freq = (double)clock() / 8 / (double)(m_timercnt[tmr] + 1);
-			if (!m_baud_w.isnull())
+			if (!m_baud_w.isunset())
 				m_timers[tmr]->adjust(attotime::from_usec(freq), tmr);
 			break;
 
@@ -190,7 +178,7 @@ void acorn_ioc_device::latch_timer_cnt(int tmr)
 	m_timerout[tmr] = m_timercnt[tmr] - (uint32_t)m_timers[tmr]->elapsed().as_ticks(clock() / 4);
 }
 
-WRITE_LINE_MEMBER(acorn_ioc_device::if_w)
+void acorn_ioc_device::if_w(int state)
 {
 	// set on falling edge
 	if (m_if && !state)
@@ -199,7 +187,7 @@ WRITE_LINE_MEMBER(acorn_ioc_device::if_w)
 	m_if = state;
 }
 
-WRITE_LINE_MEMBER(acorn_ioc_device::ir_w)
+void acorn_ioc_device::ir_w(int state)
 {
 	// set on rising edge
 	if (!m_ir && state)
@@ -241,7 +229,8 @@ uint32_t acorn_ioc_device::registers_r(offs_t offset, uint32_t mem_mask)
 		return data;
 
 	case KART:
-		change_interrupt(IRQ_STATUS_B, 0x80, CLEAR_LINE);
+		if (!machine().side_effects_disabled())
+			change_interrupt(IRQ_STATUS_B, 0x80, CLEAR_LINE);
 		return m_regs[KART];
 
 	case IRQ_STATUS_A:

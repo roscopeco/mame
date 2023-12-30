@@ -97,7 +97,7 @@ public:
 	void write_pa5(int state) { set_pa_line(5, state); }
 	void write_pa6(int state) { set_pa_line(6, state); }
 	void write_pa7(int state) { set_pa_line(7, state); }
-	void write_pa( u8 data );
+	void write_pa(u8 data);
 	void write_ca1(int state);
 	void write_ca2(int state);
 
@@ -109,7 +109,7 @@ public:
 	void write_pb5(int state) { set_pb_line(5, state); }
 	void write_pb6(int state) { set_pb_line(6, state); }
 	void write_pb7(int state) { set_pb_line(7, state); }
-	void write_pb( u8 data );
+	void write_pb(u8 data);
 	void write_cb1(int state);
 	void write_cb2(int state);
 
@@ -123,17 +123,14 @@ protected:
 	// device-level overrides
 	virtual void device_start() override;
 	virtual void device_reset() override;
-	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
+
+	TIMER_CALLBACK_MEMBER(shift_irq_tick);
+	TIMER_CALLBACK_MEMBER(shift_tick);
+	TIMER_CALLBACK_MEMBER(t1_tick);
+	TIMER_CALLBACK_MEMBER(t2_tick);
+	TIMER_CALLBACK_MEMBER(ca2_tick);
 
 private:
-	static constexpr device_timer_id TIMER_SHIFT = 0;
-	static constexpr device_timer_id TIMER_T1 = 1;
-	static constexpr device_timer_id TIMER_T2 = 2;
-	static constexpr device_timer_id TIMER_CA2 = 3;
-	static constexpr device_timer_id TIMER_SHIFT_IRQ = 4;
-	static constexpr device_timer_id TIMER_CB2 = 5;
-
-
 	uint16_t get_counter1_value();
 	void counter2_decrement();
 

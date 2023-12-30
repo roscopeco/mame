@@ -43,7 +43,7 @@ DEFINE_DEVICE_TYPE(M50753, m50753_device, "m50753", "Mitsubishi M50753")
 m5074x_device::m5074x_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock, int addrbits, address_map_constructor internal_map) :
 	m740_device(mconfig, type, tag, owner, clock),
 	m_program_config("program", ENDIANNESS_LITTLE, 8, addrbits, 0, internal_map),
-	m_read_p(*this),
+	m_read_p(*this, 0),
 	m_write_p(*this),
 	m_intctrl(0),
 	m_tmrctrl(0),
@@ -66,13 +66,10 @@ m5074x_device::m5074x_device(const machine_config &mconfig, device_type type, co
 
 void m5074x_device::device_start()
 {
-	m_read_p.resolve_all_safe(0);
-	m_write_p.resolve_all_safe();
-
-	for (int i = 0; i < NUM_TIMERS; i++)
-	{
-		m_timers[i] = timer_alloc(i, nullptr);
-	}
+	m_timers[TIMER_1] = timer_alloc(FUNC(m5074x_device::timer1_tick), this);
+	m_timers[TIMER_2] = timer_alloc(FUNC(m5074x_device::timer2_tick), this);
+	m_timers[TIMER_X] = timer_alloc(FUNC(m5074x_device::timerx_tick), this);
+	m_timers[TIMER_ADC] = timer_alloc(FUNC(m5074x_device::adc_complete), this);
 
 	m740_device::device_start();
 
@@ -122,42 +119,39 @@ void m5074x_device::device_reset()
 	m_tmr1 = m_tmr2 = m_tmrx = 0;
 }
 
-void m5074x_device::device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr)
+TIMER_CALLBACK_MEMBER(m5074x_device::timer1_tick)
 {
-	switch (id)
+	m_tmr1--;
+
+	if (m_tmr1 <= 0)
 	{
-		case TIMER_1:
-			m_tmr1--;
+		m_intctrl |= IRQ_TMR1REQ;
+		m_tmr1 = m_tmr1latch;
+		recalc_irqs();
+	}
+}
 
-			if (m_tmr1 <= 0)
-			{
-				m_intctrl |= IRQ_TMR1REQ;
-				m_tmr1 = m_tmr1latch;
-				recalc_irqs();
-			}
-			break;
+TIMER_CALLBACK_MEMBER(m5074x_device::timer2_tick)
+{
+	m_tmr2--;
 
-		case TIMER_2:
-			m_tmr2--;
+	if (m_tmr2 <= 0)
+	{
+		m_intctrl |= IRQ_TMR2REQ;
+		m_tmr2 = m_tmr2latch;
+		recalc_irqs();
+	}
+}
 
-			if (m_tmr2 <= 0)
-			{
-				m_intctrl |= IRQ_TMR2REQ;
-				m_tmr2 = m_tmr2latch;
-				recalc_irqs();
-			}
-			break;
+TIMER_CALLBACK_MEMBER(m5074x_device::timerx_tick)
+{
+	m_tmrx--;
 
-		case TIMER_X:
-			m_tmrx--;
-
-			if (m_tmrx <= 0)
-			{
-				m_tmrctrl |= TMRC_TMRXREQ;
-				m_tmrx = m_tmrxlatch;
-				recalc_irqs();
-			}
-			break;
+	if (m_tmrx <= 0)
+	{
+		m_tmrctrl |= TMRC_TMRXREQ;
+		m_tmrx = m_tmrxlatch;
+		recalc_irqs();
 	}
 }
 
@@ -516,8 +510,8 @@ m50753_device::m50753_device(const machine_config &mconfig, const char *tag, dev
 
 m50753_device::m50753_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock) :
 	m5074x_device(mconfig, type, tag, owner, clock, 16, address_map_constructor(FUNC(m50753_device::m50753_map), this)),
-	m_ad_in(*this),
-	m_in_p(*this),
+	m_ad_in(*this, 0),
+	m_in_p(*this, 0),
 	m_ad_control(0),
 	m_pwm_enabled(false)
 {
@@ -526,9 +520,6 @@ m50753_device::m50753_device(const machine_config &mconfig, device_type type, co
 void m50753_device::device_start()
 {
 	m5074x_device::device_start();
-
-	m_ad_in.resolve_all_safe(0);
-	m_in_p.resolve_safe(0);
 
 	save_item(NAME(m_ad_control));
 	save_item(NAME(m_pwm_enabled));
@@ -607,23 +598,14 @@ void m50753_device::execute_set_input(int inputnum, int state)
 	recalc_irqs();
 }
 
-void m50753_device::device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr)
+TIMER_CALLBACK_MEMBER(m50753_device::adc_complete)
 {
-	switch (id)
+	m_timers[TIMER_ADC]->adjust(attotime::never);
+
+	// if interrupt source is the ADC, do it.
+	if (m_ad_control & 4)
 	{
-	case TIMER_ADC:
-		m_timers[TIMER_ADC]->adjust(attotime::never);
-
-		// if interrupt source is the ADC, do it.
-		if (m_ad_control & 4)
-		{
-			m_intctrl |= IRQ_50753_INTADC;
-			recalc_irqs();
-		}
-		break;
-
-	default:
-		m5074x_device::device_timer(timer, id, param, ptr);
-		break;
+		m_intctrl |= IRQ_50753_INTADC;
+		recalc_irqs();
 	}
 }

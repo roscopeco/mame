@@ -83,9 +83,10 @@ void er2055_device::nvram_default()
 //  .nv file
 //-------------------------------------------------
 
-void er2055_device::nvram_read(emu_file &file)
+bool er2055_device::nvram_read(util::read_stream &file)
 {
-	file.read(&m_rom_data[0], SIZE_DATA);
+	size_t actual;
+	return !file.read(&m_rom_data[0], SIZE_DATA, actual) && actual == SIZE_DATA;
 }
 
 
@@ -94,9 +95,10 @@ void er2055_device::nvram_read(emu_file &file)
 //  .nv file
 //-------------------------------------------------
 
-void er2055_device::nvram_write(emu_file &file)
+bool er2055_device::nvram_write(util::write_stream &file)
 {
-	file.write(&m_rom_data[0], SIZE_DATA);
+	size_t actual;
+	return !file.write(&m_rom_data[0], SIZE_DATA, actual) && actual == SIZE_DATA;
 }
 
 
@@ -161,7 +163,7 @@ void er2055_device::update_state()
 //  successive write or erase operations
 //-------------------------------------------------
 
-WRITE_LINE_MEMBER(er2055_device::set_clk)
+void er2055_device::set_clk(int state)
 {
 	uint8_t oldstate = m_control_state;
 	if (state)

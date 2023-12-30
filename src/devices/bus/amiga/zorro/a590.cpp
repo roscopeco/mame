@@ -18,8 +18,8 @@
 //  DEVICE DEFINITIONS
 //**************************************************************************
 
-DEFINE_DEVICE_TYPE_NS(ZORRO_A590,  bus::amiga::zorro, a590_device,  "zorro_a590",  "CBM A590 HD Controller")
-DEFINE_DEVICE_TYPE_NS(ZORRO_A2091, bus::amiga::zorro, a2091_device, "zorro_a2091", "CBM A2091 HD Controller")
+DEFINE_DEVICE_TYPE(ZORRO_A590,  bus::amiga::zorro::a590_device,  "zorro_a590",  "CBM A590 HD Controller")
+DEFINE_DEVICE_TYPE(ZORRO_A2091, bus::amiga::zorro::a2091_device, "zorro_a2091", "CBM A2091 HD Controller")
 
 
 namespace bus::amiga::zorro {
@@ -318,7 +318,7 @@ void a2091_device::device_reset()
 //  IMPLEMENTATION
 //**************************************************************************
 
-WRITE_LINE_MEMBER( a590_device::cfgin_w )
+void a590_device::cfgin_w(int state)
 {
 	// make sure we configure ourselves first
 	m_int6 = m_jp4->read() & 0x01;
@@ -328,7 +328,7 @@ WRITE_LINE_MEMBER( a590_device::cfgin_w )
 	m_dmac->configin_w(state);
 }
 
-WRITE_LINE_MEMBER( a2091_device::cfgin_w )
+void a2091_device::cfgin_w(int state)
 {
 	// make sure we configure ourselves first
 	m_int6 = m_jp3->read() & 0x01;
@@ -358,7 +358,7 @@ void dmac_hdc_device_base::dmac_scsi_w(offs_t offset, uint8_t data)
 	}
 }
 
-WRITE_LINE_MEMBER( dmac_hdc_device_base::dmac_int_w )
+void dmac_hdc_device_base::dmac_int_w(int state)
 {
 	if (m_int6)
 		int6_w(state);
@@ -366,13 +366,13 @@ WRITE_LINE_MEMBER( dmac_hdc_device_base::dmac_int_w )
 		int2_w(state);
 }
 
-WRITE_LINE_MEMBER( dmac_hdc_device_base::scsi_irq_w )
+void dmac_hdc_device_base::scsi_irq_w(int state)
 {
 	// should be or'ed with xt-ide IRQ
 	m_dmac->intx_w(state);
 }
 
-WRITE_LINE_MEMBER( dmac_hdc_device_base::scsi_drq_w )
+void dmac_hdc_device_base::scsi_drq_w(int state)
 {
 	m_dmac->xdreq_w(state);
 }

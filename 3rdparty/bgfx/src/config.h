@@ -1,12 +1,12 @@
 /*
- * Copyright 2011-2021 Branimir Karadzic. All rights reserved.
- * License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause
+ * Copyright 2011-2022 Branimir Karadzic. All rights reserved.
+ * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
  */
 
 #ifndef BGFX_CONFIG_H_HEADER_GUARD
 #define BGFX_CONFIG_H_HEADER_GUARD
 
-#include <bx/bx.h>
+#include <bx/bx.h> // bx::isPowerOf2
 
 // # Configuration options for bgfx.
 //
@@ -15,11 +15,12 @@
 //
 // When selecting rendering backends select all backends you want to include in the build.
 
-#ifndef BGFX_CONFIG_DEBUG
-#	define BGFX_CONFIG_DEBUG 0
-#endif // BGFX_CONFIG_DEBUG
+#ifndef BX_CONFIG_DEBUG
+#	error "BX_CONFIG_DEBUG must be defined in build script!"
+#endif // BX_CONFIG_DEBUG
 
-#if !defined(BGFX_CONFIG_RENDERER_DIRECT3D9)  \
+#if !defined(BGFX_CONFIG_RENDERER_AGC)        \
+ && !defined(BGFX_CONFIG_RENDERER_DIRECT3D9)  \
  && !defined(BGFX_CONFIG_RENDERER_DIRECT3D11) \
  && !defined(BGFX_CONFIG_RENDERER_DIRECT3D12) \
  && !defined(BGFX_CONFIG_RENDERER_GNM)        \
@@ -30,14 +31,22 @@
  && !defined(BGFX_CONFIG_RENDERER_VULKAN)     \
  && !defined(BGFX_CONFIG_RENDERER_WEBGPU)
 
+#	ifndef BGFX_CONFIG_RENDERER_AGC
+#		define BGFX_CONFIG_RENDERER_AGC (0 \
+					|| BX_PLATFORM_PS5     \
+					? 1 : 0)
+#	endif // BGFX_CONFIG_RENDERER_AGC
+
 #	ifndef BGFX_CONFIG_RENDERER_DIRECT3D9
 #		define BGFX_CONFIG_RENDERER_DIRECT3D9 (0 \
+					|| BX_PLATFORM_LINUX         \
 					|| BX_PLATFORM_WINDOWS       \
 					? 1 : 0)
 #	endif // BGFX_CONFIG_RENDERER_DIRECT3D9
 
 #	ifndef BGFX_CONFIG_RENDERER_DIRECT3D11
 #		define BGFX_CONFIG_RENDERER_DIRECT3D11 (0 \
+					|| BX_PLATFORM_LINUX          \
 					|| BX_PLATFORM_WINDOWS        \
 					|| BX_PLATFORM_WINRT          \
 					|| BX_PLATFORM_XBOXONE        \
@@ -46,6 +55,7 @@
 
 #	ifndef BGFX_CONFIG_RENDERER_DIRECT3D12
 #		define BGFX_CONFIG_RENDERER_DIRECT3D12 (0 \
+					|| BX_PLATFORM_LINUX          \
 					|| BX_PLATFORM_WINDOWS        \
 					|| BX_PLATFORM_WINRT          \
 					|| BX_PLATFORM_XBOXONE        \
@@ -116,6 +126,10 @@
 #	endif // BGFX_CONFIG_RENDERER_WEBGPU
 
 #else
+#	ifndef BGFX_CONFIG_RENDERER_AGC
+#		define BGFX_CONFIG_RENDERER_AGC 0
+#	endif // BGFX_CONFIG_RENDERER_AGC
+
 #	ifndef BGFX_CONFIG_RENDERER_DIRECT3D9
 #		define BGFX_CONFIG_RENDERER_DIRECT3D9 0
 #	endif // BGFX_CONFIG_RENDERER_DIRECT3D9

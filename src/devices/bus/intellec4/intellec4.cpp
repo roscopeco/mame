@@ -7,8 +7,8 @@
 #include <algorithm>
 
 
-DEFINE_DEVICE_TYPE_NS(INTELLEC4_UNIV_SLOT, bus::intellec4, univ_slot_device, "intlc4univslot", "INTELLEC 4 Universal Slot")
-DEFINE_DEVICE_TYPE_NS(INTELLEC4_UNIV_BUS,  bus::intellec4, univ_bus_device,  "intlc4univbus",  "INTELLEC 4 Universal Bus")
+DEFINE_DEVICE_TYPE(INTELLEC4_UNIV_SLOT, bus::intellec4::univ_slot_device, "intlc4univslot", "INTELLEC 4 Universal Slot")
+DEFINE_DEVICE_TYPE(INTELLEC4_UNIV_BUS,  bus::intellec4::univ_bus_device,  "intlc4univbus",  "INTELLEC 4 Universal Bus")
 
 
 namespace bus::intellec4 {
@@ -69,7 +69,7 @@ univ_bus_device::univ_bus_device(machine_config const &mconfig, char const *tag,
   input lines
 ----------------------------------*/
 
-WRITE_LINE_MEMBER(univ_bus_device::sync_in)
+void univ_bus_device::sync_in(int state)
 {
 	for (device_univ_card_interface *card : m_cards)
 	{
@@ -80,7 +80,7 @@ WRITE_LINE_MEMBER(univ_bus_device::sync_in)
 	}
 }
 
-WRITE_LINE_MEMBER(univ_bus_device::stop_acknowledge_in)
+void univ_bus_device::stop_acknowledge_in(int state)
 {
 	for (device_univ_card_interface *card : m_cards)
 	{
@@ -91,7 +91,7 @@ WRITE_LINE_MEMBER(univ_bus_device::stop_acknowledge_in)
 	}
 }
 
-WRITE_LINE_MEMBER(univ_bus_device::cpu_reset_in)
+void univ_bus_device::cpu_reset_in(int state)
 {
 	for (device_univ_card_interface *card : m_cards)
 	{
@@ -109,11 +109,6 @@ WRITE_LINE_MEMBER(univ_bus_device::cpu_reset_in)
 
 void univ_bus_device::device_start()
 {
-	m_test_out_cb.resolve_safe();
-	m_stop_out_cb.resolve_safe();
-	m_reset_4002_out_cb.resolve_safe();
-	m_user_reset_out_cb.resolve_safe();
-
 	save_item(NAME(m_test));
 	save_item(NAME(m_stop));
 	save_item(NAME(m_reset_4002));
@@ -263,6 +258,12 @@ void device_univ_card_interface::set_bus(univ_bus_device &bus)
 #include "insdatastor.h"
 #include "prommemory.h"
 #include "tapereader.h"
+
+
+// must come after including the headers that declare these extern
+template class device_finder<bus::intellec4::device_univ_card_interface, false>;
+template class device_finder<bus::intellec4::device_univ_card_interface, true>;
+
 
 void intellec4_univ_cards(device_slot_interface &device)
 {

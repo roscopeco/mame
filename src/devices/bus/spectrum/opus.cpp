@@ -6,9 +6,11 @@
 
 **********************************************************************/
 
-
 #include "emu.h"
 #include "opus.h"
+#include "softlist_dev.h"
+
+#include "formats/opd_dsk.h"
 
 
 //**************************************************************************
@@ -81,8 +83,8 @@ void spectrum_opus_device::device_add_mconfig(machine_config &config)
 	WD1770(config, m_fdc, 16_MHz_XTAL / 2);
 	m_fdc->drq_wr_callback().set(DEVICE_SELF_OWNER, FUNC(spectrum_expansion_slot_device::nmi_w));
 
-	FLOPPY_CONNECTOR(config, "fdc:0", spectrum_floppies, "35dd", spectrum_opus_device::floppy_formats).enable_sound(true);
-	FLOPPY_CONNECTOR(config, "fdc:1", spectrum_floppies, "35dd", spectrum_opus_device::floppy_formats).enable_sound(true);
+	for (auto &floppy : m_floppy)
+		FLOPPY_CONNECTOR(config, floppy, spectrum_floppies, "35dd", spectrum_opus_device::floppy_formats).enable_sound(true);
 
 	/* parallel printer port */
 	CENTRONICS(config, m_centronics, centronics_devices, "printer");
@@ -90,7 +92,7 @@ void spectrum_opus_device::device_add_mconfig(machine_config &config)
 	m_centronics->busy_handler().set(FUNC(spectrum_opus_device::busy_w));
 
 	/* pia */
-	PIA6821(config, m_pia, 0);
+	PIA6821(config, m_pia);
 	m_pia->writepa_handler().set(FUNC(spectrum_opus_device::pia_out_a));
 	m_pia->writepb_handler().set(FUNC(spectrum_opus_device::pia_out_b));
 	m_pia->cb2_handler().set("centronics", FUNC(centronics_device::write_strobe));
@@ -101,6 +103,7 @@ void spectrum_opus_device::device_add_mconfig(machine_config &config)
 	/* passthru without NMI */
 	SPECTRUM_EXPANSION_SLOT(config, m_exp, spectrum_expansion_devices, nullptr);
 	m_exp->irq_handler().set(DEVICE_SELF_OWNER, FUNC(spectrum_expansion_slot_device::irq_w));
+	m_exp->fb_r_handler().set(DEVICE_SELF_OWNER, FUNC(spectrum_expansion_slot_device::fb_r));
 }
 
 const tiny_rom_entry *spectrum_opus_device::device_rom_region() const
@@ -124,8 +127,7 @@ spectrum_opus_device::spectrum_opus_device(const machine_config &mconfig, const 
 	, m_rom(*this, "rom")
 	, m_pia(*this, "pia")
 	, m_fdc(*this, "fdc")
-	, m_floppy0(*this, "fdc:0")
-	, m_floppy1(*this, "fdc:1")
+	, m_floppy(*this, "fdc:%u", 0U)
 	, m_centronics(*this, "centronics")
 	, m_exp(*this, "exp")
 {
@@ -157,7 +159,7 @@ void spectrum_opus_device::device_reset()
 //  IMPLEMENTATION
 //**************************************************************************
 
-READ_LINE_MEMBER(spectrum_opus_device::romcs)
+int spectrum_opus_device::romcs()
 {
 	return m_romcs | m_exp->romcs();
 }
@@ -187,7 +189,7 @@ uint8_t spectrum_opus_device::iorq_r(offs_t offset)
 	// PIA bit 7 is enable joystick and selected on A5 only
 	if (!BIT(m_pia->a_output(), 7) && (~offset & 0x20))
 	{
-		data &= m_joy->read() & 0x1f;
+		data = m_joy->read() & 0x1f;
 	}
 	return data;
 }
@@ -254,8 +256,8 @@ void spectrum_opus_device::pia_out_a(uint8_t data)
 	floppy_image_device *floppy = nullptr;
 
 	// bit 0, 1: drive select
-	if (!BIT(data, 0)) floppy = m_floppy1->get_device();
-	if (!BIT(data, 1)) floppy = m_floppy0->get_device();
+	if (!BIT(data, 0)) floppy = m_floppy[1]->get_device();
+	if (!BIT(data, 1)) floppy = m_floppy[0]->get_device();
 	m_fdc->set_floppy(floppy);
 
 	// bit 4: side select
@@ -278,7 +280,7 @@ void spectrum_opus_device::pia_out_b(uint8_t data)
 	m_centronics->write_data7(BIT(data, 7));
 }
 
-WRITE_LINE_MEMBER(spectrum_opus_device::busy_w)
+void spectrum_opus_device::busy_w(int state)
 {
 	m_pia->set_a_input(state << 6);
 }

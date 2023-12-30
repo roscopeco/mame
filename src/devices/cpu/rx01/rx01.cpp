@@ -38,7 +38,7 @@ DEFINE_DEVICE_TYPE(RX01_CPU, rx01_cpu_device, "rx01_cpu", "DEC RX01 CPU")
 rx01_cpu_device::rx01_cpu_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock)
 	: cpu_device(mconfig, RX01_CPU, tag, owner, clock)
 	, m_inst_config("program", ENDIANNESS_LITTLE, 8, 12, 0)
-	, m_data_config("sector data", ENDIANNESS_LITTLE, 8, 10, 0) // actually 1 bit wide
+	, m_data_config("sectordata", ENDIANNESS_LITTLE, 8, 10, 0) // actually 1 bit wide
 	, m_interface_callback(*this)
 	, m_pc(0)
 	, m_ppc(0)
@@ -75,11 +75,6 @@ device_memory_interface::space_config_vector rx01_cpu_device::memory_space_confi
 		std::make_pair(AS_PROGRAM, &m_inst_config),
 		std::make_pair(AS_DATA, &m_data_config)
 	};
-}
-
-void rx01_cpu_device::device_resolve_objects()
-{
-	m_interface_callback.resolve_all_safe();
 }
 
 void rx01_cpu_device::device_start()

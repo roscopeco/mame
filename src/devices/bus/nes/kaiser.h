@@ -33,15 +33,9 @@ class nes_ks7058_device : public nes_nrom_device
 {
 public:
 	// construction/destruction
-	nes_ks7058_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
+	nes_ks7058_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock);
 
-	virtual void write_h(offs_t offset, uint8_t data) override;
-
-	virtual void pcb_reset() override;
-
-protected:
-	// device-level overrides
-	virtual void device_start() override;
+	virtual void write_h(offs_t offset, u8 data) override;
 };
 
 
@@ -51,10 +45,10 @@ class nes_ks7022_device : public nes_nrom_device
 {
 public:
 	// construction/destruction
-	nes_ks7022_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
+	nes_ks7022_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock);
 
-	virtual uint8_t read_h(offs_t offset) override;
-	virtual void write_h(offs_t offset, uint8_t data) override;
+	virtual u8 read_h(offs_t offset) override;
+	virtual void write_h(offs_t offset, u8 data) override;
 
 	virtual void pcb_reset() override;
 
@@ -63,7 +57,7 @@ protected:
 	virtual void device_start() override;
 
 private:
-	uint8_t m_latch;
+	u8 m_latch;
 };
 
 
@@ -73,30 +67,31 @@ class nes_ks7032_device : public nes_nrom_device
 {
 public:
 	// construction/destruction
-	nes_ks7032_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
+	nes_ks7032_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock);
 
-	virtual uint8_t read_m(offs_t offset) override;
-	void ks7032_write(offs_t offset, uint8_t data);
-	virtual void write_h(offs_t offset, uint8_t data) override { ks7032_write(offset, data); }
+	virtual u8 read_m(offs_t offset) override;
+	virtual void write_h(offs_t offset, u8 data) override;
 
 	virtual void pcb_reset() override;
 
 protected:
-	nes_ks7032_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock);
+	// construction/destruction
+	nes_ks7032_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, u32 clock);
 
 	// device-level overrides
 	virtual void device_start() override;
-	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
 
+	TIMER_CALLBACK_MEMBER(irq_timer_tick);
+
+	u8 m_reg[8];
+
+private:
 	void prg_update();
+	u8 m_latch;
 
-	uint8_t m_latch;
-	uint8_t m_reg[8];
+	u16 m_irq_count, m_irq_count_latch;
+	u8 m_irq_enable;
 
-	uint16_t m_irq_count;
-	int m_irq_enable;
-
-	static const device_timer_id TIMER_IRQ = 0;
 	emu_timer *irq_timer;
 };
 
@@ -107,11 +102,10 @@ class nes_ks202_device : public nes_ks7032_device
 {
 public:
 	// construction/destruction
-	nes_ks202_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
+	nes_ks202_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock);
 
-	// device-level overrides
-	virtual uint8_t read_m(offs_t offset) override;
-	virtual void write_h(offs_t offset, uint8_t data) override;
+	virtual u8 read_m(offs_t offset) override;
+	virtual void write_h(offs_t offset, u8 data) override;
 };
 
 
@@ -129,13 +123,15 @@ public:
 	virtual void pcb_reset() override;
 
 protected:
-	nes_ks7016_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, u32 clock, u8 mask);
+	// construction/destruction
+	nes_ks7016_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, u32 clock, u8 a15_flip);
 
 	// device-level overrides
 	virtual void device_start() override;
 
 private:
-	u8 m_latch, m_mask;
+	u8 m_latch;
+	const u8 m_a15_flip;
 };
 
 
@@ -155,27 +151,27 @@ class nes_ks7017_device : public nes_nrom_device
 {
 public:
 	// construction/destruction
-	nes_ks7017_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
+	nes_ks7017_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock);
 
-	virtual uint8_t read_ex(offs_t offset) override;
-	virtual void write_ex(offs_t offset, uint8_t data) override;
-	virtual void write_l(offs_t offset, uint8_t data) override;
+	virtual u8 read_ex(offs_t offset) override;
+	virtual void write_ex(offs_t offset, u8 data) override;
+	virtual void write_l(offs_t offset, u8 data) override;
 
 	virtual void pcb_reset() override;
 
 protected:
 	// device-level overrides
 	virtual void device_start() override;
-	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
+
+	TIMER_CALLBACK_MEMBER(irq_timer_tick);
 
 private:
-	uint8_t m_latch;
+	u8 m_latch;
 
-	uint16_t m_irq_count;
-	uint8_t m_irq_status;
-	int m_irq_enable;
+	u16 m_irq_count;
+	u8 m_irq_status;
+	u8 m_irq_enable;
 
-	static const device_timer_id TIMER_IRQ = 0;
 	emu_timer *irq_timer;
 };
 
@@ -191,10 +187,6 @@ public:
 	virtual void write_h(offs_t offset, u8 data) override;
 
 	virtual void pcb_reset() override;
-
-protected:
-	// device-level overrides
-	virtual void device_start() override;
 };
 
 
@@ -226,15 +218,11 @@ class nes_ks7012_device : public nes_nrom_device
 {
 public:
 	// construction/destruction
-	nes_ks7012_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
+	nes_ks7012_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock);
 
-	virtual void write_h(offs_t offset, uint8_t data) override;
+	virtual void write_h(offs_t offset, u8 data) override;
 
 	virtual void pcb_reset() override;
-
-protected:
-	// device-level overrides
-	virtual void device_start() override;
 };
 
 
@@ -244,16 +232,12 @@ class nes_ks7013b_device : public nes_nrom_device
 {
 public:
 	// construction/destruction
-	nes_ks7013b_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
+	nes_ks7013b_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock);
 
-	virtual void write_m(offs_t offset, uint8_t data) override;
-	virtual void write_h(offs_t offset, uint8_t data) override;
+	virtual void write_m(offs_t offset, u8 data) override;
+	virtual void write_h(offs_t offset, u8 data) override;
 
 	virtual void pcb_reset() override;
-
-protected:
-	// device-level overrides
-	virtual void device_start() override;
 };
 
 
@@ -287,11 +271,11 @@ class nes_ks7031_device : public nes_nrom_device
 {
 public:
 	// construction/destruction
-	nes_ks7031_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
+	nes_ks7031_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock);
 
-	virtual uint8_t read_m(offs_t offset) override;
-	virtual uint8_t read_h(offs_t offset) override;
-	virtual void write_h(offs_t offset, uint8_t data) override;
+	virtual u8 read_m(offs_t offset) override;
+	virtual u8 read_h(offs_t offset) override;
+	virtual void write_h(offs_t offset, u8 data) override;
 
 	virtual void pcb_reset() override;
 
@@ -300,7 +284,7 @@ protected:
 	virtual void device_start() override;
 
 private:
-	uint8_t m_reg[4];
+	u8 m_reg[4];
 };
 
 
@@ -310,12 +294,12 @@ class nes_ks7037_device : public nes_nrom_device
 {
 public:
 	// construction/destruction
-	nes_ks7037_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
+	nes_ks7037_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock);
 
-	virtual uint8_t read_m(offs_t offset) override;
-	virtual uint8_t read_h(offs_t offset) override;
-	virtual void write_m(offs_t offset, uint8_t data) override;
-	virtual void write_h(offs_t offset, uint8_t data) override;
+	virtual u8 read_m(offs_t offset) override;
+	virtual u8 read_h(offs_t offset) override;
+	virtual void write_m(offs_t offset, u8 data) override;
+	virtual void write_h(offs_t offset, u8 data) override;
 
 	virtual void pcb_reset() override;
 
@@ -324,9 +308,7 @@ protected:
 	virtual void device_start() override;
 
 private:
-	void update_prg();
-	uint8_t m_latch;
-	uint8_t m_reg[8];
+	u8 m_reg;
 };
 
 

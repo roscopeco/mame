@@ -48,21 +48,14 @@ void e0c6s46_device::e0c6s46_data(address_map &map)
 
 
 // device definitions
-e0c6s46_device::e0c6s46_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock)
-	: e0c6200_cpu_device(mconfig, E0C6S46, tag, owner, clock, address_map_constructor(FUNC(e0c6s46_device::e0c6s46_program), this), address_map_constructor(FUNC(e0c6s46_device::e0c6s46_data), this))
-	, m_vram1(*this, "vram1")
-	, m_vram2(*this, "vram2")
-	, m_osc(0), m_svd(0), m_lcd_control(0), m_lcd_contrast(0)
-	, m_pixel_update_cb(*this)
-	, m_write_r(*this)
-	, m_read_p(*this)
-	, m_write_p(*this)
-	, m_r_dir(0), m_p_dir(0), m_p_pullup(0), m_dfk0(0), m_256_src_pulse(0), m_core_256_handle(nullptr)
-	, m_watchdog_count(0), m_clktimer_count(0), m_stopwatch_on(0), m_swl_cur_pulse(0), m_swl_slice(0)
-	, m_swl_count(0), m_swh_count(0), m_prgtimer_select(0), m_prgtimer_on(0), m_prgtimer_src_pulse(0)
-	, m_prgtimer_cur_pulse(0), m_prgtimer_count(0), m_prgtimer_reload(0), m_prgtimer_handle(nullptr)
-	, m_bz_43_on(0), m_bz_freq(0), m_bz_envelope(0), m_bz_duty_ratio(0), m_bz_1shot_on(0)
-	, m_bz_1shot_running(false), m_bz_1shot_count(0), m_bz_pulse(0), m_buzzer_handle(nullptr)
+e0c6s46_device::e0c6s46_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock) :
+	e0c6200_cpu_device(mconfig, E0C6S46, tag, owner, clock, address_map_constructor(FUNC(e0c6s46_device::e0c6s46_program), this), address_map_constructor(FUNC(e0c6s46_device::e0c6s46_data), this)),
+	m_vram1(*this, "vram1"),
+	m_vram2(*this, "vram2"),
+	m_pixel_update_cb(*this),
+	m_write_r(*this),
+	m_read_p(*this, 0),
+	m_write_p(*this)
 { }
 
 
@@ -75,19 +68,14 @@ void e0c6s46_device::device_start()
 {
 	e0c6200_cpu_device::device_start();
 
-	// find ports
-	m_write_r.resolve_all_safe();
-	m_read_p.resolve_all_safe(0);
-	m_write_p.resolve_all_safe();
-
 	m_pixel_update_cb.resolve();
 
 	// create timers
-	m_core_256_handle = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(e0c6s46_device::core_256_cb), this));
+	m_core_256_handle = timer_alloc(FUNC(e0c6s46_device::core_256_cb), this);
 	m_core_256_handle->adjust(attotime::from_ticks(64, unscaled_clock()));
-	m_prgtimer_handle = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(e0c6s46_device::prgtimer_cb), this));
+	m_prgtimer_handle = timer_alloc(FUNC(e0c6s46_device::prgtimer_cb), this);
 	m_prgtimer_handle->adjust(attotime::never);
-	m_buzzer_handle = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(e0c6s46_device::buzzer_cb), this));
+	m_buzzer_handle = timer_alloc(FUNC(e0c6s46_device::buzzer_cb), this);
 	m_buzzer_handle->adjust(attotime::never);
 
 	// zerofill

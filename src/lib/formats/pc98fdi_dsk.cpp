@@ -2,7 +2,7 @@
 // copyright-holders:Olivier Galibert
 /*********************************************************************
 
-    formats/pc98fdi_dsk.h
+    formats/pc98fdi_dsk.cpp
 
     PC98FDI disk images
 
@@ -12,27 +12,29 @@
 
 #include "ioprocs.h"
 
+#include "osdcomm.h" // little_endianize_int32
+
 
 pc98fdi_format::pc98fdi_format()
 {
 }
 
-const char *pc98fdi_format::name() const
+const char *pc98fdi_format::name() const noexcept
 {
 	return "pc98_fdi";
 }
 
-const char *pc98fdi_format::description() const
+const char *pc98fdi_format::description() const noexcept
 {
 	return "PC98 FDI disk image";
 }
 
-const char *pc98fdi_format::extensions() const
+const char *pc98fdi_format::extensions() const noexcept
 {
 	return "fdi";
 }
 
-int pc98fdi_format::identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants)
+int pc98fdi_format::identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants) const
 {
 	uint64_t size;
 	if(io.length(size))
@@ -49,12 +51,12 @@ int pc98fdi_format::identify(util::random_read &io, uint32_t form_factor, const 
 	uint32_t const sides = little_endianize_int32(*(uint32_t *) (h + 0x18));
 	uint32_t const ntrk = little_endianize_int32(*(uint32_t *) (h + 0x1c));
 	if(size == hsize + psize && psize == ssize*scnt*sides*ntrk)
-		return 100;
+		return FIFID_STRUCT;
 
 	return 0;
 }
 
-bool pc98fdi_format::load(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants, floppy_image *image)
+bool pc98fdi_format::load(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants, floppy_image &image) const
 {
 	size_t actual;
 
@@ -97,9 +99,9 @@ bool pc98fdi_format::load(util::random_read &io, uint32_t form_factor, const std
 	return true;
 }
 
-bool pc98fdi_format::supports_save() const
+bool pc98fdi_format::supports_save() const noexcept
 {
 	return false;
 }
 
-const floppy_format_type FLOPPY_PC98FDI_FORMAT = &floppy_image_format_creator<pc98fdi_format>;
+const pc98fdi_format FLOPPY_PC98FDI_FORMAT;

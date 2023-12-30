@@ -6,9 +6,6 @@
 
     Memory-mapped, uses IRQ3 and IRQ7, no DMA.
 
-    Copyright MESS Team.
-    Visit http://mamedev.org for licensing and usage restrictions.
-
 **********************************************************************/
 
 #include "emu.h"
@@ -131,7 +128,7 @@ void p1_sound_device::dac_w(offs_t offset, uint8_t data)
 	m_isa->irq7_w(CLEAR_LINE);
 }
 
-WRITE_LINE_MEMBER(p1_sound_device::sampler_sync)
+void p1_sound_device::sampler_sync(int state)
 {
 	if (state)
 	{

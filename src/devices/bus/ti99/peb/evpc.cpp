@@ -40,19 +40,20 @@
 
 #include "emu.h"
 #include "evpc.h"
+
 #include "speaker.h"
 
-#define LOG_WARN        (1U<<1)   // Warnings
-#define LOG_CRU         (1U<<2)   // CRU access
-#define LOG_MEM         (1U<<3)   // Memory access
-#define LOG_ADDRESS     (1U<<4)   // Addresses
+#define LOG_WARN        (1U << 1)   // Warnings
+#define LOG_CRU         (1U << 2)   // CRU access
+#define LOG_MEM         (1U << 3)   // Memory access
+#define LOG_ADDRESS     (1U << 4)   // Addresses
 
-#define VERBOSE ( LOG_GENERAL | LOG_WARN )
+#define VERBOSE (LOG_GENERAL | LOG_WARN)
 
 #include "logmacro.h"
 #define EVPC_SCREEN_TAG      "screen"
 
-DEFINE_DEVICE_TYPE_NS(TI99_EVPC, bus::ti99::peb, snug_enhanced_video_device, "ti99_evpc", "SNUG Enhanced Video Processor Card")
+DEFINE_DEVICE_TYPE(TI99_EVPC, bus::ti99::peb::snug_enhanced_video_device, "ti99_evpc", "SNUG Enhanced Video Processor Card")
 
 namespace bus::ti99::peb {
 
@@ -130,9 +131,10 @@ void snug_enhanced_video_device::nvram_default()
 //  .nv file
 //-------------------------------------------------
 
-void snug_enhanced_video_device::nvram_read(emu_file &file)
+bool snug_enhanced_video_device::nvram_read(util::read_stream &file)
 {
-	file.read(m_novram.get(), NOVRAM_SIZE);
+	size_t actual;
+	return !file.read(m_novram.get(), NOVRAM_SIZE, actual) && actual == NOVRAM_SIZE;
 }
 
 //-------------------------------------------------
@@ -140,9 +142,10 @@ void snug_enhanced_video_device::nvram_read(emu_file &file)
 //  .nv file
 //-------------------------------------------------
 
-void snug_enhanced_video_device::nvram_write(emu_file &file)
+bool snug_enhanced_video_device::nvram_write(util::write_stream &file)
 {
-	file.write(m_novram.get(), NOVRAM_SIZE);
+	size_t actual;
+	return !file.write(m_novram.get(), NOVRAM_SIZE, actual) && actual == NOVRAM_SIZE;
 }
 
 /*
@@ -396,7 +399,7 @@ void snug_enhanced_video_device::cruwrite(offs_t offset, uint8_t data)
 /*
     READY line for the sound chip
 */
-WRITE_LINE_MEMBER( snug_enhanced_video_device::ready_line )
+void snug_enhanced_video_device::ready_line(int state)
 {
 	m_slot->set_ready(state);
 }
@@ -435,7 +438,7 @@ void snug_enhanced_video_device::device_stop()
 
     For the SGCPU, the signal is delivered by the LCP line.
 */
-WRITE_LINE_MEMBER( snug_enhanced_video_device::video_interrupt_in )
+void snug_enhanced_video_device::video_interrupt_in(int state)
 {
 	// This method is frequently called without level change, so we only
 	// react on changes

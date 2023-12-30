@@ -10,12 +10,33 @@
 #include "emu.h"
 #include "bus/a2gameio/gizmo.h"
 
-//**************************************************************************
-//  GLOBAL VARIABLES
-//**************************************************************************
 
-// device type definition
-DEFINE_DEVICE_TYPE(APPLE2_GIZMO, apple2_gizmo_device, "a2gizmo", "HAL Labs Gizmo")
+namespace {
+
+// ======================> apple2_gizmo_device
+
+class apple2_gizmo_device : public device_t, public device_a2gameio_interface
+{
+public:
+	// construction/destruction
+	apple2_gizmo_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock);
+
+protected:
+	// device-level overrides
+	virtual ioport_constructor device_input_ports() const override;
+	virtual void device_start() override;
+
+	// device_a2gameio_interface overrides
+	virtual int sw0_r() override;
+	virtual void an0_w(int state) override;
+	virtual void an1_w(int state) override;
+	virtual void an2_w(int state) override;
+
+private:
+	// input ports
+	required_ioport m_player1;
+	int m_an0, m_an1, m_an2;
+};
 
 //**************************************************************************
 //  INPUT PORTS
@@ -53,23 +74,33 @@ void apple2_gizmo_device::device_start()
 	save_item(NAME(m_an2));
 }
 
-READ_LINE_MEMBER(apple2_gizmo_device::sw0_r)
+int apple2_gizmo_device::sw0_r()
 {
 	static const int gizmo_bits[8] = { 1,3,2,0,4,5,5,5 };
 	return BIT(m_player1->read(),gizmo_bits[m_an0+(m_an1<<1)+(m_an2<<2)]);
 }
 
-WRITE_LINE_MEMBER(apple2_gizmo_device::an0_w)
+void apple2_gizmo_device::an0_w(int state)
 {
 	m_an0 = state;
 }
 
-WRITE_LINE_MEMBER(apple2_gizmo_device::an1_w)
+void apple2_gizmo_device::an1_w(int state)
 {
 	m_an1 = state;
 }
 
-WRITE_LINE_MEMBER(apple2_gizmo_device::an2_w)
+void apple2_gizmo_device::an2_w(int state)
 {
 	m_an2 = state;
 }
+
+} // anonymous namespace
+
+
+//**************************************************************************
+//  GLOBAL VARIABLES
+//**************************************************************************
+
+// device type definition
+DEFINE_DEVICE_TYPE_PRIVATE(APPLE2_GIZMO, device_a2gameio_interface, apple2_gizmo_device, "a2gizmo", "HAL Labs Gizmo")

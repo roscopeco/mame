@@ -28,7 +28,7 @@
 #include "emu.h"
 #include "samsmem.h"
 
-DEFINE_DEVICE_TYPE_NS(TI99_SAMSMEM, bus::ti99::peb, sams_memory_expansion_device, "ti99_sams", "SuperAMS memory expansion card")
+DEFINE_DEVICE_TYPE(TI99_SAMSMEM, bus::ti99::peb::sams_memory_expansion_device, "ti99_sams", "SuperAMS memory expansion card")
 
 namespace bus::ti99::peb {
 
@@ -112,12 +112,12 @@ void sams_memory_expansion_device::cruwrite(offs_t offset, uint8_t data)
 		m_crulatch->write_bit((offset & 0x000e) >> 1, data);
 }
 
-WRITE_LINE_MEMBER(sams_memory_expansion_device::access_mapper_w)
+void sams_memory_expansion_device::access_mapper_w(int state)
 {
 	m_access_mapper = state;
 }
 
-WRITE_LINE_MEMBER(sams_memory_expansion_device::map_mode_w)
+void sams_memory_expansion_device::map_mode_w(int state)
 {
 	m_map_mode = state;
 }

@@ -8,7 +8,7 @@ DEFINE_DEVICE_TYPE(SPG_RENDERER, spg_renderer_device, "spg_renderer", "SunPlus /
 
 spg_renderer_device::spg_renderer_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock) :
 	device_t(mconfig, type, tag, owner, clock),
-	m_space_read_cb(*this)
+	m_space_read_cb(*this, 0)
 {
 }
 
@@ -19,8 +19,6 @@ spg_renderer_device::spg_renderer_device(const machine_config &mconfig, const ch
 
 void spg_renderer_device::device_start()
 {
-	m_space_read_cb.resolve_safe(0);
-
 	for (uint8_t i = 0; i < 32; i++)
 	{
 		m_rgb5_to_rgb8[i] = (i << 3) | (i >> 2);
@@ -467,7 +465,11 @@ void spg_renderer_device::draw_page(bool read_from_csspace, bool has_extended_ti
 	const uint32_t bits_per_row = nc_bpp * tile_w / 16;
 	//const uint32_t words_per_tile = bits_per_row * tile_h;
 	const bool row_scroll = (ctrl & 0x0010);
-	uint8_t blendlevel = (m_video_regs_2a & 3) << 3;
+
+	// Max blend level (3) should result in 100% opacity, per docs
+	// Min blend level (0) should result in 25% opacity, per docs
+	static const uint8_t s_blend_levels[4] = { 0x08, 0x10, 0x18, 0x20 };
+	uint8_t blendlevel = s_blend_levels[m_video_regs_2a & 3];
 
 	uint32_t words_per_tile;
 

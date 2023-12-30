@@ -2,7 +2,7 @@
 // copyright-holders:Olivier Galibert
 /*************************************************************************
 
-    formats/coupedsk.c
+    formats/coupedsk.cpp
 
     SAM Coupe disk image formats
 
@@ -44,39 +44,39 @@ mgt_format::mgt_format()
 {
 }
 
-const char *mgt_format::name() const
+const char *mgt_format::name() const noexcept
 {
 	return "mgt";
 }
 
-const char *mgt_format::description() const
+const char *mgt_format::description() const noexcept
 {
 	return "Sam Coupe MGT image format";
 }
 
-const char *mgt_format::extensions() const
+const char *mgt_format::extensions() const noexcept
 {
 	return "mgt,dsk";
 }
 
-bool mgt_format::supports_save() const
+bool mgt_format::supports_save() const noexcept
 {
 	return true;
 }
 
-int mgt_format::identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants)
+int mgt_format::identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants) const
 {
 	uint64_t size;
 	if(io.length(size))
 		return 0;
 
 	if(/*size == 737280 || */ size == 819200)
-		return 50;
+		return FIFID_SIZE;
 
 	return 0;
 }
 
-bool mgt_format::load(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants, floppy_image *image)
+bool mgt_format::load(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants, floppy_image &image) const
 {
 	uint64_t size;
 	if(io.length(size))
@@ -100,11 +100,11 @@ bool mgt_format::load(util::random_read &io, uint32_t form_factor, const std::ve
 		}
 	}
 
-	image->set_variant(floppy_image::DSDD);
+	image.set_variant(floppy_image::DSDD);
 	return true;
 }
 
-bool mgt_format::save(util::random_read_write &io, const std::vector<uint32_t> &variants, floppy_image *image)
+bool mgt_format::save(util::random_read_write &io, const std::vector<uint32_t> &variants, const floppy_image &image) const
 {
 	int track_count, head_count, sector_count;
 	get_geometry_mfm_pc(image, 2000, track_count, head_count, sector_count);
@@ -128,4 +128,4 @@ bool mgt_format::save(util::random_read_write &io, const std::vector<uint32_t> &
 	return true;
 }
 
-const floppy_format_type FLOPPY_MGT_FORMAT = &floppy_image_format_creator<mgt_format>;
+const mgt_format FLOPPY_MGT_FORMAT;

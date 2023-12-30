@@ -1,19 +1,61 @@
 // license:BSD-3-Clause
 // copyright-holders:Vas Crabb
+/*
+imm4-90 High-Speed Paper Tape Reader
+
+The monitor PROM has support for loading BNPF or Intel HEX from this
+device (use J command to select it), but it doesn't appear in any
+catalogues or manuals I've seen.  Apparently it was announced in
+Computerworld.
+
+In practice you needed a GPIO card (e.g. an imm4-60 or imm4-22) to talk
+to the paper taper reader.  To simplify configuration we emulate the I/O
+interface and paper tape reader as a single device.
+*/
 
 #include "emu.h"
 #include "tapereader.h"
 
+#include "imagedev/papertape.h"
 
-DEFINE_DEVICE_TYPE_NS(INTELLEC4_TAPE_READER, bus::intellec4, imm4_90_device, "intlc4_imm4_90", "Intel imm4-90 High-Speed Paper Tape Reader")
 
+namespace {
 
-namespace bus::intellec4 {
+class imm4_90_device
+		: public paper_tape_reader_device
+		, public bus::intellec4::device_univ_card_interface
+{
+public:
+	imm4_90_device(machine_config const &mconfig, char const *tag, device_t *owner, u32 clock);
+
+	virtual std::pair<std::error_condition, std::string> call_load() override;
+	virtual void call_unload() override;
+
+	virtual char const *file_extensions() const noexcept override { return "bnpf,hex,lst,txt"; }
+
+protected:
+	virtual void device_start() override;
+
+private:
+	u8 rom4_in() { return m_ready ? 0x07U : 0x0fU; }
+	u8 rom6_in() { return ~m_data & 0x0fU; }
+	u8 rom7_in() { return (~m_data >> 4) & 0x0fU; }
+	void rom4_out(u8 data) { advance(BIT(data, 3)); }
+	void advance(int state);
+	TIMER_CALLBACK_MEMBER(step);
+
+	emu_timer   *m_step_timer;
+
+	u8      m_data;
+	bool    m_ready;
+	bool    m_advance;
+	bool    m_stepping;
+};
+
 
 imm4_90_device::imm4_90_device(machine_config const &mconfig, char const *tag, device_t *owner, u32 clock)
-	: device_t(mconfig, INTELLEC4_TAPE_READER, tag, owner, clock)
-	, device_univ_card_interface(mconfig, *this)
-	, device_image_interface(mconfig, *this)
+	: paper_tape_reader_device(mconfig, INTELLEC4_TAPE_READER, tag, owner, clock)
+	, bus::intellec4::device_univ_card_interface(mconfig, *this)
 	, m_step_timer(nullptr)
 	, m_data(0xffU)
 	, m_ready(false)
@@ -23,13 +65,13 @@ imm4_90_device::imm4_90_device(machine_config const &mconfig, char const *tag, d
 }
 
 
-image_init_result imm4_90_device::call_load()
+std::pair<std::error_condition, std::string> imm4_90_device::call_load()
 {
 	m_step_timer->reset();
 	m_data = 0x00U;
 	m_ready = false;
 	m_stepping = false;
-	return image_init_result::PASS;
+	return std::make_pair(std::error_condition(), std::string());
 }
 
 void imm4_90_device::call_unload()
@@ -43,7 +85,7 @@ void imm4_90_device::call_unload()
 
 void imm4_90_device::device_start()
 {
-	m_step_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(imm4_90_device::step), this));
+	m_step_timer = timer_alloc(FUNC(imm4_90_device::step), this);
 
 	save_item(NAME(m_data));
 	save_item(NAME(m_ready));
@@ -57,7 +99,7 @@ void imm4_90_device::device_start()
 }
 
 
-DECLARE_WRITE_LINE_MEMBER(imm4_90_device::advance)
+void imm4_90_device::advance(int state)
 {
 	// this is edge-sensitive - CPU sends the narrowest pulse it can
 	if (!m_advance && !bool(state) && !m_stepping)
@@ -83,4 +125,7 @@ TIMER_CALLBACK_MEMBER(imm4_90_device::step)
 	}
 }
 
-} // namespace bus::intellec4
+} // anonymous namespace
+
+
+DEFINE_DEVICE_TYPE_PRIVATE(INTELLEC4_TAPE_READER, bus::intellec4::device_univ_card_interface, imm4_90_device, "intlc4_imm4_90", "Intel imm4-90 High-Speed Paper Tape Reader")

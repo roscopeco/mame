@@ -35,13 +35,6 @@
 #include "dirtc.h"
 
 
-/***************************************************************************
-CONSTANTS
-***************************************************************************/
-
-#define PCF8573_SLAVE_ADDRESS ( 0xd0 )
-
-
 //**************************************************************************
 //  TYPE DEFINITIONS
 //**************************************************************************
@@ -62,21 +55,24 @@ public:
 	void set_a0(int a0) { m_slave_address = (m_slave_address & 0xfd) | (a0 << 1); }
 	void set_a1(int a1) { m_slave_address = (m_slave_address & 0xfb) | (a1 << 2); }
 
-	DECLARE_WRITE_LINE_MEMBER(a0_w);
-	DECLARE_WRITE_LINE_MEMBER(a1_w);
-	DECLARE_WRITE_LINE_MEMBER(scl_w);
-	DECLARE_WRITE_LINE_MEMBER(sda_w);
-	DECLARE_READ_LINE_MEMBER(sda_r);
+	void a0_w(int state);
+	void a1_w(int state);
+	void scl_w(int state);
+	void sda_w(int state);
+	int sda_r();
 
 protected:
 	// device-level overrides
 	virtual void device_start() override;
-	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
 
 	// device_rtc_interface overrides
 	virtual void rtc_clock_updated(int year, int month, int day, int day_of_week, int hour, int minute, int second) override;
 
+	TIMER_CALLBACK_MEMBER(clock_tick);
+
 private:
+	static constexpr uint8_t PCF8573_SLAVE_ADDRESS = 0xd0;
+
 	enum
 	{
 		REG_HOURS               = 0x00,
@@ -122,7 +118,7 @@ private:
 	int m_address;
 	int m_status;
 
-	enum { STATE_IDLE, STATE_ADDRESS, STATE_MODE, STATE_DATAIN, STATE_DATAOUT };
+	enum { STATE_IDLE, STATE_ADDRESS, STATE_MODE, STATE_DATAIN, STATE_DATAOUT, STATE_READSELACK };
 };
 
 // device type definition

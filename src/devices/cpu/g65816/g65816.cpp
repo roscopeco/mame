@@ -589,6 +589,7 @@ void g65816_device::g65816i_set_reg_p(unsigned value)
 
 void g65816_device::g65816i_interrupt_hardware(unsigned vector)
 {
+	standard_irq_callback(0, g65816_get_pc());
 	if (FLAG_E)
 	{
 		CLK(7);
@@ -598,7 +599,6 @@ void g65816_device::g65816i_interrupt_hardware(unsigned vector)
 		g65816i_set_flag_i(IFLAG_SET);
 		REGISTER_PB = 0;
 		g65816i_jump_16(g65816i_read_16_vector(vector));
-		standard_irq_callback(0);
 	}
 	else
 	{
@@ -610,7 +610,6 @@ void g65816_device::g65816i_interrupt_hardware(unsigned vector)
 		g65816i_set_flag_i(IFLAG_SET);
 		REGISTER_PB = 0;
 		g65816i_jump_16(g65816i_read_16_vector(vector));
-		standard_irq_callback(0);
 	}
 }
 
@@ -641,6 +640,7 @@ void g65816_device::g65816i_interrupt_software(unsigned vector)
 
 void g65816_device::g65816i_interrupt_nmi()
 {
+	standard_irq_callback(G65816_LINE_NMI, g65816_get_pc());
 	if (FLAG_E)
 	{
 		CLK(7);
@@ -684,13 +684,13 @@ unsigned g65816_device::EA_DX()    {return MAKE_UINT_16(REGISTER_D + g65816i_rea
 unsigned g65816_device::EA_DY()    {return MAKE_UINT_16(REGISTER_D + g65816i_read_8_immediate(EA_IMM8()) + REGISTER_Y);}
 unsigned g65816_device::EA_AX()    {unsigned tmp = EA_A(); if((tmp^(tmp+REGISTER_X))&0xff00) CLK(1); return tmp + REGISTER_X;}
 unsigned g65816_device::EA_ALX()   {return EA_AL() + REGISTER_X;}
-unsigned g65816_device::EA_AY()    {unsigned tmp = EA_A(); if((tmp^(tmp+REGISTER_X))&0xff00) CLK(1); return tmp + REGISTER_Y;}
+unsigned g65816_device::EA_AY()    {unsigned tmp = EA_A(); if((tmp^(tmp+REGISTER_Y))&0xff00) CLK(1); return tmp + REGISTER_Y;}
 unsigned g65816_device::EA_DI()    {return REGISTER_DB | g65816i_read_16_direct(EA_D());}
 unsigned g65816_device::EA_DLI()   {return g65816i_read_24_direct(EA_D());}
 unsigned g65816_device::EA_AI()    {return g65816i_read_16_normal(g65816i_read_16_immediate(EA_IMM16()));}
 unsigned g65816_device::EA_ALI()   {return g65816i_read_24_normal(EA_A());}
 unsigned g65816_device::EA_DXI()   {return REGISTER_DB | g65816i_read_16_direct(EA_DX());}
-unsigned g65816_device::EA_DIY()   {unsigned tmp = REGISTER_DB | g65816i_read_16_direct(EA_D()); if((tmp^(tmp+REGISTER_X))&0xff00) CLK(1); return tmp + REGISTER_Y;}
+unsigned g65816_device::EA_DIY()   {unsigned tmp = REGISTER_DB | g65816i_read_16_direct(EA_D()); if((tmp^(tmp+REGISTER_Y))&0xff00) CLK(1); return tmp + REGISTER_Y;}
 unsigned g65816_device::EA_DLIY()  {return g65816i_read_24_direct(EA_D()) + REGISTER_Y;}
 unsigned g65816_device::EA_AXI()   {return g65816i_read_16_normal(MAKE_UINT_16(g65816i_read_16_immediate(EA_IMM16()) + REGISTER_X));}
 unsigned g65816_device::EA_S()     {return MAKE_UINT_16(REGISTER_S + g65816i_read_8_immediate(EA_IMM8()));}
@@ -771,7 +771,6 @@ void g65816_device::g65816_set_pc(unsigned val)
 	g65816_jumping(REGISTER_PB | REGISTER_PC);
 }
 
-#ifdef UNUSED_FUNCTION
 /* Get the current Stack Pointer */
 unsigned g65816_device::g65816_get_sp()
 {
@@ -783,7 +782,6 @@ void g65816_device::g65816_set_sp(unsigned val)
 {
 	REGISTER_S = FLAG_E ? MAKE_UINT_8(val) | 0x100 : MAKE_UINT_16(val);
 }
-#endif
 
 /* Get a register */
 unsigned g65816_device::g65816_get_reg(int regnum)
@@ -876,8 +874,6 @@ void g65816_device::device_start()
 	space(AS_PROGRAM).cache(m_program);
 	(has_space(AS_OPCODES) ? space(AS_OPCODES) : space(AS_PROGRAM)).cache(m_opcode);
 	(has_space(AS_DATA) ? space(AS_DATA) : space(AS_PROGRAM)).specific(m_data);
-
-	m_wdm_w.resolve_safe();
 
 	save_item(NAME(m_a));
 	save_item(NAME(m_b));

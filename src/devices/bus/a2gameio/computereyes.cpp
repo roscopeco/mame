@@ -9,12 +9,40 @@
 #include "emu.h"
 #include "bus/a2gameio/computereyes.h"
 
-//**************************************************************************
-//  GLOBAL VARIABLES
-//**************************************************************************
+#include "imagedev/picture.h"
 
-// device type definition
-DEFINE_DEVICE_TYPE(APPLE2_COMPUTEREYES, apple2_compeyes_device, "a2ceyes", "Digital Vision ComputerEyes")
+#include "bitmap.h"
+
+
+namespace {
+
+// ======================> apple2_compeyes_device
+
+class apple2_compeyes_device : public device_t, public device_a2gameio_interface
+{
+public:
+	// construction/destruction
+	apple2_compeyes_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock);
+
+protected:
+	// device-level overrides
+	virtual void device_add_mconfig(machine_config &config) override;
+	virtual void device_start() override;
+	virtual void device_reset() override;
+
+	// device_a2gameio_interface overrides
+	virtual int sw0_r() override;
+	virtual int sw1_r() override;
+	virtual void an0_w(int state) override;
+	virtual void an1_w(int state) override;
+	virtual void an2_w(int state) override;
+	virtual void an3_w(int state) override;
+
+private:
+	required_device<picture_image_device> m_picture;
+	int m_x, m_y, m_an1, m_an2, m_an3, m_level;
+	u8 m_a2_bitmap[280*192];
+};
 
 //**************************************************************************
 //  DEVICE IMPLEMENTATION
@@ -47,12 +75,12 @@ void apple2_compeyes_device::device_reset()
 	m_x = m_y = m_an1 = m_an2 = m_an3 = m_level = 0;
 }
 
-READ_LINE_MEMBER(apple2_compeyes_device::sw0_r)
+int apple2_compeyes_device::sw0_r()
 {
 	return 0;
 }
 
-READ_LINE_MEMBER(apple2_compeyes_device::sw1_r)
+int apple2_compeyes_device::sw1_r()
 {
 	// to avoid triggering the self-test on //e, return only 0
 	// for the first 2 seconds of emulation.
@@ -76,7 +104,7 @@ READ_LINE_MEMBER(apple2_compeyes_device::sw1_r)
 	return res;
 }
 
-WRITE_LINE_MEMBER(apple2_compeyes_device::an0_w)
+void apple2_compeyes_device::an0_w(int state)
 {
 	m_x =  m_y = 0;
 
@@ -103,20 +131,30 @@ WRITE_LINE_MEMBER(apple2_compeyes_device::an0_w)
 	}
 }
 
-WRITE_LINE_MEMBER(apple2_compeyes_device::an1_w)
+void apple2_compeyes_device::an1_w(int state)
 {
 	m_an1 = state;
 	m_level = (128 * m_an2) + (64 * m_an1) + (32 * m_an3);
 }
 
-WRITE_LINE_MEMBER(apple2_compeyes_device::an2_w)
+void apple2_compeyes_device::an2_w(int state)
 {
 	m_an2 = state;
 	m_level = (128 * m_an2) + (64 * m_an1) + (32 * m_an3);
 }
 
-WRITE_LINE_MEMBER(apple2_compeyes_device::an3_w)
+void apple2_compeyes_device::an3_w(int state)
 {
 	m_an3 = state;
 	m_level = (128 * m_an2) + (64 * m_an1) + (32 * m_an3);
 }
+
+} // anonymous namespace
+
+
+//**************************************************************************
+//  GLOBAL VARIABLES
+//**************************************************************************
+
+// device type definition
+DEFINE_DEVICE_TYPE_PRIVATE(APPLE2_COMPUTEREYES, device_a2gameio_interface, apple2_compeyes_device, "a2ceyes", "Digital Vision ComputerEyes")

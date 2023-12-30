@@ -1,6 +1,7 @@
 // license:BSD-3-Clause
 // copyright-holders:Barry Rodewald
 
+
 #include "emu.h"
 #include "virge_pci.h"
 
@@ -29,9 +30,18 @@ void virge_pci_device::mmio_map(address_map& map)
 	// image transfer ports
 	map(0x1000000,0x1007fff).w(m_vga, FUNC(s3virge_vga_device::image_xfer));
 
+	//map(0x1008180,0x10081ff) primary/secondary stream control
+
+	//map(0x1008200,0x100821f) memory port controller
+	//map(0x1008220,0x1008227) DMA control
+
 	// MMIO address map
+	map(0x10083b0,0x10083df).m(m_vga, FUNC(s3virge_vga_device::io_map));
 	map(0x1008504,0x1008507).rw(m_vga, FUNC(s3virge_vga_device::s3d_sub_status_r), FUNC(s3virge_vga_device::s3d_sub_control_w));
 	map(0x100850c,0x100850f).r(m_vga, FUNC(s3virge_vga_device::s3d_func_ctrl_r));
+
+	//map(0x1008580,0x100858b) video DMA
+	//map(0x1008590,0x100859f) command DMA
 
 	// S3D engine registers
 	map(0x100a000,0x100b7ff).rw(m_vga, FUNC(s3virge_vga_device::s3d_register_r), FUNC(s3virge_vga_device::s3d_register_w));
@@ -39,6 +49,7 @@ void virge_pci_device::mmio_map(address_map& map)
 	// alternate image transfer ports
 	map(0x100d000,0x100efff).w(m_vga, FUNC(s3virge_vga_device::image_xfer));
 
+	//map(0x100ff00, 0x100ff43) LPB control
 }
 
 void virge_pci_device::lfb_map(address_map& map)
@@ -52,6 +63,11 @@ void virge_pci_device::config_map(address_map &map)
 {
 	pci_device::config_map(map);
 	map(0x10, 0x13).rw(FUNC(virge_pci_device::base_address_r),FUNC(virge_pci_device::base_address_w));
+}
+
+void virge_pci_device::legacy_io_map(address_map &map)
+{
+	map(0x00, 0x2f).m(m_vga, FUNC(s3virge_vga_device::io_map));
 }
 
 void virge_pci_device::refresh_linear_window()
@@ -95,118 +111,16 @@ uint32_t virge_pci_device::base_address_r()
 void virge_pci_device::base_address_w(offs_t offset, uint32_t data)
 {
 	pci_device::address_base_w(offset,data);
-	downcast<s3virge_vga_device *>(m_vga.target())->set_linear_address(data & 0xffff0000);
+	// only bits 31-26 are changed here, cfr. page 25-4
+	const u32 new_address = (data & 0xfc000000) | (base_address_r() & 0x3ffffff);
+	downcast<s3virge_vga_device *>(m_vga.target())->set_linear_address(new_address);
 	refresh_linear_window();
 }
 
-uint32_t virge_pci_device::vga_3b0_r(offs_t offset, uint32_t mem_mask)
+void virge_pci_device::linear_config_changed_w(int state)
 {
-	uint32_t result = 0;
-	if (ACCESSING_BITS_0_7)
-		result |= downcast<s3_vga_device *>(m_vga.target())->port_03b0_r(offset * 4 + 0) << 0;
-	if (ACCESSING_BITS_8_15)
-		result |= downcast<s3_vga_device *>(m_vga.target())->port_03b0_r(offset * 4 + 1) << 8;
-	if (ACCESSING_BITS_16_23)
-		result |= downcast<s3_vga_device *>(m_vga.target())->port_03b0_r(offset * 4 + 2) << 16;
-	if (ACCESSING_BITS_24_31)
-		result |= downcast<s3_vga_device *>(m_vga.target())->port_03b0_r(offset * 4 + 3) << 24;
-	return result;
-}
-
-void virge_pci_device::vga_3b0_w(offs_t offset, uint32_t data, uint32_t mem_mask)
-{
-	if (ACCESSING_BITS_0_7)
-	{
-		downcast<s3_vga_device *>(m_vga.target())->port_03b0_w(offset * 4 + 0, data >> 0);
-		if(offset == 1 && downcast<s3virge_vga_device *>(m_vga.target())->get_crtc_port() == 0x3b0)
-			m_current_crtc_reg = data & 0xff;
-	}
-	if (ACCESSING_BITS_8_15)
-	{
-		downcast<s3_vga_device *>(m_vga.target())->port_03b0_w(offset * 4 + 1, data >> 8);
-		if(offset == 1 && downcast<s3virge_vga_device *>(m_vga.target())->get_crtc_port() == 0x3b0)
-		{
-			if(m_current_crtc_reg == 0x58)
-			{
-				refresh_linear_window();
-				remap_cb();
-			}
-			else if(m_current_crtc_reg == 0x59 || m_current_crtc_reg == 0x5a)
-			{
-				refresh_linear_window();
-				remap_cb();
-			}
-		}
-	}
-	if (ACCESSING_BITS_16_23)
-		downcast<s3_vga_device *>(m_vga.target())->port_03b0_w(offset * 4 + 2, data >> 16);
-	if (ACCESSING_BITS_24_31)
-		downcast<s3_vga_device *>(m_vga.target())->port_03b0_w(offset * 4 + 3, data >> 24);
-}
-
-uint32_t virge_pci_device::vga_3c0_r(offs_t offset, uint32_t mem_mask)
-{
-	uint32_t result = 0;
-	if (ACCESSING_BITS_0_7)
-		result |= downcast<s3_vga_device *>(m_vga.target())->port_03c0_r(offset * 4 + 0) << 0;
-	if (ACCESSING_BITS_8_15)
-		result |= downcast<s3_vga_device *>(m_vga.target())->port_03c0_r(offset * 4 + 1) << 8;
-	if (ACCESSING_BITS_16_23)
-		result |= downcast<s3_vga_device *>(m_vga.target())->port_03c0_r(offset * 4 + 2) << 16;
-	if (ACCESSING_BITS_24_31)
-		result |= downcast<s3_vga_device *>(m_vga.target())->port_03c0_r(offset * 4 + 3) << 24;
-	return result;
-}
-
-void virge_pci_device::vga_3c0_w(offs_t offset, uint32_t data, uint32_t mem_mask)
-{
-	if (ACCESSING_BITS_0_7)
-		downcast<s3_vga_device *>(m_vga.target())->port_03c0_w(offset * 4 + 0, data >> 0);
-	if (ACCESSING_BITS_8_15)
-		downcast<s3_vga_device *>(m_vga.target())->port_03c0_w(offset * 4 + 1, data >> 8);
-	if (ACCESSING_BITS_16_23)
-		downcast<s3_vga_device *>(m_vga.target())->port_03c0_w(offset * 4 + 2, data >> 16);
-	if (ACCESSING_BITS_24_31)
-		downcast<s3_vga_device *>(m_vga.target())->port_03c0_w(offset * 4 + 3, data >> 24);
-}
-
-uint32_t virge_pci_device::vga_3d0_r(offs_t offset, uint32_t mem_mask)
-{
-	uint32_t result = 0;
-	if (ACCESSING_BITS_0_7)
-		result |= downcast<s3_vga_device *>(m_vga.target())->port_03d0_r(offset * 4 + 0) << 0;
-	if (ACCESSING_BITS_8_15)
-		result |= downcast<s3_vga_device *>(m_vga.target())->port_03d0_r(offset * 4 + 1) << 8;
-	if (ACCESSING_BITS_16_23)
-		result |= downcast<s3_vga_device *>(m_vga.target())->port_03d0_r(offset * 4 + 2) << 16;
-	if (ACCESSING_BITS_24_31)
-		result |= downcast<s3_vga_device *>(m_vga.target())->port_03d0_r(offset * 4 + 3) << 24;
-	return result;
-}
-
-void virge_pci_device::vga_3d0_w(offs_t offset, uint32_t data, uint32_t mem_mask)
-{
-	if (ACCESSING_BITS_0_7)
-	{
-		downcast<s3_vga_device *>(m_vga.target())->port_03d0_w(offset * 4 + 0, data >> 0);
-		if(offset == 1 && downcast<s3virge_vga_device *>(m_vga.target())->get_crtc_port() == 0x3d0)
-			m_current_crtc_reg = data & 0xff;
-	}
-	if (ACCESSING_BITS_8_15)
-	{
-		downcast<s3_vga_device *>(m_vga.target())->port_03d0_w(offset * 4 + 1, data >> 8);
-		if(offset == 1 && downcast<s3virge_vga_device *>(m_vga.target())->get_crtc_port() == 0x3d0)
-		{
-			if(m_current_crtc_reg >= 0x58 && m_current_crtc_reg <= 0x5a)
-			{
-				refresh_linear_window();
-			}
-		}
-	}
-	if (ACCESSING_BITS_16_23)
-		downcast<s3_vga_device *>(m_vga.target())->port_03d0_w(offset * 4 + 2, data >> 16);
-	if (ACCESSING_BITS_24_31)
-		downcast<s3_vga_device *>(m_vga.target())->port_03d0_w(offset * 4 + 3, data >> 24);
+	refresh_linear_window();
+	remap_cb();
 }
 
 uint8_t virge_pci_device::vram_r(offs_t offset)
@@ -261,9 +175,7 @@ void virge_pci_device::map_extra(uint64_t memory_window_start, uint64_t memory_w
 {
 	memory_space->install_readwrite_handler(0xa0000, 0xbffff, read8sm_delegate(*this, FUNC(virge_pci_device::vram_r)), write8sm_delegate(*this, FUNC(virge_pci_device::vram_w)));
 
-	io_space->install_readwrite_handler(0x3b0, 0x3bf, read32s_delegate(*this, FUNC(virge_pci_device::vga_3b0_r)), write32s_delegate(*this, FUNC(virge_pci_device::vga_3b0_w)));
-	io_space->install_readwrite_handler(0x3c0, 0x3cf, read32s_delegate(*this, FUNC(virge_pci_device::vga_3c0_r)), write32s_delegate(*this, FUNC(virge_pci_device::vga_3c0_w)));
-	io_space->install_readwrite_handler(0x3d0, 0x3df, read32s_delegate(*this, FUNC(virge_pci_device::vga_3d0_r)), write32s_delegate(*this, FUNC(virge_pci_device::vga_3d0_w)));
+	io_space->install_device(0x03b0, 0x03df, *this, &virge_pci_device::legacy_io_map);
 }
 
 void virge_pci_device::device_add_mconfig(machine_config &config)
@@ -272,7 +184,10 @@ void virge_pci_device::device_add_mconfig(machine_config &config)
 	screen.set_raw(XTAL(25'174'800), 900, 0, 640, 526, 0, 480);
 	screen.set_screen_update("vga", FUNC(s3virge_vga_device::screen_update));
 
-	S3VIRGE(config, m_vga, 0).set_screen("screen");
+	S3VIRGE(config, m_vga, 0);
+	m_vga->set_screen("screen");
+	m_vga->set_vram_size(0x400000);
+	m_vga->linear_config_changed().set(FUNC(virge_pci_device::linear_config_changed_w));
 }
 
 void virgedx_pci_device::device_add_mconfig(machine_config &config)
@@ -281,7 +196,10 @@ void virgedx_pci_device::device_add_mconfig(machine_config &config)
 	screen.set_raw(XTAL(25'174'800), 900, 0, 640, 526, 0, 480);
 	screen.set_screen_update("vga", FUNC(s3virge_vga_device::screen_update));
 
-	S3VIRGEDX(config, m_vga, 0).set_screen("screen");
+	S3VIRGEDX(config, m_vga, 0);
+	m_vga->set_screen("screen");
+	m_vga->set_vram_size(0x400000);
+	m_vga->linear_config_changed().set(FUNC(virgedx_pci_device::linear_config_changed_w));
 }
 
 

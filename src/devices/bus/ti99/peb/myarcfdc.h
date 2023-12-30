@@ -50,15 +50,15 @@ private:
 	static void floppy_formats(format_registration &fr);
 
 	// Callback methods
-	DECLARE_WRITE_LINE_MEMBER( fdc_irq_w );
-	DECLARE_WRITE_LINE_MEMBER( fdc_drq_w );
-	DECLARE_WRITE_LINE_MEMBER( fdc_mon_w );
+	void fdc_irq_w(int state);
+	void fdc_drq_w(int state);
+	void fdc_mon_w(int state);
 
-	DECLARE_WRITE_LINE_MEMBER( den_w );
-	DECLARE_WRITE_LINE_MEMBER( wdreset_w );
-	DECLARE_WRITE_LINE_MEMBER( sidsel_w );
-	DECLARE_WRITE_LINE_MEMBER( bankdden_w );
-	DECLARE_WRITE_LINE_MEMBER( drivesel_w );
+	void den_w(int state);
+	void wdreset_w(int state);
+	void sidsel_w(int state);
+	void bankdden_w(int state);
+	void drivesel_w(int state);
 
 	// Deliver the current state of the address bus
 	offs_t get_address();
@@ -103,6 +103,9 @@ private:
 
 	// Recent address
 	int m_address;
+
+	// AMA/B/C decoding active
+	bool m_dec_high;
 };
 
 // =========== Decoder PAL circuit ================
@@ -119,7 +122,7 @@ public:
 	bool cs259();
 
 private:
-	void device_start() override { };
+	void device_start() override { }
 	void device_config_complete() override;
 
 	myarc_fdc_device* m_board;

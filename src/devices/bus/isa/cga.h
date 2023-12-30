@@ -55,8 +55,8 @@ protected:
 
 	virtual uint32_t screen_update(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect);
 
-	DECLARE_WRITE_LINE_MEMBER( hsync_changed );
-	DECLARE_WRITE_LINE_MEMBER( vsync_changed );
+	void hsync_changed(int state);
+	void vsync_changed(int state);
 
 public:
 	void mode_control_w(uint8_t data);
@@ -192,6 +192,7 @@ public:
 	virtual uint32_t screen_update(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect) override;
 	void change_resolution(uint8_t mode);
 
+	memory_bank_creator m_vrambank;
 	uint8_t m_bank_offset;
 	uint8_t m_bank_base;
 	uint8_t m_control;

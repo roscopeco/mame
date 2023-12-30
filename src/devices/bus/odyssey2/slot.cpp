@@ -52,7 +52,7 @@ device_o2_cart_interface::~device_o2_cart_interface()
 
 o2_cart_slot_device::o2_cart_slot_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock)
 	: device_t(mconfig, O2_CART_SLOT, tag, owner, clock)
-	, device_image_interface(mconfig, *this)
+	, device_cartrom_image_interface(mconfig, *this)
 	, device_single_card_slot_interface<device_o2_cart_interface>(mconfig, *this)
 	, m_type(O2_STD)
 	, m_cart(nullptr)
@@ -130,7 +130,7 @@ static const char *o2_get_slot(int type)
  call load
 -------------------------------------------------*/
 
-image_init_result o2_cart_slot_device::call_load()
+std::pair<std::error_condition, std::string> o2_cart_slot_device::call_load()
 {
 	if (m_cart)
 	{
@@ -152,7 +152,7 @@ image_init_result o2_cart_slot_device::call_load()
 		}
 		else
 		{
-			u32 size = length();
+			u32 const size = length();
 			fread(m_cart->m_rom, size);
 
 			m_cart->m_rom_size = size;
@@ -166,11 +166,11 @@ image_init_result o2_cart_slot_device::call_load()
 		if (m_cart->get_rom_size() > 0)
 		{
 			m_cart->cart_init();
-			return image_init_result::PASS;
+			return std::make_pair(std::error_condition(), std::string());
 		}
 	}
 
-	return image_init_result::FAIL;
+	return std::make_pair(image_error::UNSPECIFIED, std::string());
 }
 
 
@@ -182,10 +182,10 @@ std::string o2_cart_slot_device::get_default_card_software(get_default_card_soft
 {
 	if (hook.image_file())
 	{
-		const char *slot_string;
-		u32 size = hook.image_file()->size();
-		int type = (size == 0x4000) ? O2_RALLY : O2_STD;
-		slot_string = o2_get_slot(type);
+		uint64_t size;
+		hook.image_file()->length(size); // FIXME: check error return
+		int const type = (size == 0x4000) ? O2_RALLY : O2_STD;
+		char const *const slot_string = o2_get_slot(type);
 
 		return std::string(slot_string);
 	}
@@ -241,7 +241,7 @@ u8 o2_cart_slot_device::bus_read()
 	return (m_cart) ? m_cart->bus_read() : 0xff;
 }
 
-READ_LINE_MEMBER(o2_cart_slot_device::t0_read)
+int o2_cart_slot_device::t0_read()
 {
 	return (m_cart) ? m_cart->t0_read() : 0;
 }

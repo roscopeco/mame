@@ -40,9 +40,9 @@ DEFINE_DEVICE_TYPE(M37450, m37450_device, "m37450", "Mitsubishi M37450")
 m3745x_device::m3745x_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock, address_map_constructor internal_map) :
 	m740_device(mconfig, type, tag, owner, clock),
 	m_program_config("program", ENDIANNESS_LITTLE, 8, 16, 0, internal_map),
-	m_read_p(*this),
+	m_read_p(*this, 0),
 	m_write_p(*this),
-	m_read_ad(*this),
+	m_read_ad(*this, 0),
 	m_intreq1(0),
 	m_intreq2(0),
 	m_intctrl1(0),
@@ -58,14 +58,11 @@ m3745x_device::m3745x_device(const machine_config &mconfig, device_type type, co
 
 void m3745x_device::device_start()
 {
-	m_read_p.resolve_all_safe(0);
-	m_write_p.resolve_all_safe();
-	m_read_ad.resolve_all_safe(0);
-
-	for (int i = 0; i < NUM_TIMERS; i++)
+	for (int i = TIMER_1; i <= TIMER_3; i++)
 	{
-		m_timers[i] = timer_alloc(i, nullptr);
+		m_timers[i] = machine().scheduler().timer_alloc(timer_expired_delegate());
 	}
+	m_timers[TIMER_ADC] = timer_alloc(FUNC(m3745x_device::adc_complete), this);
 
 	m740_device::device_start();
 
@@ -116,22 +113,13 @@ void m3745x_device::device_reset()
 	m_last_all_ints = 0;
 }
 
-void m3745x_device::device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr)
+TIMER_CALLBACK_MEMBER(m3745x_device::adc_complete)
 {
-	switch (id)
-	{
-		case TIMER_ADC:
-			m_timers[TIMER_ADC]->adjust(attotime::never);
+	m_timers[TIMER_ADC]->adjust(attotime::never);
 
-			m_adctrl |= ADCTRL_COMPLETE;
-			m_intreq2 |= IRQ2_ADC;
-			recalc_irqs();
-			break;
-
-		default:
-			printf("M3775x: unknown timer expire %d\n", id);
-			break;
-	}
+	m_adctrl |= ADCTRL_COMPLETE;
+	m_intreq2 |= IRQ2_ADC;
+	recalc_irqs();
 }
 
 void m3745x_device::execute_set_input(int inputnum, int state)
