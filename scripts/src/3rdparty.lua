@@ -1885,7 +1885,7 @@ if _OPTIONS["targetos"]=="windows" then
 elseif _OPTIONS["targetos"]=="macosx" then
 	buildoptions {
 		"-F" .. backtick("qmake -query QT_INSTALL_LIBS"),
-		"-isystem /usr/local/opt/qt5/lib/QtWidgets.framework/Headers",
+                "-isystem /usr/local/opt/qt5/lib/QtWidgets.framework/Headers",
 		"-isystem /usr/local/opt/qt5/lib/QtGui.framework/Headers",
 		"-isystem /usr/local/opt/qt5/lib/QtCore.framework/Headers"
 	}

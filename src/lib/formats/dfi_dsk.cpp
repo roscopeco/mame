@@ -162,11 +162,7 @@ bool dfi_format::load(util::random_read &io, uint32_t form_factor, const std::ve
 			osd_printf_verbose("dfi_dsk: Actual rpm based on index: %f\n", ((double)clock_rate/(double)onerev_time)*60);
 		}
 
-<<<<<<< HEAD
 		//rpm += 0;   // HACK: prevent GCC 4.6+ from warning "variable set but unused"
-
-=======
->>>>>>> dcb77f0255aae9381655a8134c7e011086d54eb9
 		if(!index_time)
 			index_time = total_time;
 
