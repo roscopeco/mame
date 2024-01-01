@@ -16,16 +16,8 @@ namespace EmitterUtils {
 
 #ifndef ASMJIT_NO_LOGGING
 
-<<<<<<< HEAD
-Error formatLine(String& sb, const uint8_t* binData, size_t binSize, size_t dispSize, size_t immSize, const char* comment) noexcept {
-  //size_t currentSize = sb.size();
-  size_t commentSize = comment ? Support::strLen(comment, Globals::kMaxCommentSize) : 0;
-
-  ASMJIT_ASSERT(binSize >= dispSize);
-=======
 Error finishFormattedLine(String& sb, const FormatOptions& formatOptions, const uint8_t* binData, size_t binSize, size_t offsetSize, size_t immSize, const char* comment) noexcept {
   ASMJIT_ASSERT(binSize >= offsetSize);
->>>>>>> dcb77f0255aae9381655a8134c7e011086d54eb9
   const size_t kNoBinSize = SIZE_MAX;
 
   size_t commentSize = comment ? Support::strLen(comment, Globals::kMaxCommentSize) : 0;
@@ -35,12 +27,7 @@ Error finishFormattedLine(String& sb, const FormatOptions& formatOptions, const 
     size_t padding = Formatter::paddingFromOptions(formatOptions, FormatPaddingGroup::kRegularLine);
 
     for (size_t i = (binSize == kNoBinSize); i < 2; i++) {
-<<<<<<< HEAD
-      //size_t begin = sb.size();
-      ASMJIT_PROPAGATE(sb.padEnd(align));
-=======
       ASMJIT_PROPAGATE(sb.padEnd(padding));
->>>>>>> dcb77f0255aae9381655a8134c7e011086d54eb9
 
       if (sep) {
         ASMJIT_PROPAGATE(sb.append(sep));
@@ -58,11 +45,6 @@ Error finishFormattedLine(String& sb, const FormatOptions& formatOptions, const 
         ASMJIT_PROPAGATE(sb.append(comment, commentSize));
       }
 
-<<<<<<< HEAD
-      //currentSize += sb.size() - begin;
-      align += kMaxBinarySize;
-=======
->>>>>>> dcb77f0255aae9381655a8134c7e011086d54eb9
       sep = '|';
       padding += Formatter::paddingFromOptions(formatOptions, FormatPaddingGroup::kMachineCode);
     }
