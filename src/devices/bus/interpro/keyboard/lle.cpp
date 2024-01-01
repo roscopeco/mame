@@ -148,14 +148,13 @@
 #include "speaker.h"
 #include "machine/keyboard.ipp"
 
-#define LOG_GENERAL (1U << 0)
 #define LOG_RXTX    (1U << 1)
 #define LOG_PORT    (1U << 2)
 
 #define VERBOSE (0)
 #include "logmacro.h"
 
-DEFINE_DEVICE_TYPE_NS(INTERPRO_LLE_EN_US_KEYBOARD, bus::interpro::keyboard, lle_en_us_device, "kbd_lle_en_us", "InterPro Keyboard (LLE, US English)")
+DEFINE_DEVICE_TYPE(INTERPRO_LLE_EN_US_KEYBOARD, bus::interpro::keyboard::lle_en_us_device, "kbd_lle_en_us", "InterPro Keyboard (LLE, US English)")
 
 namespace bus::interpro::keyboard {
 
@@ -487,7 +486,7 @@ void lle_device_base::ext_map(address_map &map)
 				}, "write");
 }
 
-READ_LINE_MEMBER(lle_device_base::t0_r)
+int lle_device_base::t0_r()
 {
 	if ((VERBOSE & LOG_RXTX) && (m_mcu->pc() == 0x8e) && m_txd)
 	{
@@ -502,7 +501,7 @@ READ_LINE_MEMBER(lle_device_base::t0_r)
 	return !m_txd;
 }
 
-READ_LINE_MEMBER(lle_device_base::t1_r)
+int lle_device_base::t1_r()
 {
 	return BIT(m_lower[m_count >> 3]->read(), m_count & 0x7) ? ASSERT_LINE : CLEAR_LINE;
 }

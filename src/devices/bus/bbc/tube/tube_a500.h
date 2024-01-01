@@ -60,6 +60,8 @@ private:
 
 	void arm_mem(address_map &map);
 	void a500_map(address_map &map);
+
+	void prst_w(int state);
 };
 
 

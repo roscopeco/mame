@@ -17,7 +17,7 @@
 #include "logmacro.h"
 
 
-DEFINE_DEVICE_TYPE_NS(HPDIO_98265A, bus::hp_dio, dio16_98265a_device, "hp98265a", "HP98265A SCSI S16 Interface")
+DEFINE_DEVICE_TYPE(HPDIO_98265A, bus::hp_dio::dio16_98265a_device, "hp98265a", "HP98265A SCSI S16 Interface")
 
 namespace bus::hp_dio {
 
@@ -253,7 +253,7 @@ void dio16_98265a_device::update_irq(bool state)
 	irq6_out(state && irq_level == 3);
 }
 
-WRITE_LINE_MEMBER(dio16_98265a_device::irq_w)
+void dio16_98265a_device::irq_w(int state)
 {
 	LOG("%s: %s\n", __FUNCTION__, state ? "true" : "false");
 
@@ -268,7 +268,7 @@ void dio16_98265a_device::dmack_w_in(int channel, uint8_t data)
 	if(channel == 0 && !(m_control & REG_CONTROL_DE0))
 		return;
 	if(channel == 1 && !(m_control & REG_CONTROL_DE1))
-			return;
+		return;
 
 	m_spc->dma_w(data);
 }
@@ -288,7 +288,7 @@ void dio16_98265a_device::update_dma()
 	dmar0_out((m_control & REG_CONTROL_DE0) && m_dmar0);
 	dmar1_out((m_control & REG_CONTROL_DE1) && m_dmar0);
 }
-WRITE_LINE_MEMBER(dio16_98265a_device::dmar0_w)
+void dio16_98265a_device::dmar0_w(int state)
 {
 	m_dmar0 = state;
 	update_dma();

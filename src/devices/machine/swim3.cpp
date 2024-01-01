@@ -22,9 +22,7 @@ void swim3_device::device_start()
 {
 	applefdintf_device::device_start();
 
-	m_irq_cb.resolve_safe();
-	m_drq_cb.resolve_safe();
-	m_timer = timer_alloc(0);
+	m_timer = timer_alloc(FUNC(swim3_device::update), this);
 
 	save_item(NAME(m_mode));
 	save_item(NAME(m_setup));
@@ -300,7 +298,8 @@ void swim3_device::index_callback(floppy_image_device *floppy, int state)
 		run(false, true);
 	}
 }
-void swim3_device::device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr)
+
+TIMER_CALLBACK_MEMBER(swim3_device::update)
 {
 	sync();
 	run(true, false);

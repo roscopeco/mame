@@ -1,5 +1,10 @@
 // license:BSD-3-Clause
 // copyright-holders:Olivier Galibert
+/*
+ * References:
+ * - PCI local bus (rev 2.x)
+ * - https://wiki.osdev.org/PCI
+ */
 #include "emu.h"
 #include "pci.h"
 
@@ -87,6 +92,12 @@ pci_device::pci_device(const machine_config &mconfig, device_type type, const ch
 	}
 }
 
+// main_id << 16 = vendor ID ($00-$01)
+// main_id & 0xffff = device ID ($02-$03)
+// revision = board versioning ($08)
+// pclass = programming interface/sub class code/base class code ($09-$0b)
+// subsystem_id << 16 = sub vendor ID ($2c-$2d)    - NB: not all cards have these
+// subsystem_id & 0xffff = sub device ID ($2e-$2f) /
 void pci_device::set_ids(uint32_t _main_id, uint8_t _revision, uint32_t _pclass, uint32_t _subsystem_id)
 {
 	main_id = _main_id;
@@ -257,6 +268,17 @@ void pci_device::expansion_base_w(offs_t offset, uint32_t data, uint32_t mem_mas
 	remap_cb();
 }
 
+// if non-zero a CAPability PoinTeR marks an offset in PCI config space where a standard extension is located
+// For example if capptr_r is 0xc0 then [offset+0xc0] has a capability identifier that is set with:
+// bits 31-16 <capability dependant, usually revision and supported sub-features>
+// bits 15-8 next capptr offset, 0x00 to determine the given item as last
+// bits 7-0 capability ID:
+// - 0x01 PMI Power Management Interface
+// - 0x02 AGP Accelerated Graphics Port
+// - 0x03 VPD Vital Product Data
+// - 0x04 Slot Identification
+// - 0x05 MSI Message Signaled Interrupts
+// - 0x06 CompactPCI Hot Swap
 uint8_t pci_device::capptr_r()
 {
 	return 0x00;
@@ -522,6 +544,10 @@ void pci_bridge_device::device_reset()
 	primary_bus = 0x00;
 	secondary_bus = 0x00;
 	subordinate_bus = 0x00;
+}
+
+void pci_bridge_device::interface_post_reset()
+{
 	regenerate_config_mapping();
 }
 
@@ -871,9 +897,14 @@ void pci_host_device::device_reset()
 {
 	pci_bridge_device::device_reset();
 	reset_all_mappings();
-	regenerate_mapping();
 
 	config_address = 0;
+}
+
+void pci_host_device::interface_post_reset()
+{
+	pci_bridge_device::interface_post_reset();
+	regenerate_mapping();
 }
 
 void pci_host_device::regenerate_mapping()
@@ -905,6 +936,38 @@ void pci_host_device::config_data_w(offs_t offset, uint32_t data, uint32_t mem_m
 {
 	if(config_address & 0x80000000)
 		root_config_write((config_address >> 16) & 0xff, (config_address >> 8) & 0xff, config_address & 0xfc, data, mem_mask);
+}
+
+uint32_t pci_host_device::config_data_ex_r(offs_t offset, uint32_t mem_mask)
+{
+	// is this a Type 0 or Type 1 configuration address? (page 31, PCI 2.2 Specification)
+	if ((config_address & 3) == 0)
+	{
+		const int devnum = 31 - count_leading_zeros_32(config_address & 0xfffff800);
+		return root_config_read(0, devnum << 3, config_address & 0xfc, mem_mask);
+	}
+	else if ((config_address & 3) == 1)
+		return config_address & 0x80000000 ? root_config_read((config_address >> 16) & 0xff, (config_address >> 8) & 0xff, config_address & 0xfc, mem_mask) : 0xffffffff;
+
+	logerror("pci: configuration address format %d unsupported", config_address & 3);
+	return 0xffffffff;
+}
+
+void pci_host_device::config_data_ex_w(offs_t offset, uint32_t data, uint32_t mem_mask)
+{
+	// is this a Type 0 or Type 1 configuration address? (page 31, PCI 2.2 Specification)
+	if ((config_address & 3) == 0)
+	{
+		const int devnum = 31 - count_leading_zeros_32(config_address & 0xfffff800);
+		root_config_write(0, devnum << 3, config_address & 0xfc, data, mem_mask);
+	}
+	else if ((config_address & 3) == 1)
+	{
+		if (config_address & 0x80000000)
+			root_config_write((config_address >> 16) & 0xff, (config_address >> 8) & 0xff, config_address & 0xfc, data, mem_mask);
+	}
+	else
+		logerror("pci: configuration address format %d unsupported", config_address & 3);
 }
 
 uint32_t pci_host_device::root_config_read(uint8_t bus, uint8_t device, uint16_t reg, uint32_t mem_mask)

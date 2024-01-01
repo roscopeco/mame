@@ -10,6 +10,9 @@
 #ifndef MAME_LIB_UTIL_UTILFWD_H
 #define MAME_LIB_UTIL_UTILFWD_H
 
+// aviio.h
+class avi_file;
+
 // chd.h
 class chd_file;
 
@@ -27,6 +30,10 @@ class random_access;
 class random_read;
 class random_write;
 class random_read_write;
+
+// opresolv.h
+class option_guide;
+class option_resolution;
 
 // unzip.h
 class archive_file;

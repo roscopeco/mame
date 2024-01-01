@@ -198,35 +198,37 @@ CRUCLK*  51||52  DBIN
 #include "forti.h"
 #include "pgram.h"
 #include "sidmaster.h"
+#include "scsicard.h"
+#include "tipi.h"
 
-#define LOG_WARN        (1U<<1)   // Warnings
-#define LOG_CONFIG      (1U<<2)   // Configuration
-#define LOG_INT         (1U<<3)
-#define LOG_READY       (1U<<4)
+#define LOG_WARN        (1U << 1)   // Warnings
+#define LOG_CONFIG      (1U << 2)   // Configuration
+#define LOG_INT         (1U << 3)
+#define LOG_READY       (1U << 4)
 
-#define VERBOSE ( LOG_CONFIG | LOG_WARN )
+#define VERBOSE (LOG_CONFIG | LOG_WARN)
 
 #include "logmacro.h"
 
 // Peripheral box that is attached to the TI console (also TI with EVPC)
 // and has the Flex Cable Interface in slot 1
 // This is a device that plugs into the slot "ioport" of the console
-DEFINE_DEVICE_TYPE_NS(TI99_PERIBOX,      bus::ti99::peb, peribox_device,      "peribox",      "Peripheral expansion box")
+DEFINE_DEVICE_TYPE(TI99_PERIBOX,      bus::ti99::peb::peribox_device,      "peribox",      "Peripheral expansion box")
 
 // Peripheral box which has a EVPC card in slot 2 (for use with the ti99_4ev)
-DEFINE_DEVICE_TYPE_NS(TI99_PERIBOX_EV,   bus::ti99::peb, peribox_ev_device,   "peribox_ev",   "Peripheral expansion box with EVPC")
+DEFINE_DEVICE_TYPE(TI99_PERIBOX_EV,   bus::ti99::peb::peribox_ev_device,   "peribox_ev",   "Peripheral expansion box with EVPC")
 
 // Peripheral box which hosts the SGCPU card in slot 1
-DEFINE_DEVICE_TYPE_NS(TI99_PERIBOX_SG,   bus::ti99::peb, peribox_sg_device,   "peribox_sg",   "Peripheral expansion box SGCPU")
+DEFINE_DEVICE_TYPE(TI99_PERIBOX_SG,   bus::ti99::peb::peribox_sg_device,   "peribox_sg",   "Peripheral expansion box SGCPU")
 
 // Peripheral box which hosts the Geneve 9640 in slot 1
-DEFINE_DEVICE_TYPE_NS(TI99_PERIBOX_GEN,  bus::ti99::peb, peribox_gen_device,  "peribox_gen",  "Peripheral expansion box Geneve")
+DEFINE_DEVICE_TYPE(TI99_PERIBOX_GEN,  bus::ti99::peb::peribox_gen_device,  "peribox_gen",  "Peripheral expansion box Geneve")
 
 // Peripheral box which hosts the Geneve 9640 in slot 1 with Genmod
-DEFINE_DEVICE_TYPE_NS(TI99_PERIBOX_GENMOD,  bus::ti99::peb, peribox_genmod_device,  "peribox_genmod",  "Peripheral expansion box Genmod")
+DEFINE_DEVICE_TYPE(TI99_PERIBOX_GENMOD,  bus::ti99::peb::peribox_genmod_device,  "peribox_genmod",  "Peripheral expansion box Genmod")
 
 // Single slot of the PEB
-DEFINE_DEVICE_TYPE_NS(TI99_PERIBOX_SLOT, bus::ti99::peb, peribox_slot_device, "peribox_slot", "TI P-Box slot")
+DEFINE_DEVICE_TYPE(TI99_PERIBOX_SLOT, bus::ti99::peb::peribox_slot_device, "peribox_slot", "TI P-Box slot")
 
 namespace bus::ti99::peb {
 
@@ -321,7 +323,7 @@ void peribox_device::cruwrite(offs_t offset, uint8_t data)
 /*
     RESET line from the console.
 */
-WRITE_LINE_MEMBER(peribox_device::reset_in)
+void peribox_device::reset_in(int state)
 {
 	for (int i=2; i <= 8; i++)
 	{
@@ -333,7 +335,7 @@ WRITE_LINE_MEMBER(peribox_device::reset_in)
     And here are finally the two mythical lines SENILA* and SENILB*; mythical
     since there is no report of any software that ever used them.
 */
-WRITE_LINE_MEMBER(peribox_device::senila)
+void peribox_device::senila(int state)
 {
 	for (int i=2; i <= 8; i++)
 	{
@@ -341,7 +343,7 @@ WRITE_LINE_MEMBER(peribox_device::senila)
 	}
 }
 
-WRITE_LINE_MEMBER(peribox_device::senilb)
+void peribox_device::senilb(int state)
 {
 	for (int i=2; i <= 8; i++)
 	{
@@ -352,7 +354,7 @@ WRITE_LINE_MEMBER(peribox_device::senilb)
 /*
     MEMEN input. Used to start the external memory access cycle.
 */
-WRITE_LINE_MEMBER(peribox_device::memen_in)
+void peribox_device::memen_in(int state)
 {
 	m_memen = (state==ASSERT_LINE);
 }
@@ -360,7 +362,7 @@ WRITE_LINE_MEMBER(peribox_device::memen_in)
 /*
     MSAST input. Defined by TI-99/8; we ignore this part in the PEB.
 */
-WRITE_LINE_MEMBER(peribox_device::msast_in)
+void peribox_device::msast_in(int state)
 {
 	m_msast = (state==ASSERT_LINE);
 }
@@ -369,7 +371,7 @@ WRITE_LINE_MEMBER(peribox_device::msast_in)
     CLKOUT line
 */
 
-WRITE_LINE_MEMBER(peribox_device::clock_in)
+void peribox_device::clock_in(int state)
 {
 	for (int i=2; i <= 8; i++)
 	{
@@ -450,13 +452,7 @@ void peribox_device::set_slot_loaded(int slot, peribox_slot_device* slotdev)
 
 void peribox_device::device_start()
 {
-	// Resolve the callback lines to the console
-	m_slot1_inta.resolve();
-	m_slot1_intb.resolve();
-	m_slot1_lcp.resolve();
-	m_slot1_ready.resolve();
-
-	m_ioport_connected = (m_slot1_inta.isnull()); // TODO: init
+	m_ioport_connected = (m_slot1_inta.isunset()); // TODO: init
 
 	LOGMASKED(LOG_CONFIG, "AMA/B/C address prefix set to %05x\n", m_address_prefix);
 	for (int i=2; i < 9; i++)
@@ -501,6 +497,8 @@ void ti99_peribox_slot_standard(device_slot_interface &device)
 	device.option_add("ddcc1",    TI99_DDCC1);
 	device.option_add("forti",    TI99_FORTI);
 	device.option_add("sidmaster", TI99_SIDMASTER);
+	device.option_add("whtscsi",  TI99_WHTSCSI);
+	device.option_add("tipi",     TI99_TIPI);
 }
 
 void peribox_device::device_add_mconfig(machine_config &config)
@@ -546,6 +544,8 @@ void ti99_peribox_slot_evpc(device_slot_interface &device)
 	device.option_add("ddcc1",    TI99_DDCC1);
 	device.option_add("forti",    TI99_FORTI);
 	device.option_add("sidmaster", TI99_SIDMASTER);
+	device.option_add("whtscsi",  TI99_WHTSCSI);
+	device.option_add("tipi",     TI99_TIPI);
 }
 
 void peribox_ev_device::device_add_mconfig(machine_config &config)
@@ -602,6 +602,8 @@ void ti99_peribox_slot_geneve(device_slot_interface &device)
 	device.option_add("ddcc1",    TI99_DDCC1);
 	device.option_add("forti",    TI99_FORTI);
 	device.option_add("sidmaster", TI99_SIDMASTER);
+	device.option_add("whtscsi",  TI99_WHTSCSI);
+	device.option_add("tipi",     TI99_TIPI);
 }
 
 void peribox_gen_device::device_add_mconfig(machine_config &config)
@@ -658,6 +660,8 @@ void ti99_peribox_slot_sgcpu(device_slot_interface &device)
 	device.option_add("ddcc1",    TI99_DDCC1);
 	device.option_add("forti",    TI99_FORTI);
 	device.option_add("sidmaster", TI99_SIDMASTER);
+	device.option_add("whtscsi",  TI99_WHTSCSI);
+	device.option_add("tipi",     TI99_TIPI);
 }
 
 void peribox_sg_device::device_add_mconfig(machine_config &config)
@@ -708,22 +712,22 @@ void peribox_slot_device::cruwrite(offs_t offset, uint8_t data)
 	m_card->cruwrite(offset, data);
 }
 
-WRITE_LINE_MEMBER( peribox_slot_device::senila )
+void peribox_slot_device::senila(int state)
 {
 	m_card->set_senila(state);
 }
 
-WRITE_LINE_MEMBER( peribox_slot_device::senilb )
+void peribox_slot_device::senilb(int state)
 {
 	m_card->set_senilb(state);
 }
 
-WRITE_LINE_MEMBER( peribox_slot_device::clock_in )
+void peribox_slot_device::clock_in(int state)
 {
 	m_card->clock_in(state);
 }
 
-WRITE_LINE_MEMBER( peribox_slot_device::reset_in )
+void peribox_slot_device::reset_in(int state)
 {
 	m_card->reset_in(state);
 }
@@ -744,25 +748,25 @@ void peribox_slot_device::device_config_complete()
     These methods are called from the expansion cards. They add the
     slot number to identify the slot to the box.
 */
-WRITE_LINE_MEMBER( peribox_slot_device::set_inta )
+void peribox_slot_device::set_inta(int state)
 {
 	peribox_device *peb = static_cast<peribox_device*>(owner());
 	peb->inta_join(m_slotnumber, state);
 }
 
-WRITE_LINE_MEMBER( peribox_slot_device::set_intb )
+void peribox_slot_device::set_intb(int state)
 {
 	peribox_device *peb = static_cast<peribox_device*>(owner());
 	peb->intb_join(m_slotnumber, state);
 }
 
-WRITE_LINE_MEMBER( peribox_slot_device::lcp_line )
+void peribox_slot_device::lcp_line(int state)
 {
 	peribox_device *peb = static_cast<peribox_device*>(owner());
 	peb->lcp_join(m_slotnumber, state);
 }
 
-WRITE_LINE_MEMBER( peribox_slot_device::set_ready )
+void peribox_slot_device::set_ready(int state)
 {
 	peribox_device *peb = static_cast<peribox_device*>(owner());
 	peb->ready_join(m_slotnumber, state);
@@ -786,18 +790,18 @@ void device_ti99_peribox_card_interface::interface_config_complete()
 
 bool device_ti99_peribox_card_interface::in_dsr_space(offs_t offset, bool amadec)
 {
-	if (amadec)
-		return (offset & 0x7e000)==0x74000;
-	else
-		return (offset & 0x0e000)==0x04000;
+	if (amadec && !amabc_is_set(offset)) return false;
+	return (offset & 0x0e000)==0x04000;
 }
 
-bool device_ti99_peribox_card_interface::in_cart_space(offs_t offset, bool amadec)
+/*
+    Some cards do not decode the additional address lines AMA, AMB, AMC.
+    This leads to errors when using the card with Genmod. The typical procedure
+    to decode the lines is the same for each card.
+*/
+bool device_ti99_peribox_card_interface::amabc_is_set(offs_t offset)
 {
-	if (amadec)
-		return (offset & 0x7e000)==0x76000;
-	else
-		return (offset & 0x0e000)==0x06000;
+	return (((offset >> 16)&0x07)==0x07);
 }
 
 } // end namespace bus::ti99::peb

@@ -25,6 +25,8 @@
 #include "emu.h"
 #include "emuopts.h"
 
+#include "main.h"
+
 #include "util/coreutil.h"
 #include "util/ioprocs.h"
 #include "util/ioprocsfilter.h"
@@ -208,7 +210,7 @@ void save_manager::save_memory(device_t *device, const char *module, const char 
 //  state
 //-------------------------------------------------
 
-save_error save_manager::check_file(running_machine &machine, emu_file &file, const char *gamename, void (CLIB_DECL *errormsg)(const char *fmt, ...))
+save_error save_manager::check_file(running_machine &machine, util::core_file &file, const char *gamename, void (CLIB_DECL *errormsg)(const char *fmt, ...))
 {
 	// if we want to validate the signature, compute it
 	u32 sig;
@@ -217,10 +219,11 @@ save_error save_manager::check_file(running_machine &machine, emu_file &file, co
 	// seek to the beginning and read the header
 	file.seek(0, SEEK_SET);
 	u8 header[HEADER_SIZE];
-	if (file.read(header, sizeof(header)) != sizeof(header))
+	size_t actual(0);
+	if (file.read(header, sizeof(header), actual) || actual != sizeof(header))
 	{
 		if (errormsg != nullptr)
-			(*errormsg)("Could not read %s save file header",emulator_info::get_appname());
+			(*errormsg)("Could not read %s save file header", emulator_info::get_appname());
 		return STATERR_READ_ERROR;
 	}
 
@@ -257,7 +260,7 @@ void save_manager::dispatch_presave()
 //  write_file - writes the data to a file
 //-------------------------------------------------
 
-save_error save_manager::write_file(emu_file &file)
+save_error save_manager::write_file(util::core_file &file)
 {
 	util::write_stream::ptr writer;
 	save_error err = do_write(
@@ -272,12 +275,14 @@ save_error save_manager::write_file(emu_file &file)
 			{
 				if (file.seek(0, SEEK_SET))
 					return false;
-				writer = util::core_file_read_write(file);
-				return bool(writer);
+				util::core_file::ptr proxy;
+				std::error_condition filerr = util::core_file::open_proxy(file, proxy);
+				writer = std::move(proxy);
+				return !filerr && writer;
 			},
 			[&file, &writer] ()
 			{
-				writer = util::zlib_write(util::core_file_read_write(file), 6, 16384);
+				writer = util::zlib_write(file, 6, 16384);
 				return bool(writer);
 			});
 	return (STATERR_NONE != err) ? err : writer->finalize() ? STATERR_WRITE_ERROR : STATERR_NONE;
@@ -288,7 +293,7 @@ save_error save_manager::write_file(emu_file &file)
 //  read_file - read the data from a file
 //-------------------------------------------------
 
-save_error save_manager::read_file(emu_file &file)
+save_error save_manager::read_file(util::core_file &file)
 {
 	util::read_stream::ptr reader;
 	return do_read(
@@ -303,12 +308,14 @@ save_error save_manager::read_file(emu_file &file)
 			{
 				if (file.seek(0, SEEK_SET))
 					return false;
-				reader = util::core_file_read(file);
-				return bool(reader);
+				util::core_file::ptr proxy;
+				std::error_condition filerr = util::core_file::open_proxy(file, proxy);
+				reader = std::move(proxy);
+				return !filerr && reader;
 			},
 			[&file, &reader] ()
 			{
-				reader = util::zlib_read(util::core_file_read(file), 16384);
+				reader = util::zlib_read(file, 16384);
 				return bool(reader);
 			});
 }
@@ -543,7 +550,7 @@ save_error save_manager::validate_header(const u8 *header, const char *gamename,
 	if (memcmp(header, STATE_MAGIC_NUM, 8))
 	{
 		if (errormsg != nullptr)
-			(*errormsg)("%sThis is not a %s save file", error_prefix,emulator_info::get_appname());
+			(*errormsg)("%sThis is not a %s save file", error_prefix, emulator_info::get_appname());
 		return STATERR_INVALID_HEADER;
 	}
 

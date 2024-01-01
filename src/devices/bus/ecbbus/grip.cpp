@@ -317,7 +317,7 @@ void ecb_grip21_device::ppi_pc_w(uint8_t data)
 //  Z80STI_INTERFACE( sti_intf )
 //-------------------------------------------------
 
-WRITE_LINE_MEMBER(ecb_grip21_device::write_centronics_busy)
+void ecb_grip21_device::write_centronics_busy(int state)
 {
 	m_centronics_busy = state;
 }
@@ -359,7 +359,7 @@ uint8_t ecb_grip21_device::sti_gpio_r()
 	return data;
 }
 
-WRITE_LINE_MEMBER( ecb_grip21_device::speaker_w )
+void ecb_grip21_device::speaker_w(int state)
 {
 	int level = state && ((m_vol1 << 1) | m_vol0);
 
@@ -571,7 +571,20 @@ ecb_grip21_device::ecb_grip21_device(const machine_config &mconfig, const char *
 	m_j3a(*this, "J3A"),
 	m_j3b(*this, "J3B"),
 	m_j7(*this, "J7"),
-	m_centronics_busy(0), m_centronics_fault(0), m_vol0(0), m_vol1(0), m_ia(0), m_ib(0), m_keydata(0), m_kbf(0), m_lps(0), m_page(0), m_flash(0), m_base(0), m_ppi_pa(0), m_ppi_pc(0), m_kb_timer(nullptr)
+	m_centronics_busy(0),
+	m_centronics_fault(0),
+	m_vol0(0),
+	m_vol1(0),
+	m_ia(0),
+	m_ib(0),
+	m_keydata(0),
+	m_kbf(0),
+	m_lps(0),
+	m_page(0),
+	m_flash(0),
+	m_base(0),
+	m_ppi_pa(0),
+	m_ppi_pc(0)
 {
 }
 
@@ -584,10 +597,6 @@ void ecb_grip21_device::device_start()
 	// setup GRIP memory banking
 	membank("videoram")->configure_entries(0, 2, m_video_ram, 0x8000);
 	membank("videoram")->set_entry(0);
-
-	// allocate keyboard scan timer
-	m_kb_timer = timer_alloc();
-	m_kb_timer->adjust(attotime::zero, 0, attotime::from_hz(2500));
 
 	// register for state saving
 	save_item(NAME(m_vol0));
@@ -671,7 +680,7 @@ void ecb_grip21_device::page_w(uint8_t data)
 //  stat_r -
 //-------------------------------------------------
 
-WRITE_LINE_MEMBER(ecb_grip21_device::write_centronics_fault)
+void ecb_grip21_device::write_centronics_fault(int state)
 {
 	m_centronics_fault = state;
 }

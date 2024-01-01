@@ -7,15 +7,14 @@
 */
 
 #include "emu.h"
-#include "debugger.h"
 #include "diablo1300.h"
 #include "diablo1300dasm.h"
 
 //**************************************************************************
 //  CONFIGURABLE LOGGING
 //**************************************************************************
-#define LOG_OP   (1U <<  1)
-#define LOG_TABLE   (1U <<  2)
+#define LOG_OP      (1U << 1)
+#define LOG_TABLE   (1U << 2)
 
 #define VERBOSE (LOG_GENERAL | LOG_OP | LOG_TABLE)
 //#define LOG_OUTPUT_FUNC printf

@@ -57,7 +57,6 @@
 */
 
 #include "emu.h"
-#include "debugger.h"
 #include "cop400.h"
 #include "cop410ds.h"
 #include "cop420ds.h"
@@ -89,7 +88,9 @@ DEFINE_DEVICE_TYPE(COP446C, cop446c_cpu_device, "cop446c", "National Semiconduct
     CONSTANTS
 ***************************************************************************/
 
-#define LOG_MICROBUS 0
+#define LOG_MICROBUS (1U << 1)
+#define VERBOSE (0)
+#include "logmacro.h"
 
 // step through skipped instructions in debugger
 #define COP_DEBUG_SKIP 0
@@ -110,10 +111,10 @@ DEFINE_DEVICE_TYPE(COP446C, cop446c_cpu_device, "cop446c", "National Semiconduct
 #define IN_IN()         (m_in_mask ? m_read_in(0, 0xff) : 0)
 
 #define OUT_G(v)        m_write_g(0, (v) & m_g_mask, 0xff)
-#define OUT_L(v)        m_write_l(0, v, 0xff)
+#define OUT_L(v)        m_write_l(0, m_l_output = v, 0xff)
 #define OUT_D(v)        m_write_d(0, (v) & m_d_mask, 0xff)
-#define OUT_SK(v)       m_write_sk(v)
-#define OUT_SO(v)       m_write_so(v)
+#define OUT_SK(v)       m_write_sk(m_sk_output = v)
+#define OUT_SO(v)       m_write_so(m_so_output = v)
 
 #define PC              m_pc
 #define A               m_a
@@ -175,17 +176,17 @@ cop400_cpu_device::cop400_cpu_device(const machine_config &mconfig, device_type 
 	: cpu_device(mconfig, type, tag, owner, clock)
 	, m_program_config("program", ENDIANNESS_LITTLE, 8, program_addr_bits, 0, internal_map_program)
 	, m_data_config("data", ENDIANNESS_LITTLE, 8, data_addr_bits, 0, internal_map_data) // data width is really 4
-	, m_read_l(*this)
-	, m_read_l_tristate(*this)
+	, m_read_l(*this, 0)
+	, m_read_l_tristate(*this, 0)
 	, m_write_l(*this)
-	, m_read_g(*this)
+	, m_read_g(*this, 0)
 	, m_write_g(*this)
 	, m_write_d(*this)
-	, m_read_in(*this)
-	, m_read_si(*this)
+	, m_read_in(*this, 0)
+	, m_read_si(*this, 0)
 	, m_write_so(*this)
 	, m_write_sk(*this)
-	, m_read_cko(*this)
+	, m_read_cko(*this, 0)
 	, m_cki(COP400_CKI_DIVISOR_16)
 	, m_cko(COP400_CKO_OSCILLATOR_OUTPUT)
 	, m_has_microbus(false)
@@ -1032,7 +1033,7 @@ void cop400_cpu_device::serial_tick()
 	}
 }
 
-void cop400_cpu_device::counter_tick()
+TIMER_CALLBACK_MEMBER(cop400_cpu_device::advance_counter)
 {
 	T++;
 
@@ -1062,41 +1063,17 @@ void cop400_cpu_device::inil_tick()
     INITIALIZATION
 ***************************************************************************/
 
-void cop400_cpu_device::device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr)
-{
-	switch (id)
-	{
-	case TIMER_COUNTER:
-		counter_tick();
-		break;
-	}
-}
-
-
 void cop400_cpu_device::device_start()
 {
 	/* find address spaces */
 	space(AS_PROGRAM).cache(m_program);
 	space(AS_DATA).specific(m_data);
 
-	/* find i/o handlers */
-	m_read_l.resolve_safe(0);
-	m_read_l_tristate.resolve_safe(0);
-	m_write_l.resolve_safe();
-	m_read_g.resolve_safe(0);
-	m_write_g.resolve_safe();
-	m_write_d.resolve_safe();
-	m_read_in.resolve_safe(0);
-	m_read_si.resolve_safe(0);
-	m_write_so.resolve_safe();
-	m_write_sk.resolve_safe();
-	m_read_cko.resolve_safe(0);
-
 	/* allocate counter timer */
 	m_counter_timer = nullptr;
 	if (m_has_counter)
 	{
-		m_counter_timer = timer_alloc(TIMER_COUNTER);
+		m_counter_timer = timer_alloc(FUNC(cop400_cpu_device::advance_counter), this);
 		m_counter_timer->adjust(attotime::zero, 0, attotime::from_ticks(m_cki * 4, clock()));
 	}
 
@@ -1113,12 +1090,15 @@ void cop400_cpu_device::device_start()
 	save_item(NAME(m_q));
 	save_item(NAME(m_en));
 	save_item(NAME(m_sio));
+	save_item(NAME(m_si));
+	save_item(NAME(m_so_output));
+	save_item(NAME(m_sk_output));
+	save_item(NAME(m_l_output));
 	save_item(NAME(m_skl));
 	save_item(NAME(m_t));
 	save_item(NAME(m_skip));
 	save_item(NAME(m_skip_lbi));
 	save_item(NAME(m_skt_latch));
-	save_item(NAME(m_si));
 	save_item(NAME(m_last_skip));
 	save_item(NAME(m_in));
 	save_item(NAME(m_halt));
@@ -1161,6 +1141,9 @@ void cop400_cpu_device::device_start()
 	m_il = 0;
 	m_in[0] = m_in[1] = m_in[2] = m_in[3] = 0;
 	m_si = 0;
+	m_so_output = 0;
+	m_sk_output = 0;
+	m_l_output = 0;
 	m_skip_lbi = 0;
 	m_last_skip = false;
 	m_skip = false;
@@ -1386,16 +1369,16 @@ std::unique_ptr<util::disasm_interface> cop400_cpu_device::create_disassembler()
 		return std::make_unique<cop410_disassembler>();
 }
 
-uint8_t cop400_cpu_device::microbus_rd()
+uint8_t cop400_cpu_device::microbus_r()
 {
-	if (LOG_MICROBUS) logerror("%s %s MICROBUS RD %02x\n", machine().time().as_string(), machine().describe_context(), Q);
+	LOGMASKED(LOG_MICROBUS, "%s %s MICROBUS R %02x\n", machine().time().as_string(), machine().describe_context(), Q);
 
 	return Q;
 }
 
-void cop400_cpu_device::microbus_wr(uint8_t data)
+void cop400_cpu_device::microbus_w(uint8_t data)
 {
-	if (LOG_MICROBUS) logerror("%s %s MICROBUS WR %02x\n", machine().time().as_string(), machine().describe_context(), data);
+	LOGMASKED(LOG_MICROBUS, "%s %s MICROBUS W %02x\n", machine().time().as_string(), machine().describe_context(), data);
 
 	WRITE_G(G & 0xe);
 

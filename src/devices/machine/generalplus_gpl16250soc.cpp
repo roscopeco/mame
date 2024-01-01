@@ -25,6 +25,33 @@
 
 DEFINE_DEVICE_TYPE(GCM394, sunplus_gcm394_device, "gcm394", "GeneralPlus GPL16250 System-on-a-Chip")
 
+sunplus_gcm394_base_device::sunplus_gcm394_base_device(const machine_config& mconfig, device_type type, const char* tag, device_t* owner, uint32_t clock, address_map_constructor internal) :
+	unsp_20_device(mconfig, type, tag, owner, clock, internal),
+	device_mixer_interface(mconfig, *this, 2),
+	m_screen(*this, finder_base::DUMMY_TAG),
+	m_spg_video(*this, "spgvideo"),
+	m_spg_audio(*this, "spgaudio"),
+	m_internalrom(*this, "internal"),
+	m_mainram(*this, "mainram"),
+	m_porta_in(*this, 0),
+	m_portb_in(*this, 0),
+	m_portc_in(*this, 0),
+	m_portd_in(*this, 0),
+	m_porta_out(*this),
+	m_portb_out(*this),
+	m_portc_out(*this),
+	m_portd_out(*this),
+	m_nand_read_cb(*this, 0),
+	m_csbase(0x20000),
+	m_cs_space(nullptr),
+	m_romtype(0),
+	m_space_read_cb(*this, 0),
+	m_space_write_cb(*this),
+	m_boot_mode(0),
+	m_cs_callback(*this, DEVICE_SELF, FUNC(sunplus_gcm394_base_device::default_cs_callback))
+{
+}
+
 sunplus_gcm394_device::sunplus_gcm394_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
 	sunplus_gcm394_base_device(mconfig, GCM394, tag, owner, clock)
 {
@@ -46,20 +73,107 @@ generalplus_gpspispi_device::generalplus_gpspispi_device(const machine_config &m
 }
 
 
+void generalplus_gpspi_direct_device::ramwrite_w(offs_t offset, uint16_t data)
+{
+	// TODO: Gross hack, it puts some self-check code in RAM at startup, this replaces those calls with retf.
+	if (offset == 0x100 && data == 0xf14c) data = 0x9a90;
+	if (offset == 0x00 && data == 0x9311) data = 0x9a90;
+
+	m_mainram[offset] = data;
+}
+
+uint16_t generalplus_gpspi_direct_device::ramread_r(offs_t offset)
+{
+	return m_mainram[offset];
+}
+
 uint16_t generalplus_gpspi_direct_device::spi_direct_7b40_r()
+{
+	return 0xffff; // doesn't care for now
+}
+
+uint16_t generalplus_gpspi_direct_device::spi_direct_79f5_r()
+{
+	return 0xffff; // hangs if returning 0
+}
+
+uint16_t generalplus_gpspi_direct_device::spi_direct_7b46_r()
+{
+	int i = machine().rand();
+
+	if (i & 1) return 0x01;
+	else return 0x02;
+}
+
+uint16_t generalplus_gpspi_direct_device::spi_direct_79f4_r()
+{
+	// status bits?
+	return machine().rand();
+}
+
+
+uint16_t generalplus_gpspi_direct_device::spi_direct_7af0_r()
+{
+	return m_7af0;
+}
+
+void generalplus_gpspi_direct_device::spi_direct_7af0_w(uint16_t data)
+{
+	// words read from ROM are written here during the checksum routine in RAM, and must
+	// be shifted for the checksum to pass.
+	m_7af0 = data >> 8;
+}
+
+
+uint16_t generalplus_gpspi_direct_device::spi_direct_78e8_r()
 {
 	return machine().rand();
 }
 
+void generalplus_gpspi_direct_device::device_start()
+{
+	sunplus_gcm394_base_device::device_start();
+	save_item(NAME(m_7af0));
+}
+
+void generalplus_gpspi_direct_device::device_reset()
+{
+	sunplus_gcm394_base_device::device_reset();
+	m_7af0 = 0;
+}
+
+void generalplus_gpspi_direct_device::spi_direct_78e8_w(uint16_t data)
+{
+	logerror("%s: spi_direct_78e8_w %04x\n", machine().describe_context(), data);
+}
 
 void generalplus_gpspi_direct_device::gpspi_direct_internal_map(address_map& map)
 {
 	sunplus_gcm394_base_device::base_internal_map(map);
 
-	map(0x0079f4, 0x0079f4).r(FUNC(generalplus_gpspi_direct_device::spi_direct_7b40_r));
-	map(0x0079f5, 0x0079f5).r(FUNC(generalplus_gpspi_direct_device::spi_direct_7b40_r));
+	map(0x000000, 0x0027ff).rw(FUNC(generalplus_gpspi_direct_device::ramread_r), FUNC(generalplus_gpspi_direct_device::ramwrite_w));
+	// TODO: RAM is only 0x2800 on this, like earlier SPG2xx models? unmap the extra from the base_internal_map?
+
+	map(0x00780b, 0x00780b).nopw();
+
+	map(0x0078e8, 0x0078e8).rw(FUNC(generalplus_gpspi_direct_device::spi_direct_78e8_r), FUNC(generalplus_gpspi_direct_device::spi_direct_78e8_w));
+
+	map(0x0079f4, 0x0079f4).r(FUNC(generalplus_gpspi_direct_device::spi_direct_79f4_r));
+	map(0x0079f5, 0x0079f5).r(FUNC(generalplus_gpspi_direct_device::spi_direct_79f5_r));
+
+	map(0x007af0, 0x007af0).rw(FUNC(generalplus_gpspi_direct_device::spi_direct_7af0_r), FUNC(generalplus_gpspi_direct_device::spi_direct_7af0_w));
 
 	map(0x007b40, 0x007b40).r(FUNC(generalplus_gpspi_direct_device::spi_direct_7b40_r));
+//  map(0x007b46, 0x007b46).r(FUNC(generalplus_gpspi_direct_device::spi_direct_7b46_r));
+	map(0x007b40, 0x007b40).nopw();
+	map(0x007b41, 0x007b41).nopw();
+	map(0x007b42, 0x007b42).nopw();
+
+	map(0x007b46, 0x007b46).ram(); // values must be written and read from here, but is there any transformation?
+	map(0x007b47, 0x007b47).nopw();
+	map(0x007b48, 0x007b48).nopw();
+
+	map(0x007b49, 0x007b49).ram();
 
 	map(0x009000, 0x3fffff).rom().region("spidirect", 0);
 }
@@ -192,7 +306,7 @@ void sunplus_gcm394_base_device::trigger_systemm_dma(int channel)
 	else if ((mode & 0x50) == 0x10)
 		destdelta = -1;
 
-	LOGMASKED(LOG_GCM394_SYSDMA, "%s:possible DMA operation with params mode:%04x source:%08x (word offset) dest:%08x (word offset) length:%08x (words) while csbank is %02x\n", machine().describe_context().c_str(), mode, source, dest, length, m_membankswitch_7810 );
+	LOGMASKED(LOG_GCM394_SYSDMA, "%s:possible DMA operation with params mode:%04x source:%08x (word offset) dest:%08x (word offset) length:%08x (words) while csbank is %02x\n", machine().describe_context(), mode, source, dest, length, m_membankswitch_7810 );
 
 	// wrlshunt transfers ROM to RAM, all RAM write addresses have 0x800000 in the destination set
 
@@ -439,7 +553,6 @@ void sunplus_gcm394_base_device::chipselect_csx_memory_device_control_w(offs_t o
 
 	logerror("CS%d set to size: %02x (%08x words) md: %01x %s   warat: %01x wait: %01x\n", offset, cs_size, (cs_size+1)*0x10000, cs_md, md[cs_md], cs_warat, cs_wait);
 
-
 	m_cs_callback(m_782x[0], m_782x[1], m_782x[2], m_782x[3], m_782x[4]);
 
 }
@@ -464,8 +577,7 @@ uint16_t sunplus_gcm394_base_device::ioarea_7860_porta_r()
 void sunplus_gcm394_base_device::ioarea_7860_porta_w(uint16_t data)
 {
 	LOGMASKED(LOG_GCM394_IO, "%s:sunplus_gcm394_base_device::ioarea_7860_porta_w %04x\n", machine().describe_context(), data);
-	if (m_porta_out)
-		m_porta_out(data);
+	m_porta_out(data);
 }
 
 uint16_t sunplus_gcm394_base_device::ioarea_7861_porta_buffer_r()
@@ -520,16 +632,13 @@ uint16_t sunplus_gcm394_base_device::ioarea_7869_portb_buffer_r()
 void sunplus_gcm394_base_device::ioarea_7869_portb_buffer_w(uint16_t data)
 {
 	LOGMASKED(LOG_GCM394_IO, "%s:sunplus_gcm394_base_device::ioarea_7869_portb_buffer_w %04x\n", machine().describe_context(), data);
-
-	if (m_portb_out) // buffer writes must update output state too, beijuehh requires it for banking
-		m_portb_out(data);
+	m_portb_out(data); // buffer writes must update output state too, beijuehh requires it for banking
 }
 
 void sunplus_gcm394_base_device::ioarea_7868_portb_w(uint16_t data)
 {
 	LOGMASKED(LOG_GCM394_IO, "%s:sunplus_gcm394_base_device::ioarea_7868_portb_w %04x\n", machine().describe_context(), data);
-	if (m_portb_out)
-		m_portb_out(data);
+	m_portb_out(data);
 }
 
 uint16_t sunplus_gcm394_base_device::ioarea_786a_portb_direction_r()
@@ -568,8 +677,7 @@ void sunplus_gcm394_base_device::ioarea_7870_portc_w(uint16_t data)
 {
 	LOGMASKED(LOG_GCM394_IO, "%s:sunplus_gcm394_base_device::ioarea_7870_portc_w %04x\n", machine().describe_context(), data);
 	m_7870 = data;
-	if (m_portc_out)
-		m_portc_out(data);
+	m_portc_out(data);
 }
 
 uint16_t sunplus_gcm394_base_device::ioarea_7871_portc_buffer_r()
@@ -620,9 +728,7 @@ void sunplus_gcm394_base_device::ioarea_7878_portd_w(uint16_t data)
 {
 	LOGMASKED(LOG_GCM394_IO, "%s:sunplus_gcm394_base_device::ioarea_7878_portd_w %04x\n", machine().describe_context(), data);
 	//m_7878 = data;
-
-	if (m_portd_out)
-		m_portd_out(data);
+	m_portd_out(data);
 }
 
 uint16_t sunplus_gcm394_base_device::ioarea_7879_portd_buffer_r()
@@ -634,9 +740,7 @@ uint16_t sunplus_gcm394_base_device::ioarea_7879_portd_buffer_r()
 void sunplus_gcm394_base_device::ioarea_7879_portd_buffer_w(uint16_t data)
 {
 	LOGMASKED(LOG_GCM394_IO, "%s:sunplus_gcm394_base_device::ioarea_7879_portd_buffer_w %04x\n", machine().describe_context(), data);
-
-	if (m_portd_out) // buffer writes must update output state too, beijuehh requires it for banking
-		m_portd_out(data);
+	m_portd_out(data); // buffer writes must update output state too, beijuehh requires it for banking
 }
 
 
@@ -1483,23 +1587,7 @@ void sunplus_gcm394_base_device::device_start()
 
 	m_cs_callback.resolve();
 
-	m_porta_in.resolve_safe(0);
-	m_portb_in.resolve_safe(0);
-	m_portc_in.resolve_safe(0);
-	m_portd_in.resolve_safe(0);
-
-	m_porta_out.resolve();
-	m_portb_out.resolve();
-	m_portc_out.resolve();
-	m_portd_out.resolve();
-
-
-	m_space_read_cb.resolve_safe(0);
-	m_space_write_cb.resolve();
-
-	m_nand_read_cb.resolve_safe(0);
-
-	m_unk_timer = timer_alloc(0);
+	m_unk_timer = timer_alloc(FUNC(sunplus_gcm394_base_device::unknown_tick), this);
 	m_unk_timer->adjust(attotime::never);
 
 	save_item(NAME(m_dma_params));
@@ -1698,29 +1786,22 @@ void sunplus_gcm394_base_device::checkirq6()
 */
 
 
-void sunplus_gcm394_base_device::device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr)
+TIMER_CALLBACK_MEMBER(sunplus_gcm394_base_device::unknown_tick)
 {
-	switch (id)
-	{
-	case 0:
-	{
-		m_7935 |= 0x0100;
-		set_state_unsynced(UNSP_IRQ6_LINE, ASSERT_LINE);
-		//set_state_unsynced(UNSP_IRQ4_LINE, ASSERT_LINE);
+	m_7935 |= 0x0100;
+	set_state_unsynced(UNSP_IRQ6_LINE, ASSERT_LINE);
+	//set_state_unsynced(UNSP_IRQ4_LINE, ASSERT_LINE);
 
 	//  checkirq6();
-		break;
-	}
-	}
 }
 
 
-WRITE_LINE_MEMBER(sunplus_gcm394_base_device::audioirq_w)
+void sunplus_gcm394_base_device::audioirq_w(int state)
 {
 	//set_state_unsynced(UNSP_IRQ5_LINE, state);
 }
 
-WRITE_LINE_MEMBER(sunplus_gcm394_base_device::videoirq_w)
+void sunplus_gcm394_base_device::videoirq_w(int state)
 {
 	set_state_unsynced(UNSP_IRQ5_LINE, state);
 }

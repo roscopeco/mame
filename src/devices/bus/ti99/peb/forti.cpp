@@ -30,9 +30,9 @@
 #include "emu.h"
 #include "forti.h"
 
-#define LOG_READY       (1U<<1)
+#define LOG_READY       (1U << 1)
 
-#define VERBOSE ( LOG_GENERAL )
+#define VERBOSE (LOG_GENERAL)
 
 #include "logmacro.h"
 
@@ -41,7 +41,7 @@
 #define FORTI_GEN3_TAG "soundchip3"
 #define FORTI_GEN4_TAG "soundchip4"
 
-DEFINE_DEVICE_TYPE_NS(TI99_FORTI, bus::ti99::peb, forti_device, "ti99_forti", "FORTi Sound Card")
+DEFINE_DEVICE_TYPE(TI99_FORTI, bus::ti99::peb::forti_device, "ti99_forti", "FORTi Sound Card")
 
 namespace bus::ti99::peb {
 
@@ -66,7 +66,7 @@ void forti_device::readz(offs_t offset, uint8_t *value)
 /*
     READY callbacks from the sound chips.
 */
-WRITE_LINE_MEMBER( forti_device::ready_sound )
+void forti_device::ready_sound(int state)
 {
 	LOGMASKED(LOG_READY, "READY (%d, %d, %d, %d)\n",  m_generator1->ready_r(),
 		m_generator2->ready_r(), m_generator3->ready_r(), m_generator4->ready_r());

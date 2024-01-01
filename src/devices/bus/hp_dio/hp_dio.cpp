@@ -23,10 +23,10 @@
 //  GLOBAL VARIABLES
 //**************************************************************************
 
-DEFINE_DEVICE_TYPE_NS(DIO16_SLOT, bus::hp_dio, dio16_slot_device, "dio16_slot", "16-bit DIO slot")
-DEFINE_DEVICE_TYPE_NS(DIO32_SLOT, bus::hp_dio, dio32_slot_device, "dio32_slot", "32-bit DIO-II slot")
-DEFINE_DEVICE_TYPE_NS(DIO16, bus::hp_dio, dio16_device, "dio16", "16-bit DIO bus")
-DEFINE_DEVICE_TYPE_NS(DIO32, bus::hp_dio, dio32_device, "dio32", "32-bit DIO-II bus")
+DEFINE_DEVICE_TYPE(DIO16_SLOT, bus::hp_dio::dio16_slot_device, "dio16_slot", "16-bit DIO slot")
+DEFINE_DEVICE_TYPE(DIO32_SLOT, bus::hp_dio::dio32_slot_device, "dio32_slot", "32-bit DIO-II slot")
+DEFINE_DEVICE_TYPE(DIO16,      bus::hp_dio::dio16_device,      "dio16",      "16-bit DIO bus")
+DEFINE_DEVICE_TYPE(DIO32,      bus::hp_dio::dio32_device,      "dio32",      "32-bit DIO-II bus")
 
 namespace bus::hp_dio {
 
@@ -127,16 +127,6 @@ dio16_device::dio16_device(const machine_config &mconfig, device_type type, cons
 
 void dio16_device::device_start()
 {
-	m_irq1_out_cb.resolve_safe();
-	m_irq2_out_cb.resolve_safe();
-	m_irq3_out_cb.resolve_safe();
-	m_irq4_out_cb.resolve_safe();
-	m_irq5_out_cb.resolve_safe();
-	m_irq6_out_cb.resolve_safe();
-	m_irq7_out_cb.resolve_safe();
-	m_dmar0_out_cb.resolve_safe();
-	m_dmar1_out_cb.resolve_safe();
-
 	m_prgwidth = m_prgspace->data_width();
 
 	save_item(NAME(m_irq));
@@ -245,7 +235,7 @@ uint8_t dio16_device::dmack_r_out(int index, int channel)
 	return ret;
 }
 
-WRITE_LINE_MEMBER(dio16_device::reset_in)
+void dio16_device::reset_in(int state)
 {
 	for (auto &card : m_cards) {
 		if (card->get_index() != m_bus_index)

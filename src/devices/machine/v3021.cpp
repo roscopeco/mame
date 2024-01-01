@@ -153,7 +153,7 @@ void v3021_device::device_validity_check(validity_checker &valid) const
 void v3021_device::device_start()
 {
 	/* let's call the timer callback every second */
-	m_timer = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(v3021_device::timer_callback), this));
+	m_timer = timer_alloc(FUNC(v3021_device::timer_callback), this);
 	m_timer->adjust(attotime::from_hz(clock() / XTAL(32'768)), 0, attotime::from_hz(clock() / XTAL(32'768)));
 
 	copy_clock_to_ram();
@@ -224,7 +224,7 @@ void v3021_device::write(u8 data)
 //  cs_w - CS pin handler
 //-------------------------------------------------
 
-WRITE_LINE_MEMBER(v3021_device::cs_w)
+void v3021_device::cs_w(int state)
 {
 	if (m_cs != state)
 	{
@@ -275,7 +275,7 @@ WRITE_LINE_MEMBER(v3021_device::cs_w)
 //  io_w - I/O pin write handler
 //-------------------------------------------------
 
-WRITE_LINE_MEMBER(v3021_device::io_w)
+void v3021_device::io_w(int state)
 {
 	m_io = state;
 }
@@ -284,7 +284,7 @@ WRITE_LINE_MEMBER(v3021_device::io_w)
 //  io_r - I/O pin read handler
 //-------------------------------------------------
 
-READ_LINE_MEMBER(v3021_device::io_r)
+int v3021_device::io_r()
 {
 	return m_data & 1;
 }

@@ -107,7 +107,7 @@ path_iterator &path_iterator::operator=(path_iterator const &that)
 //  multipath sequence
 //-------------------------------------------------
 
-bool path_iterator::next(std::string &buffer, const char *name)
+bool path_iterator::next(std::string &buffer)
 {
 	// if none left, return false to indicate we are done
 	if (!m_is_first && (m_searchpath.cend() == m_current))
@@ -119,10 +119,6 @@ bool path_iterator::next(std::string &buffer, const char *name)
 	m_current = sep;
 	if (m_searchpath.cend() != m_current)
 		++m_current;
-
-	// append the name if we have one
-	if (name)
-		util::path_append(buffer, name);
 
 	// bump the index and return true
 	m_is_first = false;
@@ -160,8 +156,12 @@ const osd::directory::entry *file_enumerator::next(const char *subdir)
 		while (!m_curdir)
 		{
 			// if we fail to get anything more, we're done
-			if (!m_iterator.next(m_pathbuffer, subdir))
+			if (!m_iterator.next(m_pathbuffer))
 				return nullptr;
+
+			// append the subdir if we have one
+			if (subdir)
+				util::path_append(m_pathbuffer, subdir);
 
 			// open the path
 			m_curdir = osd::directory::open(m_pathbuffer);
@@ -259,7 +259,7 @@ util::hash_collection &emu_file::hashes(std::string_view types)
 	// determine which hashes we need
 	std::string needed;
 	for (char scan : types)
-		if (already_have.find_first_of(scan) == -1)
+		if (already_have.find_first_of(scan) == std::string::npos)
 			needed.push_back(scan);
 
 	// if we need nothing, skip it
@@ -279,13 +279,14 @@ util::hash_collection &emu_file::hashes(std::string_view types)
 		return m_hashes;
 	}
 
-	// read the data if we can
-	const u8 *filedata = (const u8 *)m_file->buffer();
-	if (filedata == nullptr)
+	std::uint64_t length;
+	if (m_file->length(length))
 		return m_hashes;
 
-	// compute the hash
-	m_hashes.compute(filedata, m_file->size(), needed.c_str());
+	// hash the data
+	std::size_t actual;
+	(void)m_hashes.compute(*m_file, 0U, length, actual, needed.c_str()); // FIXME: need better interface to report errors
+
 	return m_hashes;
 }
 
@@ -445,17 +446,18 @@ std::error_condition emu_file::compressed_file_ready()
 //  seek - seek within a file
 //-------------------------------------------------
 
-int emu_file::seek(s64 offset, int whence)
+std::error_condition emu_file::seek(s64 offset, int whence)
 {
 	// load the ZIP file now if we haven't yet
-	if (compressed_file_ready())
-		return 1;
+	std::error_condition err = compressed_file_ready();
+	if (err)
+		return err;
 
 	// seek if we can
 	if (m_file)
 		return m_file->seek(offset, whence);
 
-	return 1;
+	return std::errc::bad_file_descriptor; // TODO: revisit this error condition
 }
 
 
@@ -465,13 +467,15 @@ int emu_file::seek(s64 offset, int whence)
 
 u64 emu_file::tell()
 {
+	// FIXME: need better interface to report errors
 	// load the ZIP file now if we haven't yet
 	if (compressed_file_ready())
 		return 0;
 
 	// tell if we can
-	if (m_file)
-		return m_file->tell();
+	u64 result;
+	if (m_file && !m_file->tell(result))
+		return result;
 
 	return 0;
 }
@@ -501,13 +505,15 @@ bool emu_file::eof()
 
 u64 emu_file::size()
 {
+	// FIXME: need better interface to report errors
 	// use the ZIP length if present
-	if (m_zipfile != nullptr)
+	if (m_zipfile)
 		return m_ziplength;
 
 	// return length if we can
-	if (m_file)
-		return m_file->size();
+	u64 result;
+	if (m_file && !m_file->length(result))
+		return result;
 
 	return 0;
 }
@@ -519,15 +525,17 @@ u64 emu_file::size()
 
 u32 emu_file::read(void *buffer, u32 length)
 {
+	// FIXME: need better interface to report errors
 	// load the ZIP file now if we haven't yet
 	if (compressed_file_ready())
 		return 0;
 
 	// read the data if we can
+	size_t actual = 0;
 	if (m_file)
-		return m_file->read(buffer, length);
+		m_file->read(buffer, length, actual);
 
-	return 0;
+	return actual;
 }
 
 
@@ -591,11 +599,13 @@ char *emu_file::gets(char *s, int n)
 
 u32 emu_file::write(const void *buffer, u32 length)
 {
+	// FIXME: need better interface to report errors
 	// write the data if we can
+	size_t actual = 0;
 	if (m_file)
-		return m_file->write(buffer, length);
+		m_file->write(buffer, length, actual);
 
-	return 0;
+	return actual;
 }
 
 
@@ -617,7 +627,7 @@ int emu_file::puts(std::string_view s)
 //  vfprintf - vfprintf to a text file
 //-------------------------------------------------
 
-int emu_file::vprintf(util::format_argument_pack<std::ostream> const &args)
+int emu_file::vprintf(util::format_argument_pack<char> const &args)
 {
 	// write the data if we can
 	return m_file ? m_file->vprintf(args) : 0;
@@ -794,7 +804,7 @@ std::error_condition emu_file::load_zipped_file()
 	m_zipdata.resize(m_ziplength);
 
 	// read the data into our buffer and return
-	auto const ziperr = m_zipfile->decompress(&m_zipdata[0], m_zipdata.size());
+	auto const ziperr = m_zipfile->decompress(m_zipdata.data(), m_zipdata.size());
 	if (ziperr)
 	{
 		m_zipdata.clear();
@@ -802,7 +812,7 @@ std::error_condition emu_file::load_zipped_file()
 	}
 
 	// convert to RAM file
-	std::error_condition const filerr = util::core_file::open_ram(&m_zipdata[0], m_zipdata.size(), m_openflags, m_file);
+	std::error_condition const filerr = util::core_file::open_ram(m_zipdata.data(), m_zipdata.size(), m_openflags, m_file);
 	if (filerr)
 	{
 		m_zipdata.clear();

@@ -22,7 +22,6 @@
 #include "emu.h"
 #include "v30mz.h"
 #include "cpu/nec/necdasm.h"
-#include "debugger.h"
 
 
 enum SREGS { DS1=0, PS, SS, DS0 };
@@ -84,7 +83,7 @@ v30mz_cpu_device::v30mz_cpu_device(const machine_config &mconfig, const char *ta
 	, m_TF(0)
 	, m_int_vector(0)
 	, m_pc(0)
-	, m_vector_func(*this)
+	, m_vector_func(*this, 0)
 {
 	static const BREGS reg_name[8]={ AL, CL, DL, BL, AH, CH, DH, BH };
 
@@ -129,8 +128,6 @@ void v30mz_cpu_device::device_start()
 	space(AS_PROGRAM).cache(m_cache);
 	space(AS_PROGRAM).specific(m_program);
 	space(AS_IO).specific(m_io);
-
-	m_vector_func.resolve_safe(0);
 
 	save_item(NAME(m_regs.w));
 	save_item(NAME(m_sregs));
@@ -1344,7 +1341,7 @@ void v30mz_cpu_device::interrupt(int int_num)
 
 	if (int_num == -1)
 	{
-		standard_irq_callback(0);
+		standard_irq_callback(0, pc());
 		int_num = m_vector_func();
 
 		m_irq_state = CLEAR_LINE;

@@ -34,7 +34,6 @@
 #include "emu.h"
 #include "hphybrid.h"
 #include "hphybrid_dasm.h"
-#include "debugger.h"
 
 #include "hphybrid_defs.h"
 
@@ -135,7 +134,7 @@ DEFINE_DEVICE_TYPE(HP_5061_3001, hp_5061_3001_cpu_device, "5061_3001", "Hewlett-
 DEFINE_DEVICE_TYPE(HP_5061_3011, hp_5061_3011_cpu_device, "5061_3011", "Hewlett-Packard HP-5061-3011")
 DEFINE_DEVICE_TYPE(HP_09825_67907, hp_09825_67907_cpu_device, "09825_67907", "Hewlett-Packard HP-09825-67907")
 
-WRITE_LINE_MEMBER(hp_hybrid_cpu_device::dmar_w)
+void hp_hybrid_cpu_device::dmar_w(int state)
 {
 	if (state)
 		BIT_SET(m_flags, HPHYBRID_DMAR_BIT);
@@ -143,7 +142,7 @@ WRITE_LINE_MEMBER(hp_hybrid_cpu_device::dmar_w)
 		BIT_CLR(m_flags, HPHYBRID_DMAR_BIT);
 }
 
-WRITE_LINE_MEMBER(hp_hybrid_cpu_device::halt_w)
+void hp_hybrid_cpu_device::halt_w(int state)
 {
 	if (state)
 		BIT_SET(m_flags, HPHYBRID_HALT_BIT);
@@ -151,7 +150,7 @@ WRITE_LINE_MEMBER(hp_hybrid_cpu_device::halt_w)
 		BIT_CLR(m_flags, HPHYBRID_HALT_BIT);
 }
 
-WRITE_LINE_MEMBER(hp_hybrid_cpu_device::status_w)
+void hp_hybrid_cpu_device::status_w(int state)
 {
 	if (state)
 		BIT_SET(m_flags, HPHYBRID_STS_BIT);
@@ -159,17 +158,12 @@ WRITE_LINE_MEMBER(hp_hybrid_cpu_device::status_w)
 		BIT_CLR(m_flags, HPHYBRID_STS_BIT);
 }
 
-WRITE_LINE_MEMBER(hp_hybrid_cpu_device::flag_w)
+void hp_hybrid_cpu_device::flag_w(int state)
 {
 	if (state)
 		BIT_SET(m_flags, HPHYBRID_FLG_BIT);
 	else
 		BIT_CLR(m_flags, HPHYBRID_FLG_BIT);
-}
-
-uint8_t hp_hybrid_cpu_device::pa_r() const
-{
-	return CURRENT_PA;
 }
 
 hp_hybrid_cpu_device::hp_hybrid_cpu_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock, uint8_t addrwidth)
@@ -242,10 +236,9 @@ void hp_hybrid_cpu_device::device_start()
 
 	set_icountptr(m_icount);
 
-	m_pa_changed_func.resolve_safe();
-	m_opcode_func.resolve_safe();
+	m_opcode_func.resolve();
 	m_stm_func.resolve();
-	m_int_func.resolve_safe(0xff);
+	m_int_func.resolve();
 }
 
 void hp_hybrid_cpu_device::device_reset()
@@ -955,7 +948,7 @@ uint16_t hp_hybrid_cpu_device::RM(uint32_t addr)
 		// Any access to internal registers removes forcing of BSC 2x
 		m_forced_bsc_25 = false;
 
-		if (m_stm_func) {
+		if (!m_stm_func.isnull()) {
 			m_stm_func(m_curr_cycle | CYCLE_RAL_MASK | CYCLE_RD_MASK);
 			m_curr_cycle = 0;
 		}
@@ -1024,7 +1017,7 @@ uint16_t hp_hybrid_cpu_device::RM(uint32_t addr)
 		return tmp;
 	} else {
 		m_icount -= m_r_cycles;
-		if (m_stm_func) {
+		if (!m_stm_func.isnull()) {
 			m_stm_func(m_curr_cycle | CYCLE_RD_MASK);
 			m_curr_cycle = 0;
 		}
@@ -1077,7 +1070,7 @@ void hp_hybrid_cpu_device::WM(uint32_t addr , uint16_t v)
 		// Any access to internal registers removes forcing of BSC 2x
 		m_forced_bsc_25 = false;
 
-		if (m_stm_func) {
+		if (!m_stm_func.isnull()) {
 			m_stm_func(m_curr_cycle | CYCLE_RAL_MASK | CYCLE_WR_MASK);
 			m_curr_cycle = 0;
 		}
@@ -1147,7 +1140,7 @@ void hp_hybrid_cpu_device::WM(uint32_t addr , uint16_t v)
 		m_icount -= REGISTER_RW_CYCLES;
 	} else {
 		m_icount -= m_w_cycles;
-		if (m_stm_func) {
+		if (!m_stm_func.isnull()) {
 			m_stm_func(m_curr_cycle | CYCLE_WR_MASK);
 			m_curr_cycle = 0;
 		}
@@ -1196,7 +1189,8 @@ uint16_t hp_hybrid_cpu_device::fetch_at(uint32_t addr)
 {
 	m_curr_cycle |= CYCLE_IFETCH_MASK;
 	uint16_t opcode = RM(addr);
-	m_opcode_func(opcode);
+	if (!m_opcode_func.isnull())
+		m_opcode_func(opcode);
 	return opcode;
 }
 
@@ -1323,10 +1317,10 @@ void hp_hybrid_cpu_device::check_for_interrupts()
 		return;
 	}
 
-	standard_irq_callback(irqline);
+	standard_irq_callback(irqline , add_mae(AEC_CASE_A , m_reg_P));
 
 	// Get interrupt vector in low byte (level is available on PA3)
-	uint8_t vector = m_int_func(BIT(m_flags , HPHYBRID_IRH_BIT) ? 1 : 0);
+	uint8_t vector = !m_int_func.isnull() ? m_int_func(BIT(m_flags , HPHYBRID_IRH_BIT) ? 1 : 0) : 0xff;
 	uint8_t new_PA;
 
 	// Get highest numbered 1
@@ -1617,7 +1611,7 @@ bool hp_5061_3011_cpu_device::execute_no_bpc(uint16_t opcode , uint16_t& next_pc
 					// 16 bits units.
 					WM(tmp_addr >> 1 , tmp);
 				} else {
-					if (m_stm_func) {
+					if (!m_stm_func.isnull()) {
 						m_stm_func(m_curr_cycle | CYCLE_WR_MASK);
 						m_curr_cycle = 0;
 					}
@@ -1986,7 +1980,7 @@ bool hp_09825_67907_cpu_device::execute_no_bpc(uint16_t opcode , uint16_t& next_
 					// 16 bits units.
 					WM(tmp_addr , tmp);
 				} else {
-					if (m_stm_func) {
+					if (!m_stm_func.isnull()) {
 						m_stm_func(m_curr_cycle | CYCLE_WR_MASK);
 						m_curr_cycle = 0;
 					}

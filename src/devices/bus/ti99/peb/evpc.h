@@ -57,14 +57,14 @@ protected:
 	virtual ioport_constructor device_input_ports() const override;
 	virtual void device_add_mconfig(machine_config &config) override;
 
-	void nvram_default() override;
-	void nvram_read(emu_file &file) override;
-	void nvram_write(emu_file &file) override;
+	virtual void nvram_default() override;
+	virtual bool nvram_read(util::read_stream &file) override;
+	virtual bool nvram_write(util::write_stream &file) override;
 
 private:
-	DECLARE_WRITE_LINE_MEMBER( ready_line );
+	void ready_line(int state);
 
-	DECLARE_WRITE_LINE_MEMBER( video_interrupt_in );
+	void video_interrupt_in(int state);
 
 	int     m_address;
 	int     m_dsr_page;

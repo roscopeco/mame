@@ -116,16 +116,16 @@
 #include "emu.h"
 #include "pgram.h"
 
-#define LOG_WARN       (1U<<1)
-#define LOG_WP         (1U<<2)
-#define LOG_DSR        (1U<<3)
-#define LOG_RAM        (1U<<4)
-#define LOG_GRAM       (1U<<5)
-#define LOG_GRAMADDR   (1U<<6)
-#define LOG_CRU        (1U<<7)
-#define LOG_BANK       (1U<<8)
+#define LOG_WARN       (1U << 1)
+#define LOG_WP         (1U << 2)
+#define LOG_DSR        (1U << 3)
+#define LOG_RAM        (1U << 4)
+#define LOG_GRAM       (1U << 5)
+#define LOG_GRAMADDR   (1U << 6)
+#define LOG_CRU        (1U << 7)
+#define LOG_BANK       (1U << 8)
 
-#define VERBOSE ( LOG_GENERAL | LOG_WARN )
+#define VERBOSE (LOG_GENERAL | LOG_WARN)
 
 #include "logmacro.h"
 
@@ -141,7 +141,7 @@
 #define COUNT2_TAG "u12_counter"
 #define COUNT3_TAG "u10_counter"
 
-DEFINE_DEVICE_TYPE_NS(TI99_PGRAM, bus::ti99::peb, pgram_device, "ti99_pgram", "PGRAM(+) memory card")
+DEFINE_DEVICE_TYPE(TI99_PGRAM, bus::ti99::peb::pgram_device, "ti99_pgram", "PGRAM(+) memory card")
 
 namespace bus::ti99::peb {
 

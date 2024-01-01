@@ -168,14 +168,14 @@ hd6120_device::hd6120_device(const machine_config &config, const char *tag, devi
 	: cpu_device(config, HD6120, tag, owner, clock)
 	, m_inst_config("instruction", ENDIANNESS_BIG, 16, 16, -1) // 12 data bits
 	, m_data_config("data", ENDIANNESS_BIG, 16, 16, -1) // 12 data bits
-	, m_io_config("I/O", ENDIANNESS_BIG, 16, 9, -1) // 12 data bits
-	, m_devctl_config("device control", ENDIANNESS_BIG, 8, 9, 0) // only 3 bits used
+	, m_io_config("io", ENDIANNESS_BIG, 16, 9, -1) // 12 data bits
+	, m_devctl_config("devctl", ENDIANNESS_BIG, 8, 9, 0) // only 3 bits used
 	, m_lxmar_callback(*this)
 	, m_lxpar_callback(*this)
 	, m_lxdar_callback(*this)
-	, m_rsr_callback(*this)
+	, m_rsr_callback(*this, 0)
 	, m_wsr_callback(*this)
-	, m_strtup_callback(*this)
+	, m_strtup_callback(*this, 1)
 	, m_intgnt_callback(*this)
 	, m_ioclr_callback(*this)
 	, m_pc(0)
@@ -226,19 +226,6 @@ hd6120_device::space_config_vector hd6120_device::memory_space_config() const
 			std::make_pair(AS_IO, &m_io_config),
 			std::make_pair(AS_DEVCTL, &m_devctl_config)
 		};
-}
-
-void hd6120_device::device_resolve_objects()
-{
-	// Resolve callbacks
-	m_lxmar_callback.resolve_safe();
-	m_lxpar_callback.resolve_safe();
-	m_lxdar_callback.resolve_safe();
-	m_rsr_callback.resolve();
-	m_wsr_callback.resolve_safe();
-	m_strtup_callback.resolve_safe(1);
-	m_intgnt_callback.resolve_safe();
-	m_ioclr_callback.resolve_safe();
 }
 
 u16 hd6120_device::rotate_step(u16 data)
@@ -606,9 +593,7 @@ void hd6120_device::execute_run()
 		case minor_state::TAD_4:
 			m_temp += m_ac;
 			if (m_temp >= 010000)
-				m_flags |= 4;
-			else
-				m_flags &= 3;
+				m_flags ^= 4; // LINK is complemented upon carry out
 			next_instruction();
 			break;
 
@@ -666,21 +651,29 @@ void hd6120_device::execute_run()
 
 		case minor_state::OP1_1:
 			m_pc = m_temp & 07777;
-			m_temp = ((BIT(m_ir, 7) ? 0 : m_ac) ^ (BIT(m_ir, 5) ? 07777 : 0)) + (m_ir & 0001);
+			m_temp = (BIT(m_ir, 7) ? 0 : m_ac) ^ (BIT(m_ir, 5) ? 07777 : 0); // CLA and/or CMA
+			if (BIT(m_ir, 6))
+				m_flags &= 3; // CLL
+			if (BIT(m_ir, 4))
+				m_flags ^= 4; // CML
 			m_state = minor_state::OP1_2;
 			break;
 
 		case minor_state::OP1_2:
-			m_ac = m_temp & 07777;
-			if (BIT(m_ir, 6))
-				m_flags &= 3;
-			if (BIT(m_ir, 4))
-				m_flags ^= 4;
+			if (BIT(m_ir, 0))
+			{
+				++m_temp; // IAC
+				if (m_temp == 010000)
+				{
+					m_flags ^= 4; // LINK is complemented upon carry out
+					m_temp = 0;
+				}
+			}
 			m_state = minor_state::OP1_3;
 			break;
 
 		case minor_state::OP1_3:
-			m_temp = rotate_step(m_ac);
+			m_temp = rotate_step(m_temp);
 			if (BIT(m_ir, 1))
 				m_state = minor_state::OP1_4;
 			else
@@ -728,7 +721,7 @@ void hd6120_device::execute_run()
 			break;
 
 		case minor_state::OSR_3:
-			if (m_rsr_callback.isnull())
+			if (m_rsr_callback.isunset())
 			{
 				logerror("%06o: SR read (IR = %04o)\n", m_iaddr, m_ir);
 				m_temp = 0;
@@ -1283,7 +1276,7 @@ void hd6120_device::execute_run()
 
 		case minor_state::INTGNT_1:
 			m_ac = m_temp & 07777;
-			(void)standard_irq_callback(INTREQ_LINE);
+			(void)standard_irq_callback(INTREQ_LINE, m_if << 12 | m_pc);
 			m_intgnt = true;
 			m_intgnt_callback(0);
 			m_flags &= 6;
@@ -1301,7 +1294,7 @@ void hd6120_device::execute_run()
 			m_ac = m_temp & 07777;
 			debugger_privilege_hook();
 			if (BIT(m_pnlflgs, 2))
-				(void)standard_irq_callback(CPREQ_LINE);
+				(void)standard_irq_callback(CPREQ_LINE, m_if << 12 | m_pc);
 			if (m_intgnt)
 				m_intgnt_callback(1);
 			m_if |= 010;

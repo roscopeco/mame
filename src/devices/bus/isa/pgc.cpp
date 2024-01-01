@@ -16,7 +16,7 @@
     http://www.seasip.info/VintagePC/pgc.html
 
   To do:
-  - pass IBM diagnostics (currently fail with code 3905)
+  - pass IBM diagnostics (currently fail with code 3905 - 'Cold start cycle power error')
   - CGA emulator
   - what's up with irq 3 (= vblank irq)? (causes soft reset)
   - "test pin of the microprocessor samples the hsync pulse"
@@ -32,7 +32,6 @@
 #include "screen.h"
 
 
-//#define LOG_GENERAL (1U << 0) //defined in logmacro.h already
 #define LOG_VRAM    (1U << 1)
 #define LOG_CMD     (1U << 2)
 
@@ -253,7 +252,7 @@ void isa8_pgc_device::device_reset()
 
 //
 
-WRITE_LINE_MEMBER(isa8_pgc_device::vblank_irq)
+void isa8_pgc_device::vblank_irq(int state)
 {
 	if (state)
 	{

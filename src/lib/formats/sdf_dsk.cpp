@@ -2,7 +2,7 @@
 // copyright-holders:Wilbert Pol, tim lindner
 /*********************************************************************
 
-    formats/sdf_dsk.h
+    formats/sdf_dsk.cpp
 
     SDF disk images. Format created by Darren Atkinson for use with
     his CoCoSDC floppy disk emulator.
@@ -14,6 +14,7 @@
 #include "sdf_dsk.h"
 
 #include "ioprocs.h"
+#include "multibyte.h"
 
 
 sdf_format::sdf_format()
@@ -21,25 +22,25 @@ sdf_format::sdf_format()
 }
 
 
-const char *sdf_format::name() const
+const char *sdf_format::name() const noexcept
 {
 	return "sdf";
 }
 
 
-const char *sdf_format::description() const
+const char *sdf_format::description() const noexcept
 {
 	return "SDF disk image";
 }
 
 
-const char *sdf_format::extensions() const
+const char *sdf_format::extensions() const noexcept
 {
 	return "sdf";
 }
 
 
-int sdf_format::identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants)
+int sdf_format::identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants) const
 {
 	uint8_t header[HEADER_SIZE];
 
@@ -69,14 +70,14 @@ int sdf_format::identify(util::random_read &io, uint32_t form_factor, const std:
 
 	if (size == HEADER_SIZE + heads * tracks * TOTAL_TRACK_SIZE)
 	{
-		return 100;
+		return FIFID_SIGN|FIFID_SIZE|FIFID_STRUCT;
 	}
 
 	return 0;
 }
 
 
-bool sdf_format::load(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants, floppy_image *image)
+bool sdf_format::load(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants, floppy_image &image) const
 {
 	size_t actual;
 	uint8_t header[HEADER_SIZE];
@@ -90,11 +91,11 @@ bool sdf_format::load(util::random_read &io, uint32_t form_factor, const std::ve
 
 	if (heads == 2)
 	{
-		image->set_variant(floppy_image::DSDD);
+		image.set_variant(floppy_image::DSDD);
 	}
 	else
 	{
-		image->set_variant(floppy_image::SSDD);
+		image.set_variant(floppy_image::SSDD);
 	}
 
 	for (int track = 0; track < tracks; track++)
@@ -118,8 +119,8 @@ bool sdf_format::load(util::random_read &io, uint32_t form_factor, const std::ve
 			{
 				if (i < sector_count )
 				{
-					idam_location[i] = ((track_data[ 8 * (i+1) + 1] << 8 | track_data[ 8 * (i+1)]) & 0x3FFF) - 4;
-					dam_location[i] = ((track_data[ 8 * (i+1) + 1 + 2] << 8 | track_data[ 8 * (i+1) + 2]) & 0x3FFF) - 4;
+					idam_location[i] = (get_u16le(&track_data[ 8 * (i+1)]) & 0x3FFF) - 4;
+					dam_location[i] = (get_u16le(&track_data[ 8 * (i+1) + 2]) & 0x3FFF) - 4;
 
 					if (idam_location[i] > TOTAL_TRACK_SIZE) return false;
 					if (dam_location[i] > TOTAL_TRACK_SIZE) return false;
@@ -184,16 +185,10 @@ bool sdf_format::load(util::random_read &io, uint32_t form_factor, const std::ve
 }
 
 
-bool sdf_format::save(util::random_read_write &io, const std::vector<uint32_t> &variants, floppy_image *image)
+bool sdf_format::supports_save() const noexcept
 {
 	return false;
 }
 
 
-bool sdf_format::supports_save() const
-{
-	return false;
-}
-
-
-const floppy_format_type FLOPPY_SDF_FORMAT = &floppy_image_format_creator<sdf_format>;
+const sdf_format FLOPPY_SDF_FORMAT;

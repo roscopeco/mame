@@ -5,38 +5,27 @@
 
 #pragma once
 
-#define MINIMP3_ONLY_MP3
-#define MINIMP3_NO_STDIO
-#include "minimp3/minimp3.h"
+#include "mp3_audio.h"
 
 class mas3507d_device : public device_t, public device_sound_interface
 {
 public:
-	enum {
-		PLAYBACK_STATE_IDLE,
-		PLAYBACK_STATE_BUFFER_FULL,
-		PLAYBACK_STATE_DEMAND_BUFFER
-	};
-
 	// construction/destruction
 	mas3507d_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock = 0);
 
-	auto sample_cb() { return cb_sample.bind(); }
+	auto mpeg_frame_sync_cb() { return cb_mpeg_frame_sync.bind(); }
+	auto demand_cb() { return cb_demand.bind(); }
 
 	int i2c_scl_r();
 	int i2c_sda_r();
 	void i2c_scl_w(bool line);
 	void i2c_sda_w(bool line);
 
-	uint32_t get_samples() const { return decoded_samples; }
-	uint32_t get_status() const { return playback_status; }
+	void sid_w(uint8_t byte);
 
 	void update_stream() { stream->update(); }
 
 	void reset_playback();
-	void start_playback();
-
-	bool is_started;
 
 protected:
 	virtual void device_start() override;
@@ -56,7 +45,11 @@ private:
 	void fill_buffer();
 	void append_buffer(std::vector<write_stream_view> &outputs, int &pos, int scount);
 
-	devcb_read16 cb_sample;
+	int gain_to_db(double val);
+	float gain_to_percentage(int val);
+
+	devcb_write_line cb_mpeg_frame_sync;
+	devcb_write_line cb_demand;
 
 	enum {
 		CMD_DEV_WRITE = 0x3a,
@@ -77,13 +70,10 @@ private:
 	i2c_subdest_t i2c_subdest;
 	i2c_command_t i2c_command;
 
-	mp3dec_t mp3_dec;
-	mp3dec_frame_info_t mp3_info;
-
 	sound_stream *stream;
 
 	std::array<uint8_t, 0xe00> mp3data;
-	std::array<mp3d_sample_t, MINIMP3_MAX_SAMPLES_PER_FRAME> samples;
+	std::array<short, 1152*2> samples;
 
 	bool i2c_scli, i2c_sclo, i2c_sdai, i2c_sdao;
 	int i2c_bus_curbit;
@@ -92,14 +82,17 @@ private:
 	uint32_t i2c_io_bank, i2c_io_adr, i2c_io_count, i2c_io_val;
 	uint32_t i2c_sdao_data;
 
-	uint32_t mp3data_count, current_rate;
-	uint32_t decoded_frame_count, decoded_samples;
+	uint32_t mp3data_count;
+	uint32_t decoded_frame_count;
 	int32_t sample_count, samples_idx;
+	int32_t frame_channels;
 
 	bool is_muted;
 	float gain_ll, gain_rr;
 
 	uint32_t playback_status;
+
+	std::unique_ptr<mp3_audio> mp3dec;
 };
 
 

@@ -23,7 +23,7 @@ ROM_START(hp98550)
 	ROM_LOAD("98550a.bin", 0x000000, 0x008000, CRC(9d639233) SHA1(d6b23a34850f24525ca5fb36de3deb91196d2dc5))
 ROM_END
 
-DEFINE_DEVICE_TYPE_NS(HPDIO_98550, bus::hp_dio, dio32_98550_device, "dio98550", "HP98550A high-res color DIO video card")
+DEFINE_DEVICE_TYPE(HPDIO_98550, bus::hp_dio::dio32_98550_device, "dio98550", "HP98550A high-res color DIO video card")
 
 namespace bus::hp_dio {
 
@@ -174,7 +174,7 @@ void dio32_98550_device::vram_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 		ce->vram_w(offset, data, mem_mask);
 }
 
-WRITE_LINE_MEMBER(dio32_98550_device::vblank_w)
+void dio32_98550_device::vblank_w(int state)
 {
 	for (auto &ce: m_catseye)
 		ce->vblank_w(state);

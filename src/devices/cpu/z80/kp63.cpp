@@ -29,7 +29,7 @@
 #include "emu.h"
 #include "kp63.h"
 
-#define VERBOSE 1
+#define VERBOSE 0
 #include "logmacro.h"
 
 
@@ -99,20 +99,6 @@ kp63a_device::kp63a_device(const machine_config &mconfig, const char *tag, devic
 
 
 //-------------------------------------------------
-//  device_resolve_objects - resolve objects that
-//  may be needed for other devices to set
-//  initial conditions at start time
-//-------------------------------------------------
-
-void kp63_device::device_resolve_objects()
-{
-	// Resolve output callbacks
-	m_out_pulse_callback.resolve_all_safe();
-	m_out_strobe_callback.resolve_all_safe();
-}
-
-
-//-------------------------------------------------
 //  timer_expired - handle timed count underflow
 //-------------------------------------------------
 
@@ -153,20 +139,20 @@ TIMER_CALLBACK_MEMBER(kp63_device::pwm_off)
 void kp63_device::device_start()
 {
 	// Setup timers
-	m_timer[0] = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(kp63_device::timer_expired<0>), this));
-	m_strobe_timer[0] = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(kp63_device::strobe_off<0>), this));
-	m_pwm_timer[0] = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(kp63_device::pwm_off<0>), this));
-	m_timer[1] = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(kp63_device::timer_expired<1>), this));
-	m_strobe_timer[1] = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(kp63_device::strobe_off<1>), this));
-	m_pwm_timer[1] = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(kp63_device::pwm_off<1>), this));
-	m_timer[2] = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(kp63_device::timer_expired<2>), this));
-	m_strobe_timer[2] = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(kp63_device::strobe_off<2>), this));
-	m_pwm_timer[2] = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(kp63_device::pwm_off<2>), this));
+	m_timer[0] = timer_alloc(FUNC(kp63_device::timer_expired<0>), this);
+	m_strobe_timer[0] = timer_alloc(FUNC(kp63_device::strobe_off<0>), this);
+	m_pwm_timer[0] = timer_alloc(FUNC(kp63_device::pwm_off<0>), this);
+	m_timer[1] = timer_alloc(FUNC(kp63_device::timer_expired<1>), this);
+	m_strobe_timer[1] = timer_alloc(FUNC(kp63_device::strobe_off<1>), this);
+	m_pwm_timer[1] = timer_alloc(FUNC(kp63_device::pwm_off<1>), this);
+	m_timer[2] = timer_alloc(FUNC(kp63_device::timer_expired<2>), this);
+	m_strobe_timer[2] = timer_alloc(FUNC(kp63_device::strobe_off<2>), this);
+	m_pwm_timer[2] = timer_alloc(FUNC(kp63_device::pwm_off<2>), this);
 	if (c_num_counters > 3)
 	{
-		m_timer[3] = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(kp63_device::timer_expired<3>), this));
-		m_strobe_timer[3] = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(kp63_device::strobe_off<3>), this));
-		m_pwm_timer[3] = machine().scheduler().timer_alloc(timer_expired_delegate(FUNC(kp63_device::pwm_off<3>), this));
+		m_timer[3] = timer_alloc(FUNC(kp63_device::timer_expired<3>), this);
+		m_strobe_timer[3] = timer_alloc(FUNC(kp63_device::strobe_off<3>), this);
+		m_pwm_timer[3] = timer_alloc(FUNC(kp63_device::pwm_off<3>), this);
 	}
 
 	// Save state

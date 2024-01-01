@@ -59,22 +59,23 @@
 #include "formats/mfm_hd.h"
 #include "formats/ti99_dsk.h"       // Format
 
-#define LOG_WARN        (1U<<1)    // Warnings
-#define LOG_EMU         (1U<<2)
-#define LOG_COMP        (1U<<3)
-#define LOG_RAM         (1U<<4)
-#define LOG_ROM         (1U<<5)
-#define LOG_LINES       (1U<<6)
-#define LOG_DMA         (1U<<7)
-#define LOG_MOTOR       (1U<<8)
-#define LOG_INT         (1U<<9)
-#define LOG_CRU         (1U<<10)
-#define LOG_CONFIG      (1U<<15)    // Configuration
+#define LOG_WARN        (1U << 1)   // Warnings
+#define LOG_EMU         (1U << 2)
+#define LOG_COMP        (1U << 3)
+#define LOG_RAM         (1U << 4)
+#define LOG_ROM         (1U << 5)
+#define LOG_LINES       (1U << 6)
+#define LOG_DMA         (1U << 7)
+#define LOG_MOTOR       (1U << 8)
+#define LOG_INT         (1U << 9)
+#define LOG_CRU         (1U << 10)
+#define LOG_SKCOM       (1U << 11)
+#define LOG_CONFIG      (1U << 15)  // Configuration
 
-#define VERBOSE ( LOG_GENERAL | LOG_CONFIG | LOG_WARN )
+#define VERBOSE (LOG_GENERAL | LOG_CONFIG | LOG_WARN)
 #include "logmacro.h"
 
-DEFINE_DEVICE_TYPE_NS(TI99_HFDC, bus::ti99::peb, myarc_hfdc_device, "ti99_hfdc", "Myarc Hard and Floppy Disk Controller")
+DEFINE_DEVICE_TYPE(TI99_HFDC, bus::ti99::peb::myarc_hfdc_device, "ti99_hfdc", "Myarc Hard and Floppy Disk Controller")
 
 namespace bus::ti99::peb {
 
@@ -83,8 +84,6 @@ namespace bus::ti99::peb {
 #define CLOCK_TAG "mm58274c"
 
 #define NONE -1
-
-#define MOTOR_TIMER 1
 
 #define TAPE_ADDR   0x0fc0
 #define HDC_R_ADDR  0x0fd0
@@ -507,7 +506,7 @@ void myarc_hfdc_device::cruwrite(offs_t offset, uint8_t data)
 /*
     Monoflop has gone back to the OFF state.
 */
-void myarc_hfdc_device::device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr)
+TIMER_CALLBACK_MEMBER(myarc_hfdc_device::motor_off)
 {
 	set_floppy_motors_running(false);
 }
@@ -548,7 +547,7 @@ void myarc_hfdc_device::harddisk_ready_callback(mfm_harddisk_device *harddisk, i
 */
 void myarc_hfdc_device::harddisk_skcom_callback(mfm_harddisk_device *harddisk, int state)
 {
-	LOGMASKED(LOG_LINES, "HD seek complete = %d\n", state);
+	LOGMASKED(LOG_SKCOM, "HD seek complete = %d\n", state);
 	set_bits(m_status_latch, hdc92x4_device::DS_SKCOM, (state==ASSERT_LINE));
 	signal_drive_status();
 }
@@ -827,7 +826,7 @@ void myarc_hfdc_device::set_floppy_motors_running(bool run)
 /*
     Called whenever the state of the HDC9234 interrupt pin changes.
 */
-WRITE_LINE_MEMBER( myarc_hfdc_device::intrq_w )
+void myarc_hfdc_device::intrq_w(int state)
 {
 	m_irq = (line_state)state;
 	LOGMASKED(LOG_INT, "INT pin from controller = %d, propagating to INTA*\n", state);
@@ -842,7 +841,7 @@ WRITE_LINE_MEMBER( myarc_hfdc_device::intrq_w )
     Called whenever the HDC9234 desires bus access to the buffer RAM. The
     controller expects a call to dmarq in 1 byte time.
 */
-WRITE_LINE_MEMBER( myarc_hfdc_device::dmarq_w )
+void myarc_hfdc_device::dmarq_w(int state)
 {
 	LOGMASKED(LOG_DMA, "DMARQ pin from controller = %d\n", state);
 	if (state == ASSERT_LINE)
@@ -854,7 +853,7 @@ WRITE_LINE_MEMBER( myarc_hfdc_device::dmarq_w )
 /*
     Called whenever the state of the HDC9234 DMA in progress changes.
 */
-WRITE_LINE_MEMBER( myarc_hfdc_device::dip_w )
+void myarc_hfdc_device::dip_w(int state)
 {
 	m_dip = (line_state)state;
 }
@@ -885,7 +884,7 @@ void myarc_hfdc_device::write_buffer(uint8_t data)
 void myarc_hfdc_device::device_start()
 {
 	m_dsrrom = memregion(TI99_DSRROM)->base();
-	m_motor_on_timer = timer_alloc(MOTOR_TIMER);
+	m_motor_on_timer = timer_alloc(FUNC(myarc_hfdc_device::motor_off), this);
 	// The HFDC does not use READY; it has on-board RAM for DMA
 	m_current_floppy = nullptr;
 	m_current_harddisk = nullptr;

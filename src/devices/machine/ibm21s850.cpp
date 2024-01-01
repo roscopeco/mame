@@ -12,9 +12,9 @@
 #include "emu.h"
 #include "ibm21s850.h"
 
-#define LOG_READS       (1 << 1)
-#define LOG_WRITES      (1 << 2)
-#define LOG_UNKNOWNS    (1 << 3)
+#define LOG_READS       (1U << 1)
+#define LOG_WRITES      (1U << 2)
+#define LOG_UNKNOWNS    (1U << 3)
 #define LOG_ALL         (LOG_READS | LOG_WRITES | LOG_UNKNOWNS)
 
 #define VERBOSE         (LOG_ALL)
@@ -43,9 +43,7 @@ void ibm21s85x_base_device::device_start()
 {
 	save_item(NAME(m_regs));
 
-	m_reset_timer = timer_alloc(TIMER_RESET);
-
-	m_reset_cb.resolve_safe();
+	m_reset_timer = timer_alloc(FUNC(ibm21s85x_base_device::reset_tick), this);
 }
 
 void ibm21s85x_base_device::device_reset()
@@ -81,20 +79,17 @@ void ibm21s851_device::device_reset()
 	m_regs[REG_COUNT_OFFS] |= 0x0b;     // 11 registers following the standard block on 21S851
 }
 
-void ibm21s85x_base_device::device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr)
+TIMER_CALLBACK_MEMBER(ibm21s85x_base_device::reset_tick)
 {
-	if (id == TIMER_RESET)
+	if (param)
 	{
-		if (param)
-		{
-			m_reset_cb(0);
-			m_reset_timer->adjust(attotime::never);
-		}
-		else
-		{
-			m_reset_cb(1);
-			m_reset_timer->adjust(attotime::from_usec(26266), 1); // RC reset circuit, 3.3V in, 2.3V out, 10KOhm resistor, 2.2uF capacitor
-		}
+		m_reset_cb(0);
+		m_reset_timer->adjust(attotime::never);
+	}
+	else
+	{
+		m_reset_cb(1);
+		m_reset_timer->adjust(attotime::from_usec(26266), 1); // RC reset circuit, 3.3V in, 2.3V out, 10KOhm resistor, 2.2uF capacitor
 	}
 }
 

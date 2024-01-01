@@ -33,7 +33,9 @@ void isa8_vga_device::device_add_mconfig(machine_config &config)
 	screen.set_raw(25.175_MHz_XTAL, 800, 0, 640, 524, 0, 480);
 	screen.set_screen_update(m_vga, FUNC(vga_device::screen_update));
 
-	VGA(config, m_vga, 0).set_screen("screen");
+	VGA(config, m_vga, 0);
+	m_vga->set_screen("screen");
+	m_vga->set_vram_size(0x100000);
 }
 
 //-------------------------------------------------
@@ -60,6 +62,11 @@ isa8_vga_device::isa8_vga_device(const machine_config &mconfig, const char *tag,
 {
 }
 
+void isa8_vga_device::io_isa_map(address_map &map)
+{
+	map(0x00, 0x2f).m(m_vga, FUNC(vga_device::io_map));
+}
+
 //-------------------------------------------------
 //  device_start - device-specific startup
 //-------------------------------------------------
@@ -71,9 +78,7 @@ void isa8_vga_device::device_start()
 
 	m_isa->install_rom(this, 0xc0000, 0xc7fff, "ibm_vga");
 
-	m_isa->install_device(0x3b0, 0x3bf, read8sm_delegate(*m_vga, FUNC(vga_device::port_03b0_r)), write8sm_delegate(*m_vga, FUNC(vga_device::port_03b0_w)));
-	m_isa->install_device(0x3c0, 0x3cf, read8sm_delegate(*m_vga, FUNC(vga_device::port_03c0_r)), write8sm_delegate(*m_vga, FUNC(vga_device::port_03c0_w)));
-	m_isa->install_device(0x3d0, 0x3df, read8sm_delegate(*m_vga, FUNC(vga_device::port_03d0_r)), write8sm_delegate(*m_vga, FUNC(vga_device::port_03d0_w)));
+	m_isa->install_device(0x03b0, 0x03df, *this, &isa8_vga_device::io_isa_map);
 
 	m_isa->install_memory(0xa0000, 0xbffff, read8sm_delegate(*m_vga, FUNC(vga_device::mem_r)), write8sm_delegate(*m_vga, FUNC(vga_device::mem_w)));
 }

@@ -12,8 +12,8 @@
 #include "emu.h"
 #include "pcf8573.h"
 
-#define LOG_DATA (1 << 1)
-#define LOG_LINE (1 << 2)
+#define LOG_DATA (1U << 1)
+#define LOG_LINE (1U << 2)
 
 #define VERBOSE (0)
 #include "logmacro.h"
@@ -56,12 +56,8 @@ pcf8573_device::pcf8573_device(const machine_config &mconfig, const char *tag, d
 
 void pcf8573_device::device_start()
 {
-	m_comp_cb.resolve_safe();
-	m_min_cb.resolve_safe();
-	m_sec_cb.resolve_safe();
-
 	// allocate timers
-	m_clock_timer = timer_alloc();
+	m_clock_timer = timer_alloc(FUNC(pcf8573_device::clock_tick), this);
 	m_clock_timer->adjust(attotime::from_hz(clock() / 32768), 0, attotime::from_hz(clock() / 32768));
 
 	// state saving
@@ -80,10 +76,10 @@ void pcf8573_device::device_start()
 }
 
 //-------------------------------------------------
-//  device_timer - handler timer events
+//  clock_tick - advance the RTC
 //-------------------------------------------------
 
-void pcf8573_device::device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr)
+TIMER_CALLBACK_MEMBER(pcf8573_device::clock_tick)
 {
 	advance_seconds();
 
@@ -123,7 +119,7 @@ void pcf8573_device::rtc_clock_updated(int year, int month, int day, int day_of_
 //  READ/WRITE HANDLERS
 //**************************************************************************
 
-WRITE_LINE_MEMBER(pcf8573_device::a0_w)
+void pcf8573_device::a0_w(int state)
 {
 	state &= 1;
 	if (BIT(m_slave_address, 1) != state)
@@ -133,7 +129,7 @@ WRITE_LINE_MEMBER(pcf8573_device::a0_w)
 	}
 }
 
-WRITE_LINE_MEMBER(pcf8573_device::a1_w)
+void pcf8573_device::a1_w(int state)
 {
 	state &= 1;
 	if (BIT(m_slave_address, 2) != state)
@@ -143,7 +139,7 @@ WRITE_LINE_MEMBER(pcf8573_device::a1_w)
 	}
 }
 
-WRITE_LINE_MEMBER(pcf8573_device::scl_w)
+void pcf8573_device::scl_w(int state)
 {
 	if (m_scl != state)
 	{
@@ -167,91 +163,94 @@ WRITE_LINE_MEMBER(pcf8573_device::scl_w)
 			{
 				if (m_scl)
 				{
-					switch (m_state)
-					{
-					case STATE_ADDRESS:
-						m_devsel = m_shift;
-
-						if ((m_devsel & 0xfe) != m_slave_address)
-						{
-							LOGMASKED(LOG_DATA, "address %02x: not this device\n", m_devsel);
-							m_state = STATE_IDLE;
-						}
-						else if ((m_devsel & 1) == 0)
-						{
-							LOGMASKED(LOG_DATA, "address %02x: write\n", m_devsel);
-							m_state = STATE_MODE;
-						}
-						else
-						{
-							LOGMASKED(LOG_DATA, "address %02x: read\n", m_devsel);
-							m_state = STATE_DATAOUT;
-						}
-						break;
-
-					case STATE_MODE:
-						m_mode_pointer = m_shift;
-
-						LOGMASKED(LOG_DATA, "mode pointer %02x\n", m_shift);
-
-						switch (m_mode_pointer & 0x70)
-						{
-						case 0x00: // execute address
-							m_address = m_mode_pointer & 0x07;
-							break;
-						case 0x10: // read control/status flags
-							break;
-						case 0x20: // reset prescaler
-							set_clock_register(RTC_SECOND, 0);
-							adjust_seconds();
-							break;
-						case 0x30: // time adjust
-							adjust_seconds();
-							break;
-						case 0x40: // reset NODA flag
-							m_status &= ~(1 << 2);
-							break;
-						case 0x50: // set NODA flag
-							m_status |= 1 << 2;
-							break;
-						case 0x60: // reset COMP flag
-							m_status &= ~(1 << 1);
-							m_comp_cb(0);
-							break;
-						}
-
-						m_state = STATE_DATAIN;
-						break;
-
-					case STATE_DATAIN:
-						switch (m_mode_pointer & 0x70)
-						{
-						case 0x00: // execute address
-							m_data[m_address] = m_shift;
-
-							LOGMASKED(LOG_DATA, "data[ %02x ] <- %02x\n", m_address, m_shift);
-
-							switch (m_address)
-							{
-							case REG_HOURS: set_clock_register(RTC_HOUR, bcd_to_integer(m_data[REG_HOURS])); break;
-							case REG_MINUTES: set_clock_register(RTC_MINUTE, bcd_to_integer(m_data[REG_MINUTES])); break;
-							case REG_DAYS: set_clock_register(RTC_DAY, bcd_to_integer(m_data[REG_DAYS])); break;
-							case REG_MONTHS: set_clock_register(RTC_MONTH, bcd_to_integer(m_data[REG_MONTHS])); break;
-							}
-
-							m_address = (m_address & 0x04) | ((m_address + 1) & 0x03);
-							break;
-						}
-						break;
-					}
-
 					m_bits++;
 				}
 				else
 				{
 					if (m_bits == 8)
 					{
-						m_sdar = 0;
+						switch (m_state)
+						{
+						case STATE_ADDRESS:
+							m_devsel = m_shift;
+
+							if ((m_devsel & 0xfe) != m_slave_address)
+							{
+								LOGMASKED(LOG_DATA, "address %02x: not this device\n", m_devsel);
+								m_state = STATE_IDLE;
+							}
+							else if ((m_devsel & 1) == 0)
+							{
+								LOGMASKED(LOG_DATA, "address %02x: write\n", m_devsel);
+								m_state = STATE_MODE;
+							}
+							else
+							{
+								LOGMASKED(LOG_DATA, "address %02x: read\n", m_devsel);
+								m_state = STATE_READSELACK;
+							}
+							break;
+
+						case STATE_MODE:
+							m_mode_pointer = m_shift;
+
+							LOGMASKED(LOG_DATA, "mode pointer %02x\n", m_shift);
+
+							switch (m_mode_pointer & 0x70)
+							{
+							case 0x00: // execute address
+								m_address = m_mode_pointer & 0x07;
+								break;
+							case 0x10: // read control/status flags
+								break;
+							case 0x20: // reset prescaler
+								set_clock_register(RTC_SECOND, 0);
+								adjust_seconds();
+								break;
+							case 0x30: // time adjust
+								adjust_seconds();
+								break;
+							case 0x40: // reset NODA flag
+								m_status &= ~(1 << 2);
+								break;
+							case 0x50: // set NODA flag
+								m_status |= 1 << 2;
+								break;
+							case 0x60: // reset COMP flag
+								m_status &= ~(1 << 1);
+								m_comp_cb(0);
+								break;
+							}
+
+							m_state = STATE_DATAIN;
+							break;
+
+						case STATE_DATAIN:
+							switch (m_mode_pointer & 0x70)
+							{
+							case 0x00: // execute address
+								m_data[m_address] = m_shift;
+
+								LOGMASKED(LOG_DATA, "data[ %02x ] <- %02x\n", m_address, m_shift);
+
+								switch (m_address)
+								{
+								case REG_HOURS: set_clock_register(RTC_HOUR, bcd_to_integer(m_data[REG_HOURS])); break;
+								case REG_MINUTES: set_clock_register(RTC_MINUTE, bcd_to_integer(m_data[REG_MINUTES])); break;
+								case REG_DAYS: set_clock_register(RTC_DAY, bcd_to_integer(m_data[REG_DAYS])); break;
+								case REG_MONTHS: set_clock_register(RTC_MONTH, bcd_to_integer(m_data[REG_MONTHS])); break;
+								}
+
+								m_address = (m_address & 0x04) | ((m_address + 1) & 0x03);
+								break;
+							}
+							break;
+						}
+
+						if( m_state != STATE_IDLE )
+						{
+							m_sdar = 0 ;
+						}
 					}
 					else
 					{
@@ -262,10 +261,19 @@ WRITE_LINE_MEMBER(pcf8573_device::scl_w)
 			}
 			break;
 
+		case STATE_READSELACK:
+			m_bits = 0;
+			m_state = STATE_DATAOUT;
+			break;
+
 		case STATE_DATAOUT:
 			if (m_bits < 8)
 			{
 				if (m_scl)
+				{
+					m_bits++;
+				}
+				else
 				{
 					if (m_bits == 0)
 					{
@@ -287,7 +295,6 @@ WRITE_LINE_MEMBER(pcf8573_device::scl_w)
 					m_sdar = (m_shift >> 7) & 1;
 
 					m_shift = (m_shift << 1) & 0xff;
-					m_bits++;
 				}
 			}
 			else
@@ -300,18 +307,11 @@ WRITE_LINE_MEMBER(pcf8573_device::scl_w)
 						m_state = STATE_IDLE;
 					}
 
-					m_bits++;
+					m_bits = 0;
 				}
 				else
 				{
-					if (m_bits == 8)
-					{
-						m_sdar = 1;
-					}
-					else
-					{
-						m_bits = 0;
-					}
+					m_sdar = 1;
 				}
 			}
 			break;
@@ -319,7 +319,7 @@ WRITE_LINE_MEMBER(pcf8573_device::scl_w)
 	}
 }
 
-WRITE_LINE_MEMBER(pcf8573_device::sda_w)
+void pcf8573_device::sda_w(int state)
 {
 	state &= 1;
 	if (m_sdaw != state)
@@ -346,7 +346,7 @@ WRITE_LINE_MEMBER(pcf8573_device::sda_w)
 	}
 }
 
-READ_LINE_MEMBER(pcf8573_device::sda_r)
+int pcf8573_device::sda_r()
 {
 	int res = m_sdar & 1;
 

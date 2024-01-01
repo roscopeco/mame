@@ -41,11 +41,10 @@ DEFINE_DEVICE_TYPE(MOS8580, mos8580_device, "mos8580", "MOS 8580 SID")
 mos6581_device::mos6581_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock, uint32_t variant)
 	: device_t(mconfig, type, tag, owner, clock)
 	, device_sound_interface(mconfig, *this)
-	, m_read_potx(*this)
-	, m_read_poty(*this)
+	, m_read_potx(*this, 0xff)
+	, m_read_poty(*this, 0xff)
 	, m_stream(nullptr)
 	, m_variant(variant)
-	, m_token(make_unique_clear<SID6581_t>())
 
 {
 }
@@ -194,14 +193,11 @@ void mos6581_device::save_state(SID6581_t *token)
 
 void mos6581_device::device_start()
 {
-	// resolve callbacks
-	m_read_potx.resolve_safe(0xff);
-	m_read_poty.resolve_safe(0xff);
-
 	// create sound stream
 	m_stream = stream_alloc(0, 1, machine().sample_rate());
 
 	// initialize SID engine
+	m_token = std::make_unique<SID6581_t>();
 	m_token->device = this;
 	m_token->mixer_channel = m_stream;
 	m_token->PCMfreq = machine().sample_rate();

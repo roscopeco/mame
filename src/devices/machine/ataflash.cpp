@@ -11,22 +11,20 @@ ata_flash_pccard_device::ata_flash_pccard_device(const machine_config &mconfig, 
 }
 
 ata_flash_pccard_device::ata_flash_pccard_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock)
-	: ide_hdd_device(mconfig, type, tag, owner, clock)
+	: cf_device_base(mconfig, type, tag, owner, clock)
 	, device_pccard_interface(mconfig, *this)
 {
 }
 
 void ata_flash_pccard_device::device_reset()
 {
-	ide_hdd_device::device_reset();
+	cf_device_base::device_reset();
 
-	uint32_t metalength;
-	memset(m_cis, 0xff, 512);
-
-	if (m_handle != nullptr)
+	if (m_image->exists())
 	{
-		m_handle->read_metadata(PCMCIA_CIS_METADATA_TAG, 0, m_cis, 512, metalength);
+		m_image->get_cis_data(m_cis);
 	}
+	m_cis.resize(512, 0xff);
 
 	m_configuration_option = 0;
 	m_configuration_and_status = 0;
@@ -38,11 +36,11 @@ uint16_t ata_flash_pccard_device::read_memory(offs_t offset, uint16_t mem_mask)
 	if(offset <= 7)
 	{
 		m_8bit_data_transfers = !ACCESSING_BITS_8_15; // HACK
-		return read_cs0(offset, mem_mask);
+		return command_r(offset);
 	}
 	else if(offset <= 15)
 	{
-		return read_cs1(offset & 7, mem_mask);
+		return control_r(offset & 7);
 	}
 	else
 	{
@@ -55,11 +53,11 @@ void ata_flash_pccard_device::write_memory(offs_t offset, uint16_t data, uint16_
 	if(offset <= 7)
 	{
 		m_8bit_data_transfers = !ACCESSING_BITS_8_15; // HACK
-		write_cs0(offset, data, mem_mask);
+		command_w(offset, data);
 	}
 	else if( offset <= 15)
 	{
-		write_cs1(offset & 7, data, mem_mask);
+		control_w(offset & 7, data);
 	}
 }
 
@@ -112,11 +110,6 @@ void ata_flash_pccard_device::write_reg(offs_t offset, uint16_t data, uint16_t m
 	}
 }
 
-attotime ata_flash_pccard_device::seek_time()
-{
-	return attotime::zero;
-}
-
 
 DEFINE_DEVICE_TYPE(TAITO_PCCARD1, taito_pccard1_device, "taito_pccard1", "Taito PC Card (Type 1)")
 
@@ -137,13 +130,11 @@ void taito_pccard1_device::device_reset()
 {
 	ata_flash_pccard_device::device_reset();
 
-	uint32_t metalength;
-	memset(m_key, 0, sizeof(m_key));
-
-	if (m_handle && !m_handle->read_metadata(HARD_DISK_KEY_METADATA_TAG, 0, m_key, 5, metalength))
+	if (m_image->exists() && !m_image->get_disk_key_data(m_key) && m_key.size() == 5)
 	{
 		m_locked = 0x1ff;
 	}
+	m_key.resize(5, 0);
 }
 
 uint16_t taito_pccard1_device::read_reg(offs_t offset, uint16_t mem_mask)
@@ -164,7 +155,7 @@ void taito_pccard1_device::write_reg(offs_t offset, uint16_t data, uint16_t mem_
 	{
 		uint8_t v = data;
 		int pos = offset - 0x280;
-		uint8_t k = pos < sizeof(m_key) ? m_key[pos] : 0;
+		uint8_t k = pos < m_key.size() ? m_key[pos] : 0;
 
 		// TODO: find out if unlocking the key then using an incorrect key will re-lock the card.
 		if (v == k)
@@ -228,13 +219,11 @@ void taito_pccard2_device::device_reset()
 {
 	ata_flash_pccard_device::device_reset();
 
-	uint32_t metalength;
-	memset(m_key, 0, sizeof(m_key));
-
-	if (m_handle && !m_handle->read_metadata(HARD_DISK_KEY_METADATA_TAG, 0, m_key, 5, metalength))
+	if (m_image->exists() && !m_image->get_disk_key_data(m_key) && m_key.size() == 5)
 	{
 		m_locked = true;
 	}
+	m_key.resize(5, 0);
 }
 
 void taito_pccard2_device::process_command()
@@ -327,13 +316,11 @@ void taito_compact_flash_device::device_reset()
 {
 	ata_flash_pccard_device::device_reset();
 
-	uint32_t metalength;
-	memset(m_key, 0, sizeof(m_key));
-
-	if (m_handle && !m_handle->read_metadata(HARD_DISK_KEY_METADATA_TAG, 0, m_key, 5, metalength))
+	if (m_image->exists() && !m_image->get_disk_key_data(m_key) && m_key.size() == 5)
 	{
 		m_locked = true;
 	}
+	m_key.resize(5, 0);
 }
 
 void taito_compact_flash_device::process_command()

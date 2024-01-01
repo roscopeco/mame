@@ -53,7 +53,7 @@ protected:
 
 	// device_disasm_interface overrides
 	virtual std::unique_ptr<util::disasm_interface> create_disassembler() override;
-	virtual int get_mode() const override { return m_MF; };
+	virtual int get_mode() const override { return m_MF; }
 
 	virtual u8 io_read_byte(offs_t a) { return m_io->read_byte(a); }
 	virtual u16 io_read_word(offs_t a) { return m_io->read_word_unaligned(a); }
@@ -689,7 +689,7 @@ protected:
 	v33_base_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock, address_map_constructor internal_port_map);
 
 	// device_memory_interface overrides
-	virtual bool memory_translate(int spacenum, int intention, offs_t &address) override;
+	virtual bool memory_translate(int spacenum, int intention, offs_t &address, address_space *&target_space) override;
 
 	void v33_internal_port_map(address_map &map);
 	uint16_t xam_r();

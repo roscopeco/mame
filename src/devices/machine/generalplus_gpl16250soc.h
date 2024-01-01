@@ -27,33 +27,6 @@ public:
 	{
 	}
 
-	sunplus_gcm394_base_device(const machine_config& mconfig, device_type type, const char* tag, device_t* owner, uint32_t clock, address_map_constructor internal) :
-		unsp_20_device(mconfig, type, tag, owner, clock, internal),
-		device_mixer_interface(mconfig, *this, 2),
-		m_screen(*this, finder_base::DUMMY_TAG),
-		m_spg_video(*this, "spgvideo"),
-		m_spg_audio(*this, "spgaudio"),
-		m_internalrom(*this, "internal"),
-		m_mainram(*this, "mainram"),
-		m_porta_in(*this),
-		m_portb_in(*this),
-		m_portc_in(*this),
-		m_portd_in(*this),
-		m_porta_out(*this),
-		m_portb_out(*this),
-		m_portc_out(*this),
-		m_portd_out(*this),
-		m_nand_read_cb(*this),
-		m_csbase(0x20000),
-		m_cs_space(nullptr),
-		m_romtype(0),
-		m_space_read_cb(*this),
-		m_space_write_cb(*this),
-		m_boot_mode(0),
-		m_cs_callback(*this, DEVICE_SELF, FUNC(sunplus_gcm394_base_device::default_cs_callback))
-	{
-	}
-
 	uint32_t screen_update(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect) { return m_spg_video->screen_update(screen, bitmap, cliprect); }
 
 	auto porta_in() { return m_porta_in.bind(); }
@@ -71,7 +44,7 @@ public:
 
 	auto nand_read_callback() { return m_nand_read_cb.bind(); }
 
-	DECLARE_WRITE_LINE_MEMBER(vblank) { m_spg_video->vblank(state); }
+	void vblank(int state) { m_spg_video->vblank(state); }
 
 	virtual void device_add_mconfig(machine_config& config) override;
 
@@ -95,6 +68,7 @@ public:
 	inline uint16_t get_ram_addr(uint32_t addr) { return m_mainram[addr]; }
 
 protected:
+	sunplus_gcm394_base_device(const machine_config& mconfig, device_type type, const char* tag, device_t* owner, uint32_t clock, address_map_constructor internal);
 
 	virtual void device_start() override;
 	virtual void device_reset() override;
@@ -194,7 +168,7 @@ protected:
 	uint16_t m_system_dma_memtype;
 
 	devcb_read16 m_nand_read_cb;
-	int m_csbase;
+	uint32_t m_csbase;
 
 	uint16_t internalrom_lower32_r(offs_t offset);
 
@@ -347,8 +321,8 @@ private:
 	void unkarea_7961_w(uint16_t data);
 
 
-	DECLARE_WRITE_LINE_MEMBER(videoirq_w);
-	DECLARE_WRITE_LINE_MEMBER(audioirq_w);
+	void videoirq_w(int state);
+	void audioirq_w(int state);
 
 	uint16_t system_7a35_r();
 	uint16_t system_7a37_r();
@@ -360,7 +334,8 @@ private:
 	void checkirq6();
 
 	emu_timer *m_unk_timer;
-	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
+
+	TIMER_CALLBACK_MEMBER(unknown_tick);
 
 	inline uint16_t read_space(uint32_t offset);
 	inline void write_space(uint32_t offset, uint16_t data);
@@ -472,7 +447,9 @@ public:
 		generalplus_gpspi_direct_device(mconfig, tag, owner, clock)
 	{
 		m_screen.set_tag(std::forward<T>(screen_tag));
-		m_csbase = 0x30000;
+		//m_csbase = 0x30000;
+		// TODO: is cs_space even used by this type?
+		m_csbase = 0xffffffff;
 	}
 
 	generalplus_gpspi_direct_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
@@ -480,11 +457,22 @@ public:
 protected:
 	void gpspi_direct_internal_map(address_map &map);
 
-	//virtual void device_start() override;
-	//virtual void device_reset() override;
+	virtual void device_start() override;
+	virtual void device_reset() override;
 
 private:
+	uint16_t ramread_r(offs_t offset);
+	void ramwrite_w(offs_t offset, uint16_t data);
 	uint16_t spi_direct_7b40_r();
+	uint16_t spi_direct_7b46_r();
+	uint16_t spi_direct_7af0_r();
+	void spi_direct_7af0_w(uint16_t data);
+	uint16_t spi_direct_79f5_r();
+	uint16_t spi_direct_78e8_r();
+	void spi_direct_78e8_w(uint16_t data);
+	uint16_t spi_direct_79f4_r();
+
+	uint16_t m_7af0;
 };
 
 

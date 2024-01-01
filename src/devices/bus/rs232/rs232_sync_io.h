@@ -23,10 +23,10 @@ public:
 	rs232_sync_io_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
 	virtual ~rs232_sync_io_device();
 
-	virtual DECLARE_WRITE_LINE_MEMBER(input_txd) override;
-	virtual DECLARE_WRITE_LINE_MEMBER(input_rts) override;
+	virtual void input_txd(int state) override;
+	virtual void input_rts(int state) override;
 
-	DECLARE_WRITE_LINE_MEMBER(update_serial);
+	void update_serial(int state);
 
 protected:
 	// device-level overrides
@@ -34,7 +34,8 @@ protected:
 	virtual void device_add_mconfig(machine_config &config) override;
 	virtual void device_start() override;
 	virtual void device_reset() override;
-	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
+
+	TIMER_CALLBACK_MEMBER(clock_tick);
 
 private:
 	required_device<bitbanger_device> m_stream;

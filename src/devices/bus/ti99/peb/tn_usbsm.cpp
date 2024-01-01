@@ -42,13 +42,13 @@
 #include "emu.h"
 #include "tn_usbsm.h"
 
-#define LOG_WARN        (1U<<1)    // Warnings
+#define LOG_WARN        (1U << 1)    // Warnings
 
-#define VERBOSE ( LOG_WARN )
+#define VERBOSE (LOG_WARN)
 #include "logmacro.h"
 
 
-DEFINE_DEVICE_TYPE_NS(TI99_USBSM, bus::ti99::peb, nouspikel_usb_smartmedia_device, "ti99_usbsm", "Nouspikel USB/Smartmedia card")
+DEFINE_DEVICE_TYPE(TI99_USBSM, bus::ti99::peb::nouspikel_usb_smartmedia_device, "ti99_usbsm", "Nouspikel USB/Smartmedia card")
 
 namespace bus::ti99::peb {
 

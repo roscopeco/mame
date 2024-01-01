@@ -19,6 +19,7 @@
 #include "source/cfa.h"
 #include "source/latest_version_glsl_std_450_header.h"
 #include "source/opt/iterator.h"
+#include "source/util/string_utils.h"
 
 namespace spvtools {
 namespace opt {
@@ -48,10 +49,21 @@ bool LocalSingleStoreElimPass::LocalSingleStoreElim(Function* func) {
 bool LocalSingleStoreElimPass::AllExtensionsSupported() const {
   // If any extension not in allowlist, return false
   for (auto& ei : get_module()->extensions()) {
-    const char* extName =
-        reinterpret_cast<const char*>(&ei.GetInOperand(0).words[0]);
+    const std::string extName = ei.GetInOperand(0).AsString();
     if (extensions_allowlist_.find(extName) == extensions_allowlist_.end())
       return false;
+  }
+  // only allow NonSemantic.Shader.DebugInfo.100, we cannot safely optimise
+  // around unknown extended
+  // instruction sets even if they are non-semantic
+  for (auto& inst : context()->module()->ext_inst_imports()) {
+    assert(inst.opcode() == SpvOpExtInstImport &&
+           "Expecting an import of an extension's instruction set.");
+    const std::string extension_name = inst.GetInOperand(0).AsString();
+    if (spvtools::utils::starts_with(extension_name, "NonSemantic.") &&
+        extension_name != "NonSemantic.Shader.DebugInfo.100") {
+      return false;
+    }
   }
   return true;
 }
@@ -67,7 +79,7 @@ Pass::Status LocalSingleStoreElimPass::ProcessImpl() {
   ProcessFunction pfn = [this](Function* fp) {
     return LocalSingleStoreElim(fp);
   };
-  bool modified = context()->ProcessEntryPointCallTree(pfn);
+  bool modified = context()->ProcessReachableCallTree(pfn);
   return modified ? Status::SuccessWithChange : Status::SuccessWithoutChange;
 }
 
@@ -126,6 +138,9 @@ void LocalSingleStoreElimPass::InitExtensionAllowList() {
       "SPV_KHR_subgroup_uniform_control_flow",
       "SPV_KHR_integer_dot_product",
       "SPV_EXT_shader_image_int64",
+      "SPV_KHR_non_semantic_info",
+      "SPV_KHR_uniform_group_instructions",
+      "SPV_KHR_fragment_shader_barycentric",
   });
 }
 bool LocalSingleStoreElimPass::ProcessVariable(Instruction* var_inst) {
@@ -160,29 +175,9 @@ bool LocalSingleStoreElimPass::ProcessVariable(Instruction* var_inst) {
 
 bool LocalSingleStoreElimPass::RewriteDebugDeclares(Instruction* store_inst,
                                                     uint32_t var_id) {
-  std::unordered_set<Instruction*> invisible_decls;
   uint32_t value_id = store_inst->GetSingleWordInOperand(1);
-  bool modified =
-      context()->get_debug_info_mgr()->AddDebugValueIfVarDeclIsVisible(
-          store_inst, var_id, value_id, store_inst, &invisible_decls);
-
-  // For cases like the argument passing for an inlined function, the value
-  // assignment is out of DebugDeclare's scope, but we have to preserve the
-  // value assignment information using DebugValue. Generally, we need
-  // ssa-rewrite analysis to decide a proper value assignment but at this point
-  // we confirm that |var_id| has a single store. We can safely add DebugValue.
-  if (!invisible_decls.empty()) {
-    BasicBlock* store_block = context()->get_instr_block(store_inst);
-    DominatorAnalysis* dominator_analysis =
-        context()->GetDominatorAnalysis(store_block->GetParent());
-    for (auto* decl : invisible_decls) {
-      if (dominator_analysis->Dominates(store_inst, decl)) {
-        context()->get_debug_info_mgr()->AddDebugValueForDecl(decl, value_id,
-                                                              decl, store_inst);
-        modified = true;
-      }
-    }
-  }
+  bool modified = context()->get_debug_info_mgr()->AddDebugValueForVariable(
+      store_inst, var_id, value_id, store_inst);
   modified |= context()->get_debug_info_mgr()->KillDebugDeclares(var_id);
   return modified;
 }

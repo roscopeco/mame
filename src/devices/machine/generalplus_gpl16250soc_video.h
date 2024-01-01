@@ -22,7 +22,7 @@ public:
 	gcm394_base_video_device(const machine_config &mconfig, device_type type, const char *tag, device_t *owner, uint32_t clock);
 
 	uint32_t screen_update(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect);
-	DECLARE_WRITE_LINE_MEMBER(vblank);
+	void vblank(int state);
 
 	auto space_read_callback() { return m_space_read_cb.bind(); }
 
@@ -134,14 +134,13 @@ public:
 	uint16_t video_7051_r();
 	uint16_t video_70e0_prng_r();
 
-	auto write_video_irq_callback() { return m_video_irq_cb.bind(); };
+	auto write_video_irq_callback() { return m_video_irq_cb.bind(); }
 
 	virtual void device_add_mconfig(machine_config& config) override;
 
 protected:
 
-	static const device_timer_id TIMER_SCREENPOS = 2;
-	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
+	TIMER_CALLBACK_MEMBER(screen_pos_reached);
 
 	inline void check_video_irq();
 

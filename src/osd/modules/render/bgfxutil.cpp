@@ -7,56 +7,60 @@
 //============================================================
 
 // MAMEOS headers
-#include "emu.h"
 #include "bgfxutil.h"
 #include "copyutil.h"
 
+#include "emucore.h"
 #include "render.h"
 
 
-const bgfx::Memory* bgfx_util::mame_texture_data_to_bgfx_texture_data(bgfx::TextureFormat::Enum &dst_format, uint32_t src_format, int rowpixels, int height, const rgb_t *palette, void *base, uint16_t &out_pitch, int &convert_stride)
+const bgfx::Memory* bgfx_util::mame_texture_data_to_bgfx_texture_data(bgfx::TextureFormat::Enum &dst_format, uint32_t src_format, int rowpixels, int width_margin, int height, const rgb_t *palette, void *base, uint16_t &out_pitch, int &width_div_factor, int &width_mul_factor)
 {
 	bgfx::TextureInfo info;
 	const bgfx::Memory *data = nullptr;
+	uint8_t *adjusted_base = (uint8_t *)base;
 
 	switch (src_format)
 	{
 		case PRIMFLAG_TEXFORMAT(TEXFORMAT_YUY16):
 			dst_format = bgfx::TextureFormat::BGRA8;
-			convert_stride = 2;
+			width_div_factor = 2;
+			width_mul_factor = 1;
 			out_pitch = rowpixels * 2;
-			bgfx::calcTextureSize(info, rowpixels / convert_stride, height, 1, false, false, 1, dst_format);
+			bgfx::calcTextureSize(info, rowpixels / width_div_factor, height, 1, false, false, 1, dst_format);
 
-			data = bgfx::copy(base, info.storageSize);
+			if (width_margin)
+			{
+				adjusted_base -= width_margin * 2;
+			}
+			data = bgfx::copy(adjusted_base, info.storageSize);
 			break;
 		case PRIMFLAG_TEXFORMAT(TEXFORMAT_PALETTE16):
-		{
-			dst_format = bgfx::TextureFormat::BGRA8;
-			convert_stride = 1;
-			out_pitch = rowpixels * 4;
-			bgfx::calcTextureSize(info, rowpixels / convert_stride, height, 1, false, false, 1, dst_format);
+			dst_format = bgfx::TextureFormat::R8;
+			width_div_factor = 1;
+			width_mul_factor = 2;
+			out_pitch = rowpixels * 2;
+			bgfx::calcTextureSize(info, rowpixels * width_mul_factor, height, 1, false, false, 1, dst_format);
 
-			uint16_t *src = (uint16_t *)base;
-			uint16_t *dst_data = new uint16_t[rowpixels * 2 * height];
-			uint16_t *dst = dst_data;
-			for (int i = 0; i < rowpixels * height; i++, src++)
+			if (width_margin)
 			{
-				*dst++ = *src;
-				*dst++ = 0;
+				adjusted_base -= width_margin * 2;
 			}
-
-			data = bgfx::copy(dst_data, info.storageSize);
-			delete [] dst_data;
+			data = bgfx::copy(adjusted_base, info.storageSize);
 			break;
-		}
 		case PRIMFLAG_TEXFORMAT(TEXFORMAT_ARGB32):
 		case PRIMFLAG_TEXFORMAT(TEXFORMAT_RGB32):
 			dst_format = bgfx::TextureFormat::BGRA8;
-			convert_stride = 1;
+			width_div_factor = 1;
+			width_mul_factor = 1;
 			out_pitch = rowpixels * 4;
-			bgfx::calcTextureSize(info, rowpixels / convert_stride, height, 1, false, false, 1, dst_format);
+			bgfx::calcTextureSize(info, rowpixels, height, 1, false, false, 1, dst_format);
 
-			data = bgfx::copy(base, info.storageSize);
+			if (width_margin)
+			{
+				adjusted_base -= width_margin * 4;
+			}
+			data = bgfx::copy(adjusted_base, info.storageSize);
 			break;
 	}
 
@@ -105,6 +109,7 @@ uint64_t bgfx_util::get_blend_state(uint32_t blend)
 		case BLENDMODE_ALPHA:
 			return BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA);
 		case BLENDMODE_RGB_MULTIPLY:
+			//return BGFX_STATE_BLEND_FUNC_SEPARATE(BGFX_STATE_BLEND_DST_COLOR, BGFX_STATE_BLEND_INV_SRC_COLOR, BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_ZERO);
 			return BGFX_STATE_BLEND_FUNC_SEPARATE(BGFX_STATE_BLEND_DST_COLOR, BGFX_STATE_BLEND_ZERO, BGFX_STATE_BLEND_DST_ALPHA, BGFX_STATE_BLEND_ZERO);
 		case BLENDMODE_ADD:
 			return BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_ONE);
@@ -112,4 +117,16 @@ uint64_t bgfx_util::get_blend_state(uint32_t blend)
 			return 0L;
 	}
 	return 0L;
+}
+
+void bgfx_util::find_prescale_factor(uint16_t width, uint16_t height, uint16_t max_prescale_size, uint16_t &xprescale, uint16_t &yprescale)
+{
+	while (xprescale > 1 && width * xprescale > max_prescale_size)
+	{
+		xprescale--;
+	}
+	while (yprescale > 1 && height * yprescale > max_prescale_size)
+	{
+		yprescale--;
+	}
 }

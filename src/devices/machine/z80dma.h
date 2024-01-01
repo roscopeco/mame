@@ -63,10 +63,10 @@ public:
 	uint8_t read();
 	void write(uint8_t data);
 
-	DECLARE_WRITE_LINE_MEMBER(iei_w) { m_iei = state; interrupt_check(); }
-	DECLARE_WRITE_LINE_MEMBER(rdy_w);
-	DECLARE_WRITE_LINE_MEMBER(wait_w);
-	DECLARE_WRITE_LINE_MEMBER(bai_w);
+	void iei_w(int state) { m_iei = state; interrupt_check(); }
+	void rdy_w(int state);
+	void wait_w(int state);
+	void bai_w(int state);
 
 private:
 	// device-level overrides
@@ -83,7 +83,7 @@ private:
 	void interrupt_check();
 	void trigger_interrupt(int level);
 	void do_read();
-	int do_write();
+	void do_write();
 	void do_transfer_write();
 	void do_search();
 
@@ -118,6 +118,7 @@ private:
 	uint16_t m_addressA;
 	uint16_t m_addressB;
 	uint16_t m_count;
+	uint16_t m_byte_counter;
 
 	int m_rdy;
 	int m_force_ready;
@@ -128,7 +129,7 @@ private:
 	uint8_t m_latch;
 
 	// interrupts
-	bool m_iei;
+	int m_iei;                  // interrupt enable input
 	int m_ip;                   // interrupt pending
 	int m_ius;                  // interrupt under service
 	uint8_t m_vector;             // interrupt vector

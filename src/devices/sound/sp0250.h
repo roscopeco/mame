@@ -14,15 +14,17 @@ public:
 	void set_pwm_mode() { m_pwm_mode = true; }
 
 	void write(uint8_t data);
-	uint8_t drq_r();
+	int drq_r();
 
 protected:
 	// device-level overrides
 	virtual void device_start() override;
-	virtual void device_timer(emu_timer &timer, device_timer_id id, int param, void *ptr) override;
+	virtual void device_reset() override;
 
 	// sound stream update overrides
 	virtual void sound_stream_update(sound_stream &stream, std::vector<read_stream_view> const &inputs, std::vector<write_stream_view> &outputs) override;
+
+	TIMER_CALLBACK_MEMBER(delayed_stream_update);
 
 private:
 	// internal helpers
@@ -45,6 +47,9 @@ private:
 		int16_t F, B;
 		int16_t z1, z2;
 	};
+
+	// timer for stream updates
+	emu_timer *m_timer;
 
 	// PWM state
 	bool m_pwm_mode;

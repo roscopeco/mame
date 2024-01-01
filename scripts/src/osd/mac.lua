@@ -23,6 +23,7 @@ BASE_TARGETOS       = "unix"
 local os_version = str_to_version(backtick("sw_vers -productVersion"))
 links {
 	"Cocoa.framework",
+	"IOKit.framework"
 }
 linkoptions {
 	"-framework QuartzCore",
@@ -108,6 +109,8 @@ project ("osd_" .. _OPTIONS["osd"])
 		MAME_DIR .. "src/osd/modules/debugger/osx/memoryviewer.h",
 		MAME_DIR .. "src/osd/modules/debugger/osx/pointsviewer.mm",
 		MAME_DIR .. "src/osd/modules/debugger/osx/pointsviewer.h",
+		MAME_DIR .. "src/osd/modules/debugger/osx/registerpointsview.mm",
+		MAME_DIR .. "src/osd/modules/debugger/osx/registerpointsview.h",
 		MAME_DIR .. "src/osd/modules/debugger/osx/registersview.mm",
 		MAME_DIR .. "src/osd/modules/debugger/osx/registersview.h",
 		MAME_DIR .. "src/osd/modules/debugger/osx/watchpointsview.mm",

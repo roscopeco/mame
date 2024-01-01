@@ -14,7 +14,6 @@
 #include "acorn_memc.h"
 
 #include "debug/debugcon.h"
-#include "debug/debugcmd.h"
 #include "debugger.h"
 
 #include <functional>
@@ -32,7 +31,7 @@ acorn_memc_device::acorn_memc_device(const machine_config &mconfig, const char *
 	: device_t(mconfig, ACORN_MEMC, tag, owner, clock)
 	, device_memory_interface(mconfig, *this)
 	, m_vidc(*this, finder_base::DUMMY_TAG)
-	, m_space_config("MEMC", ENDIANNESS_LITTLE, 32, 26, 0)
+	, m_space_config("memc", ENDIANNESS_LITTLE, 32, 26, 0)
 	, m_abort_w(*this)
 	, m_sirq_w(*this)
 	, m_output_dram_rowcol(false)
@@ -51,10 +50,10 @@ device_memory_interface::space_config_vector acorn_memc_device::memory_space_con
 	};
 }
 
-void acorn_memc_device::memc_map_debug_commands(int ref, const std::vector<std::string> &params)
+void acorn_memc_device::memc_map_debug_commands(const std::vector<std::string_view> &params)
 {
 	uint64_t offset;
-	if (params.size() != 1 || !machine().debugger().commands().validate_number_parameter(params[0], offset))
+	if (params.size() != 1 || !machine().debugger().console().validate_number_parameter(params[0], offset))
 		return;
 
 	// figure out the page number and offset in the page
@@ -69,12 +68,6 @@ void acorn_memc_device::memc_map_debug_commands(int ref, const std::vector<std::
 		machine().debugger().console().printf("unmapped\n");
 	else
 		machine().debugger().console().printf("0x%08lx (PPL %x)\n", 0x02000000 | ((m_pages[page] * pagesize) + poffs), m_pages_ppl[page]);
-}
-
-void acorn_memc_device::device_resolve_objects()
-{
-	m_abort_w.resolve_safe();
-	m_sirq_w.resolve_safe();
 }
 
 void acorn_memc_device::device_start()
@@ -103,7 +96,7 @@ void acorn_memc_device::device_start()
 	if (machine().debug_flags & DEBUG_FLAG_ENABLED)
 	{
 		using namespace std::placeholders;
-		machine().debugger().console().register_command("memc_map", CMDFLAG_NONE, 0, 1, 1, std::bind(&acorn_memc_device::memc_map_debug_commands, this, _1, _2));
+		machine().debugger().console().register_command("memc_map", CMDFLAG_NONE, 1, 1, std::bind(&acorn_memc_device::memc_map_debug_commands, this, _1));
 	}
 }
 
@@ -404,20 +397,20 @@ void acorn_memc_device::do_sound_dma()
 	}
 }
 
-WRITE_LINE_MEMBER(acorn_memc_device::spvmd_w)
+void acorn_memc_device::spvmd_w(int state)
 {
 	m_spvmd = state;
 	m_abort_w(CLEAR_LINE);
 }
 
-WRITE_LINE_MEMBER(acorn_memc_device::sndrq_w)
+void acorn_memc_device::sndrq_w(int state)
 {
 	if (state && m_sound_dma_on)
 		do_sound_dma();
 }
 
 
-WRITE_LINE_MEMBER(acorn_memc_device::vidrq_w)
+void acorn_memc_device::vidrq_w(int state)
 {
 	if (state && m_video_dma_on)
 		do_video_dma();
@@ -505,6 +498,15 @@ void acorn_memc_device::high_mem_w(offs_t offset, uint32_t data, uint32_t mem_ma
 		invalid_access(true, addr, data, mem_mask);
 	else if (addr < 0x1000000)   // DRAM
 		m_space->write_dword(dram_address(addr), data, mem_mask);
+	else if (addr < 0x1400000)   // Buffer enabled by IOC
+	{
+		if (ACCESSING_BITS_16_31)
+		{
+			data >>= 16;
+			mem_mask >>= 16;
+		}
+		m_space->write_dword(0x2000000 | addr, data, mem_mask);
+	}
 	else
 		m_space->write_dword(0x2000000 | addr, data, mem_mask);
 }

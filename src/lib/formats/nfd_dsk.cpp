@@ -2,7 +2,7 @@
 // copyright-holders:Fabio Priuli
 /*********************************************************************
 
-    formats/nfd_dsk.h
+    formats/nfd_dsk.cpp
 
     PC98 NFD disk images (info from: http://www.geocities.jp/t98next/dev.html )
 
@@ -81,39 +81,43 @@
 
 #include "ioprocs.h"
 
+#include "osdcomm.h" // little_endianize_int*
+
+#include <cstring>
+
 
 nfd_format::nfd_format()
 {
 }
 
-const char *nfd_format::name() const
+const char *nfd_format::name() const noexcept
 {
 	return "nfd";
 }
 
-const char *nfd_format::description() const
+const char *nfd_format::description() const noexcept
 {
 	return "NFD disk image";
 }
 
-const char *nfd_format::extensions() const
+const char *nfd_format::extensions() const noexcept
 {
 	return "nfd";
 }
 
-int nfd_format::identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants)
+int nfd_format::identify(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants) const
 {
 	uint8_t h[16];
 	size_t actual;
 	io.read_at(0, h, 16, actual);
 
 	if (strncmp((const char *)h, "T98FDDIMAGE.R0", 14) == 0 || strncmp((const char *)h, "T98FDDIMAGE.R1", 14) == 0)
-		return 100;
+		return FIFID_SIGN;
 
 	return 0;
 }
 
-bool nfd_format::load(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants, floppy_image *image)
+bool nfd_format::load(util::random_read &io, uint32_t form_factor, const std::vector<uint32_t> &variants, floppy_image &image) const
 {
 	size_t actual;
 	uint64_t size;
@@ -233,13 +237,13 @@ bool nfd_format::load(util::random_read &io, uint32_t form_factor, const std::ve
 	switch (disk_type)
 	{
 		case 0x10:  // 640K disk, 2DD
-			image->set_variant(floppy_image::DSDD);
+			image.set_variant(floppy_image::DSDD);
 			break;
 		//case 0x30:    // 1.44M disk, ?? (no images found)
 		//  break;
 		case 0x90:  // 1.2M disk, 2HD
 		default:
-			image->set_variant(floppy_image::DSHD);
+			image.set_variant(floppy_image::DSHD);
 			break;
 	}
 
@@ -279,9 +283,9 @@ bool nfd_format::load(util::random_read &io, uint32_t form_factor, const std::ve
 	return true;
 }
 
-bool nfd_format::supports_save() const
+bool nfd_format::supports_save() const noexcept
 {
 	return false;
 }
 
-const floppy_format_type FLOPPY_NFD_FORMAT = &floppy_image_format_creator<nfd_format>;
+const nfd_format FLOPPY_NFD_FORMAT;

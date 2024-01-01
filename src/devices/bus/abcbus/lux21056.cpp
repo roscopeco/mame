@@ -25,17 +25,17 @@
     Start the abc800 emulator with the ABC 850 attached on the ABC bus,
     with the new CHD and a UFD-DOS floppy mounted:
 
-    $ mess abc800m -bus abc850 -flop1 ufd631 -hard ro202.chd
-    $ mess abc800m -bus abc850 -bus:abc850:io2 xebec,bios=basf6186 -flop1 ufd631 -hard basf6186.chd
+    $ mame abc800m -bus abc850 -flop1 ufd631 -hard ro202.chd
+    $ mame abc800m -bus abc850 -bus:abc850:io2 xebec,bios=basf6186 -flop1 ufd631 -hard basf6186.chd
 
     or with the ABC 852 attached:
 
-    $ mess abc800m -bus abc852 -flop1 ufd631 -hard basf6185.chd
-    $ mess abc800m -bus abc852 -bus:abc852:io2 xebec,bios=nec5126 -flop1 ufd631 -hard nec5126.chd
+    $ mame abc800m -bus abc852 -flop1 ufd631 -hard basf6185.chd
+    $ mame abc800m -bus abc852 -bus:abc852:io2 xebec,bios=nec5126 -flop1 ufd631 -hard nec5126.chd
 
     or with the ABC 856 attached:
 
-    $ mess abc800m -bus abc856 -flop1 ufd631 -hard micr1325.chd
+    $ mame abc800m -bus abc856 -flop1 ufd631 -hard micr1325.chd
 
     Configure the floppy controller for use with an ABC 850:
 
@@ -65,9 +65,9 @@
 
     Or skip all of the above and use the preformatted images in the software list:
 
-    $ mess abc800m -bus abc850 -flop1 ufd631 -hard abc850
-    $ mess abc800m -bus abc852 -flop1 ufd631 -hard abc852
-    $ mess abc800m -bus abc856 -flop1 ufd631 -hard abc856
+    $ mame abc800m -bus abc850 -flop1 ufd631 -hard abc850
+    $ mame abc800m -bus abc852 -flop1 ufd631 -hard abc852
+    $ mame abc800m -bus abc856 -flop1 ufd631 -hard abc856
 
 */
 
@@ -198,7 +198,7 @@ void luxor_55_21056_device::io_write_byte(offs_t offset, uint8_t data)
 }
 
 
-WRITE_LINE_MEMBER( luxor_55_21056_device::write_sasi_bsy )
+void luxor_55_21056_device::write_sasi_bsy(int state)
 {
 	m_sasi_bsy = state;
 
@@ -208,7 +208,7 @@ WRITE_LINE_MEMBER( luxor_55_21056_device::write_sasi_bsy )
 	}
 }
 
-WRITE_LINE_MEMBER( luxor_55_21056_device::write_sasi_io )
+void luxor_55_21056_device::write_sasi_io(int state)
 {
 	m_sasi_io = state;
 
@@ -222,7 +222,7 @@ WRITE_LINE_MEMBER( luxor_55_21056_device::write_sasi_io )
 	}
 }
 
-WRITE_LINE_MEMBER( luxor_55_21056_device::write_sasi_req )
+void luxor_55_21056_device::write_sasi_req(int state)
 {
 	m_sasi_req = state;
 
@@ -233,12 +233,12 @@ WRITE_LINE_MEMBER( luxor_55_21056_device::write_sasi_req )
 	}
 }
 
-WRITE_LINE_MEMBER( luxor_55_21056_device::write_sasi_cd )
+void luxor_55_21056_device::write_sasi_cd(int state)
 {
 	m_sasi_cd = state;
 }
 
-WRITE_LINE_MEMBER( luxor_55_21056_device::write_sasi_msg )
+void luxor_55_21056_device::write_sasi_msg(int state)
 {
 	m_sasi_msg = state;
 }

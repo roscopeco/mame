@@ -60,7 +60,6 @@
 #include "emu.h"
 #include "tms32010.h"
 #include "32010dsm.h"
-#include "debugger.h"
 
 
 
@@ -111,7 +110,7 @@ tms32010_device::tms32010_device(const machine_config &mconfig, device_type type
 	, m_program_config("program", ENDIANNESS_BIG, 16, 12, -1)
 	, m_data_config("data", ENDIANNESS_BIG, 16, 8, -1, data_map)
 	, m_io_config("io", ENDIANNESS_BIG, 16, 4, -1)
-	, m_bio_in(*this)
+	, m_bio_in(*this, 0)
 	, m_addr_mask(addr_mask)
 {
 }
@@ -839,8 +838,6 @@ void tms32010_device::device_start()
 	space(AS_PROGRAM).specific(m_program);
 	space(AS_DATA).specific(m_data);
 	space(AS_IO).specific(m_io);
-
-	m_bio_in.resolve_safe(0);
 
 	m_PREVPC = 0;
 	m_ALU.d = 0;

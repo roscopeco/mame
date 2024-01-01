@@ -16,15 +16,13 @@
     <a href="#license-bsd-2-clause">License</a>
 </p>
 
-[![Build Status](https://travis-ci.com/bkaradzic/bgfx.svg?branch=master)](https://travis-ci.com/bkaradzic/bgfx)
-[![Build status](https://ci.appveyor.com/api/projects/status/ipa3ojgeaet1oko5?svg=true)](https://ci.appveyor.com/project/bkaradzic/bgfx)
+[![GitHub Actions](https://github.com/bkaradzic/bgfx/actions/workflows/main.yml/badge.svg)](https://github.com/bkaradzic/bgfx/actions)
 [![License](https://img.shields.io/badge/license-BSD--2%20clause-blue.svg)](https://bkaradzic.github.io/bgfx/license.html)
 [![Join the chat at https://discord.gg/9eMbv7J](https://img.shields.io/discord/712512073522872352?color=%237289DA&label=bgfx&logo=discord&logoColor=white)](https://discord.gg/9eMbv7J)
 
  * [GitHub Discussions](https://github.com/bkaradzic/bgfx/discussions)
  * [Discord Chat](https://discord.gg/9eMbv7J)
- * [AppVeyor CI](https://ci.appveyor.com/project/bkaradzic/bgfx)
- * [Travis CI](https://travis-ci.com/bkaradzic/bgfx)
+ * [GitHub Actions](https://github.com/bkaradzic/bgfx/actions)
 
 [What is it?](https://bkaradzic.github.io/bgfx/overview.html)
 -------------------------------------------------------------
@@ -51,7 +49,6 @@ Supported rendering backends:
 Supported platforms:
 
  * Android (14+, ARM, x86, MIPS)
- * asm.js/Emscripten (1.25.0)
  * FreeBSD
  * iOS (iPhone, iPad, AppleTV)
  * Linux
@@ -59,8 +56,9 @@ Supported platforms:
  * OSX (10.12+)
  * PlayStation 4
  * RaspberryPi
- * Windows (XP, Vista, 7, 8, 10)
  * UWP (Universal Windows, Xbox One)
+ * Wasm/Emscripten
+ * Windows (XP, Vista, 7, 8, 10)
 
 Supported compilers:
 
@@ -73,7 +71,6 @@ Languages:
  * [C/C++ API documentation](https://bkaradzic.github.io/bgfx/bgfx.html)
  * [Beef API bindings](https://github.com/bkaradzic/bgfx/tree/master/bindings/bf)
  * [C# language API bindings #1](https://github.com/bkaradzic/bgfx/tree/master/bindings/cs)
- * [C#/VB/F# language API bindings #2](https://github.com/MikePopoloski/SharpBgfx)
  * [D language API bindings](https://github.com/GoaLitiuM/bindbc-bgfx)
  * [Go language API bindings](https://github.com/james4k/go-bgfx)
  * [Haskell language API bindings](https://github.com/haskell-game/bgfx)
@@ -83,12 +80,12 @@ Languages:
  * [Pascal language API bindings](https://github.com/Akira13641/PasBGFX)
  * [Python language API bindings #1](https://github.com/fbertola/bgfx-python#-----bgfx-python--)
  * [Python language API bindings #2](https://github.com/jnadro/pybgfx#pybgfx)
- * [Rust language API bindings (obsolete)](https://github.com/rhoot/bgfx-rs)
  * [Rust language API bindings (new)](https://github.com/emoon/bgfx-rs)
  * [Swift language API bindings](https://github.com/stuartcarnie/SwiftBGFX)
+ * [Zig language API bindings](https://github.com/bkaradzic/bgfx/tree/master/bindings/zig)
 
-Who is using it? [#madewithbgfx](https://twitter.com/search?q=%23madewithbgfx&f=live)
--------------------------------------------------------------------------------------
+Who is using it? [#madewithbgfx](https://twitter.com/search?q=%23madewithbgfx&src=typed_query&f=live)
+-----------------------------------------------------------------------------------------------------
 
 ## Airmech
 
@@ -368,9 +365,9 @@ width="640" height="480" border="0" /></a>
 
 An open source reimplementation of the game Black & White (2001).
 
-[OpenBlack](https://github.com/openblack/openblack#openblack)
+[openblack](https://github.com/openblack/openblack#openblack)
 
-![openblack](https://user-images.githubusercontent.com/1388267/67631321-93c85380-f88c-11e9-9103-804807844af2.png)
+![openblack](https://user-images.githubusercontent.com/32263167/184559293-56cfc6a7-a7da-4876-8fce-434ba8827eae.png)
 
 ## Cluster
 
@@ -470,6 +467,69 @@ https://embersword.com
 
 ![Ember-Sword-ConceptArt5](https://user-images.githubusercontent.com/814772/120714133-a860ca80-c477-11eb-8680-f5a948dfd050.png)
 
+## Off The Road Unleashed
+
+Off The Road Unleashed is a sandbox driving game for the Nintendo Switch.  
+If you see a vehicle you bet you can hop into it! Pilot big rigs, helicopters, boats, airplanes or even trains. Sand dunes, frozen plains, mountains to climb and conquer.
+
+https://www.nintendo.com/games/detail/off-the-road-unleashed-switch/
+
+<a href="http://www.youtube.com/watch?feature=player_embedded&v=cwDR0Wj3LO4" 
+target="_blank"><img src="http://img.youtube.com/vi/cwDR0Wj3LO4/0.jpg" 
+alt="Off The Road Unleashed"
+width="640" height="480" border="0" /></a>
+
+## Guild Wars 2
+
+Guild Wars 2 is an online role-playing game with fast-paced action combat, a rich and detailed universe of stories, awe-inspiring landscapes to explore, two challenging player vs. player modes—and no subscription fees!
+
+https://www.guildwars2.com/
+
+![Guild-Wars-2-wallpaper](https://d3b4yo2b5lbfy.cloudfront.net/wp-content/uploads/wallpapers/GuildWars2-01-800x600.jpg)
+
+## Griftlands
+
+Griftlands is a roguelike deck-building game with role-playing story elements in a science fiction setting, developed and published by Klei Entertainment.
+
+https://klei.com/games/griftlands
+
+<a href="http://www.youtube.com/watch?feature=player_embedded&v=ufl14_Ne5Lg" 
+target="_blank"><img src="http://img.youtube.com/vi/ufl14_Ne5Lg/0.jpg" 
+alt="Griftlands"
+width="640" height="480" border="0" /></a>
+
+## HARFANG 3D
+
+[HARFANG® 3D](https://www.harfang3d.com) is a **BGFX-powered** 3D visualization framework for C++, Python, Go, and Lua.
+It comes with a 3D editor, HARFANG Studio.
+
+![HARFANG-STUDIO](https://raw.githubusercontent.com/harfang3d/image-storage/main/portfolio/3.2.2/harfang-studio-cyber-city.png)
+
+## Marine Melodies / Resistance
+
+Demoscene musicdisk released at Evoke 2022 demoparty.
+
+<a href="http://www.youtube.com/watch?feature=player_embedded&v=Ma1-UBa3f2E" 
+target="_blank"><img src="http://img.youtube.com/vi/Ma1-UBa3f2E/0.jpg" 
+alt="Marine Melodies"
+width="640" height="480" border="0" /></a>
+
+https://www.pouet.net/prod.php?which=91906
+
+https://github.com/astrofra/demo-marine-melodies
+
+## Activeworlds
+
+[Activeworlds](https://www.activeworlds.com/) is an online VR platform with rich multimedia and presentation features. Create your own worlds or build in free community worlds, hold your own event / meeting or join inworld events!
+
+![Activeworlds-wallpaper](http://www.activeworlds.com/img/181107-213544_small_enkii.jpg)
+
+## Equilibrium Engine
+
+[Equilibrium Engine](https://github.com/clibequilibrium/EquilibriumEngine) is a Data-oriented and multi-threaded C11 Game Engine with libraries & shaders hot-reloading.
+
+![Equilibrium Engine](https://raw.githubusercontent.com/clibequilibrium/EquilibriumEngine/master/docs/city.png)
+
 [License (BSD 2-clause)](https://bkaradzic.github.io/bgfx/license.html)
 -----------------------------------------------------------------------
 
@@ -477,7 +537,7 @@ https://embersword.com
 <img align="right" src="http://opensource.org/trademarks/opensource/OSI-Approved-License-100x137.png">
 </a>
 
-	Copyright 2010-2021 Branimir Karadzic
+	Copyright 2010-2022 Branimir Karadzic
 	
 	Redistribution and use in source and binary forms, with or without modification,
 	are permitted provided that the following conditions are met:
