@@ -16,7 +16,7 @@ make -j9
 Usage example :
 
 ```
-./sbc64 rosco -quik adventure.bin -debug
+./sbc rosco_classicv2 -quik adventure.bin -debug
 ```
 
 
