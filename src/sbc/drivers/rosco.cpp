@@ -107,7 +107,7 @@ QUICKLOAD_LOAD_MEMBER(rosco_state::quickload_cb)
 	for (int i = 0; i < quick_length; i += 2)
                 ROM16[i / 2] = get_u16be(&temp_copy[i]); //pick_integer_be(&temp_copy[0], i, 2);
         return std::make_pair(std::error_condition(), std::string());
-	
+
 }
 
 /*QUICKLOAD_LOAD_MEMBER(rosco_state::quickload_rom_cb)
@@ -164,7 +164,7 @@ void rosco_state::rosco(machine_config &config)
 
 ROM_START( rosco )
 	ROM_REGION16_BE(0x40000, "monitor", 0)
-	ROM_LOAD( "rosco_m68k_mame.rom.bin", 0x00000, 0x10000, CRC(479aa782) SHA1(a769e5d6c5a3cb56ccf6017130fe69c732eeb993))
+	ROM_LOAD( "rosco_m68k_mame.rom.bin", 0x00000, 0x10000, CRC(569c4926) SHA1(206e4b4749395f7e1d270af6bdd126ed0db9b6b1))
 ROM_END
 
 COMP( 2020, rosco, 0, 0, rosco, rosco, rosco_state, empty_init, "Ross Bamford", "rosco-m68k", MACHINE_IS_SKELETON )
