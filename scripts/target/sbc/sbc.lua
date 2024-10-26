@@ -71,6 +71,7 @@ files{
 	MAME_DIR .. "src/sbc/drivers/t68krc.cpp",
 	MAME_DIR .. "src/sbc/drivers/tiny68k.cpp",
 	MAME_DIR .. "src/sbc/drivers/ts2.cpp",
+	MAME_DIR .. "src/devices/machine/spi_sdcard.cpp",
 }
 end
 
