@@ -1,3 +1,16 @@
+/*
+ *------------------------------------------------------------
+ *                                  ___ ___ _   
+ *  ___ ___ ___ ___ ___       _____|  _| . | |_ 
+ * |  _| . |_ -|  _| . |     |     | . | . | '_|
+ * |_| |___|___|___|___|_____|_|_|_|___|___|_,_| 
+ *                     |_____|                       
+ * ------------------------------------------------------------
+ * Copyright (c) 2024 The rosco_m68k Open Source Project
+ * MIT License
+ * ------------------------------------------------------------
+ */
+
 #include "emu.h"
 #include "bus/rs232/rs232.h"
 #include "cpu/m68000/m68000.h"
@@ -9,10 +22,10 @@
 #include "multibyte.h"
 
 
-class rosco_state : public driver_device
+class rosco_m68k_r1_state : public driver_device
 {
 public:
-	rosco_state(const machine_config &mconfig, device_type type, const char *tag)
+	rosco_m68k_r1_state(const machine_config &mconfig, device_type type, const char *tag)
 		: driver_device(mconfig, type, tag)
 		, m_maincpu(*this, "maincpu")
         , m_mfp(*this, "mfp")
@@ -21,9 +34,9 @@ public:
 	{
 	}
 
-	void rosco(machine_config &config);
+	void rosco_m68k_r1(machine_config &config);
 private:
-	void rosco_map(address_map &map);
+	void memory_map(address_map &map);
 	void cpu_space_map(address_map &map);
 
 	virtual void machine_start() override;
@@ -42,7 +55,7 @@ private:
  Address Maps
 ******************************************************************************/
 
-void rosco_state::rosco_map(address_map &map)
+void rosco_m68k_r1_state::memory_map(address_map &map)
 {
 	map(0x000000, 0x0fffff).ram().share("ram");
 	map(0xf80000, 0xf8002f).rw(m_mfp, FUNC(mc68901_device::read), FUNC(mc68901_device::write)).umask16(0x00ff);
@@ -50,7 +63,7 @@ void rosco_state::rosco_map(address_map &map)
 	map(0xfc0000, 0xffffff).rom().region("monitor", 0);
 }
 
-void rosco_state::cpu_space_map(address_map &map)
+void rosco_m68k_r1_state::cpu_space_map(address_map &map)
 {
     map(0xfffff0, 0xffffff).m(m_maincpu, FUNC(m68010_device::autovectors_map));
     map(0xfffff9, 0xfffff9).r(m_mfp, FUNC(mc68901_device::get_vector));
@@ -60,7 +73,7 @@ void rosco_state::cpu_space_map(address_map &map)
  Input Ports
 ******************************************************************************/
 
-static INPUT_PORTS_START( rosco )
+static INPUT_PORTS_START( rosco_m68k_r1 )
 INPUT_PORTS_END
 
 static const input_device_default terminal_defaults[] =
@@ -77,11 +90,11 @@ static const input_device_default terminal_defaults[] =
  Machine Start/Reset
 ******************************************************************************/
 
-void rosco_state::machine_start()
+void rosco_m68k_r1_state::machine_start()
 {
 }
 
-void rosco_state::machine_reset()
+void rosco_m68k_r1_state::machine_reset()
 {
 	m_maincpu->set_pc(0xfc0000);
 }
@@ -90,7 +103,7 @@ void rosco_state::machine_reset()
  Machine Drivers
 ******************************************************************************/
 
-QUICKLOAD_LOAD_MEMBER(rosco_state::quickload_cb)
+QUICKLOAD_LOAD_MEMBER(rosco_m68k_r1_state::quickload_cb)
 {
 	int quick_length;
 	int read_;
@@ -110,7 +123,7 @@ QUICKLOAD_LOAD_MEMBER(rosco_state::quickload_cb)
 	
 }
 
-/*QUICKLOAD_LOAD_MEMBER(rosco_state::quickload_rom_cb)
+/*QUICKLOAD_LOAD_MEMBER(rosco_m68k_r1_state::quickload_rom_cb)
 {
 	int quick_length;
 	int read_;
@@ -129,11 +142,11 @@ QUICKLOAD_LOAD_MEMBER(rosco_state::quickload_cb)
 	return image_init_result::PASS;
 }
 */
-void rosco_state::rosco(machine_config &config)
+void rosco_m68k_r1_state::rosco_m68k_r1(machine_config &config)
 {
 	M68010(config, m_maincpu, 10_MHz_XTAL);
-	m_maincpu->set_addrmap(AS_PROGRAM, &rosco_state::rosco_map);
-	m_maincpu->set_addrmap(m68000_base_device::AS_CPU_SPACE, &rosco_state::cpu_space_map);
+	m_maincpu->set_addrmap(AS_PROGRAM, &rosco_m68k_r1_state::memory_map);
+	m_maincpu->set_addrmap(m68000_base_device::AS_CPU_SPACE, &rosco_m68k_r1_state::cpu_space_map);
 
 	MC68901(config, m_mfp, 10_MHz_XTAL);
 	m_mfp->set_timer_clock(3.6864_MHz_XTAL);
@@ -147,8 +160,8 @@ void rosco_state::rosco(machine_config &config)
 	rs232.set_option_device_input_defaults("terminal", terminal_defaults);
 
 	/* quickload */
-	QUICKLOAD(config, "quickload", "bin").set_load_callback(FUNC(rosco_state::quickload_cb));
-//	QUICKLOAD(config, "rom", "bin").set_load_callback(FUNC(rosco_state::quickload_rom_cb));
+	QUICKLOAD(config, "quickload", "bin").set_load_callback(FUNC(rosco_m68k_r1_state::quickload_cb));
+//	QUICKLOAD(config, "rom", "bin").set_load_callback(FUNC(rosco_m68k_r1_state::quickload_rom_cb));
 
 	V9958(config, m_v9958, XTAL(21'477'272));
 	m_v9958->set_screen_ntsc("screen");
@@ -162,9 +175,9 @@ void rosco_state::rosco(machine_config &config)
  ROM Definitions
 ******************************************************************************/
 
-ROM_START( rosco )
+ROM_START( rosco_m68k_r1 )
 	ROM_REGION16_BE(0x40000, "monitor", 0)
 	ROM_LOAD( "rosco_m68k_mame.rom.bin", 0x00000, 0x10000, CRC(479aa782) SHA1(a769e5d6c5a3cb56ccf6017130fe69c732eeb993))
 ROM_END
 
-COMP( 2020, rosco, 0, 0, rosco, rosco, rosco_state, empty_init, "Ross Bamford", "rosco-m68k", MACHINE_IS_SKELETON )
+COMP( 2020, rosco_m68k_r1, 0, 0, rosco_m68k_r1, rosco_m68k_r1, rosco_m68k_r1_state, empty_init, "Ross Bamford", "rosco_m68k Revision 1", MACHINE_IS_SKELETON )
